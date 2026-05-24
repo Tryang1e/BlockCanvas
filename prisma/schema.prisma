@@ -1,0 +1,147 @@
+generator client {
+  provider = "prisma-client-js"
+  engineType = "library"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Profile {
+  id              String             @id @default(uuid())
+  role            String             @default("creator")
+  creator_name    String             @unique
+  display_name    String?
+  email           String?
+  password        String?
+  avatar_url      String?
+  commission_open Boolean            @default(false)
+  discord_id      String?
+  created_at      DateTime           @default(now())
+  portfolios      Portfolio?
+  sections        PortfolioSection[]
+  projects        Project[]
+  messages        ContactMessage[]
+  wip_logs        WipLog[]
+}
+
+model Portfolio {
+  creator_id    String  @id
+  headline      String?
+  about_text    String?
+  banner_url    String?
+  contact_email String?
+  footer_title  String?
+  footer_subtitle String?
+  patreon_url   String?
+  twitter_url   String?
+  youtube_url   String?
+  instagram_url String?
+  sns_settings  String? // Store JSON string or use separate fields
+  theme_bg_color String? @default("#222222")
+  theme_bg_effect String? @default("none")
+  is_published  Boolean @default(true)
+  creator       Profile @relation(fields: [creator_id], references: [id], onDelete: Cascade)
+}
+
+model PortfolioSection {
+  id           String    @id @default(uuid())
+  creator_id   String
+  name         String
+  sort_order   Int       @default(0)
+  created_at   DateTime  @default(now())
+  section_type String    @default("image_grid")
+  content      String?
+  show_title   Boolean   @default(true)
+  is_visible   Boolean   @default(true)
+  animation_type String  @default("fade-in")
+  creator      Profile   @relation(fields: [creator_id], references: [id], onDelete: Cascade)
+  projects     Project[]
+}
+
+model Project {
+  id            String            @id @default(uuid())
+  creator_id    String
+  title         String
+  description   String?
+  thumbnail_url String?
+  content       String? // JSON string
+  category_id   String?
+  created_at    DateTime          @default(now())
+  section_id    String?
+  sort_order    Int               @default(0)
+  youtube_url   String?
+  is_published  Boolean           @default(false)
+  view_count    Int               @default(0)
+  creator       Profile           @relation(fields: [creator_id], references: [id], onDelete: Cascade)
+  section       PortfolioSection? @relation(fields: [section_id], references: [id], onDelete: SetNull)
+  widgets       ProjectWidget[]
+  wip_logs      WipLog[]
+}
+
+model ProjectWidget {
+  id         String  @id @default(uuid())
+  project_id String
+  type       String
+  content    String? // JSON string
+  sort_order Int     @default(0)
+  project    Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+}
+
+model SiteSetting {
+  key        String   @id
+  value      String   // JSON string
+  updated_at DateTime @updatedAt
+}
+
+model Category {
+  id         String    @id @default(uuid())
+  name       String    @unique
+  slug       String    @unique
+  sort_order Int       @default(0)
+  created_at DateTime  @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  admin_name String
+  action     String
+  target_id  String?
+  details    String?
+  created_at DateTime @default(now())
+}
+
+model CreatorLog {
+  id           String   @id @default(uuid())
+  creator_name String
+  action       String
+  target_id    String?
+  details      String?
+  created_at   DateTime @default(now())
+}
+
+model ContactMessage {
+  id           String   @id @default(uuid())
+  creator_id   String
+  name         String
+  email        String
+  message      String
+  is_read      Boolean  @default(false)
+  created_at   DateTime @default(now())
+  creator      Profile  @relation(fields: [creator_id], references: [id], onDelete: Cascade)
+}
+
+model WipLog {
+  id          String   @id @default(uuid())
+  creator_id  String
+  title       String
+  description String?
+  media_url   String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+  project_id  String?
+  profile     Profile  @relation(fields: [creator_id], references: [id], onDelete: Cascade)
+  project     Project? @relation(fields: [project_id], references: [id], onDelete: SetNull)
+
+  @@index([creator_id])
+}

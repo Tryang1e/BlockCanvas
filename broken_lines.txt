@@ -1,0 +1,73 @@
+74:   section_type?: string
+76:   content?: string | null
+80:   is_visible?: boolean
+82:   show_title?: boolean
+96:   category?: { name: string }
+98:   likes_count?: number
+118:   isOwner?: boolean
+140:   const defaultSectionId = initialSections[0]?.id || 'default'
+314:       alert('?¹ì…˜ ?´ë¦„???…ë ¥?´ì£¼?¸ìš”.')
+344:       alert('?¹ì…˜ ì¶”ê????¤íŒ¨?ˆìŠµ?ˆë‹¤.')
+360:       alert('?œëª©ê³?? íŠœë¸?ë§�í�¬ë¥?ëª¨ë‘� ?…ë ¥?´ì£¼?¸ìš”.')
+390:       alert('ë¹„ë””???„ë¡œ?�íŠ¸ ì¶”ê????¤íŒ¨?ˆìŠµ?ˆë‹¤.')
+416:         setSections(sections.map(s => s.id === sectionToRename.id ? { ...s, name: sectionToRename.name } : s))
+426:       alert('?´ë¦„ ë³€ê²½ì—� ?¤íŒ¨?ˆìŠµ?ˆë‹¤.')
+452:         const targetSection = sections.find(s => s.id !== sectionToDelete)?.id || 'default'
+454:         setProjects(projects.map(p => p.section_id === sectionToDelete ? { ...p, section_id: targetSection } : p))
+466:       alert('?¹ì…˜ ?? œ???¤íŒ¨?ˆìŠµ?ˆë‹¤.')
+482:       alert('ë³¸ë¬¸ ?´ìš©???…ë ¥?´ì£¼?¸ìš”.')
+502:         setSections(sections.map(s => s.id === editTextTargetSectionId ? { ...s, content: editTextContent, name: editTextTitle } : s))
+516:       alert('ë³¸ë¬¸ ?˜ì •???¤íŒ¨?ˆìŠµ?ˆë‹¤.')
+604:     setActiveType(active.data.current?.type as 'Section' | 'Project')
+628:     const isActiveProject = active.data.current?.type === 'Project'
+630:     const isOverProject = over.data.current?.type === 'Project'
+632:     const isOverSection = over.data.current?.type === 'Section'
+738:       if (targetSectionData?.section_type === 'text') return
+782:     const isActiveSection = active.data.current?.type === 'Section'
+810:     const isActiveProject = active.data.current?.type === 'Project'
+984:               ?¹ì…˜ ?œì„œ ê´€ë¦?            </button>
+1022:             ?¹ì…˜ ì¶”ê?
+1080:                     alert('ë§ˆì?ë§??¨ì? ?¹ì…˜?€ ?? œ?????†ìŠµ?ˆë‹¤.')
+1126:           {activeId && activeType === 'Section' ? (
+1130:               {sections.find(s => s.id === activeId)?.name}
+1136:           {activeId && activeType === 'Project' ? (
+1162:               <h2 className="text-xl font-bold text-neutral-800">?ˆë¡œ???¹ì…˜ ì¶”ê?</h2>
+1164:               <p className="text-sm text-neutral-500 mt-1">?¹ì…˜??ì¢…ë¥˜?€ ?´ìš©???¤ì •?˜ì„¸??</p>
+1174:                 <label className="block text-xs font-bold text-neutral-600 uppercase mb-2">?¹ì…˜ ì¢…ë¥˜</label>
+1182:                     className={`flex flex-col items-center justify-center py-4 px-2 rounded-lg border-2 transition-colors ${newSectionType === 'image_grid' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-neutral-200 hover:border-neutral-300 text-neutral-500'}`}
+1186:                     <span className="text-2xl mb-2">?–¼ï¸?/span>
+1188:                     <span className="text-xs font-bold">?´ë?ì§€ ê·¸ë¦¬??/span>
+1196:                     className={`flex flex-col items-center justify-center py-4 px-2 rounded-lg border-2 transition-colors ${newSectionType === 'video_slider' ? 'border-red-500 bg-red-50 text-red-700' : 'border-neutral-200 hover:border-neutral-300 text-neutral-500'}`}
+1200:                     <span className="text-2xl mb-2">?¶ï¸�</span>
+1202:                     <span className="text-xs font-bold">?�ìƒ� ?¬ë�¼?´ë�”</span>
+1210:                     className={`flex flex-col items-center justify-center py-4 px-2 rounded-lg border-2 transition-colors ${newSectionType === 'text' ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-neutral-200 hover:border-neutral-300 text-neutral-500'}`}
+1214:                     <span className="text-2xl mb-2">?“�</span>
+1216:                     <span className="text-xs font-bold">?�ìŠ¤???¨ë�½</span>
+1228:                 <label className="block text-xs font-bold text-neutral-600 uppercase mb-2">?¹ì…˜ ?´ë¦„</label>
+1238:                   placeholder="?? 3D ëª¨ë�¸ë§??‘ì—…ë¬?
+1252:                   <label className="block text-xs font-bold text-neutral-600 uppercase mb-2">ë³¸ë¬¸ ?´ìš©</label>
+1294:                 {isCreatingSection ? 'ì¶”ê? ì¤?..' : '?¹ì…˜ ì¶”ê?'}
+1318:               <h2 className="text-xl font-bold text-neutral-800">??ë¹„ë””??ì¶”ê?</h2>
+1320:               <p className="text-sm text-neutral-500 mt-1">? íŠœë¸?ë§�í�¬ë¥??…ë ¥?˜ì—¬ ?¬ë�¼?´ë�”??ì¶”ê??˜ì„¸??</p>
+1330:                 <label className="block text-xs font-bold text-neutral-600 uppercase mb-2">?‘í’ˆ ?œëª©</label>
+1340:                   placeholder="?? 3D ëª¨ë�¸ë§??€?„ëž©??
+1352:                 <label className="block text-xs font-bold text-neutral-600 uppercase mb-2">? íŠœë¸?URL</label>
+1362:                   placeholder="https://youtube.com/watch?v=..."
+1368:                 <p className="text-xs text-neutral-400 mt-2">?…ë ¥??? íŠœë¸??�ìƒ�???�ë�™?¼ë¡œ ?„ë² ?œë�˜???¬ìƒ�?©ë‹ˆ??</p>
+1400:                 {isCreatingVideo ? 'ì¶”ê? ì¤?..' : 'ë¹„ë””??ì¶”ê?'}
+1434:                   title="?«ê¸°"
+1442:                 <span className="text-sm font-semibold text-neutral-500">ë³¸ë¬¸ ?¸ì§‘</span>
+1456:                 {isEditingText ? '?€??ì¤?..' : '?„ë£Œ'}
+1482:                   placeholder="?¹ì…˜ ?œëª©???…ë ¥?˜ì„¸??
+1526:               <h2 className="text-xl font-bold text-neutral-800">?¹ì…˜ ?´ë¦„ ë³€ê²?/h2>
+1534:               <label className="block text-xs font-bold text-neutral-600 uppercase mb-2">?ˆë¡œ???´ë¦„</label>
+1578:                 {isRenaming ? '?€??ì¤?..' : 'ë³€ê²??´ìš© ?€??}
+1602:               <h2 className="text-xl font-bold text-red-600">?¹ì…˜ ?? œ ?•ì�¸</h2>
+1610:               <p className="text-neutral-700 font-medium">?•ë§�ë¡????¹ì…˜???? œ?˜ì‹œê² ìŠµ?ˆê¹Œ?</p>
+1612:               <p className="text-sm text-neutral-500 mt-2">???¹ì…˜???¬í•¨???„ë¡œ?�íŠ¸?¤ì? ?? œ?˜ì? ?Šê³  <strong>ê¸°ë³¸ ?¹ì…˜</strong>?¼ë¡œ ?´ë�™?©ë‹ˆ??</p>
+1642:                 {isDeleting ? '?? œ ì¤?..' : '?? ?? œ?©ë‹ˆ??}
+1664:           title={selectedProjectData?.title}
+1666:           description={selectedProjectData?.description}
+1668:           createdAt={selectedProjectData?.created_at}
+1672:           {isLoadingProject ? (
+1680:           ) : selectedProjectData ? (

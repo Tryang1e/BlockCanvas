@@ -1,0 +1,78 @@
+@import url('https://fonts.googleapis.com/css2?family=Jua&family=Nanum+Myeongjo:wght@400;700;800&family=Nanum+Pen+Script&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+@keyframes grid-pan {
+  0% {
+    transform: translateY(-4rem);
+  }
+
+  100% {
+    transform: translateY(0);
+  }
+}
+
+.animate-grid-pan {
+  animation: grid-pan 3s linear infinite;
+}
+
+/* Lenis smooth scrolling iframe fix */
+html.lenis-scrolling iframe {
+  pointer-events: none;
+}
+
+/* Tiptap Placeholder */
+.tiptap p.is-editor-empty:first-child::before {
+  color: #adb5bd;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+/* Editor Only Layout Styles */
+.tiptap [data-type="column"] {
+  @apply p-4 rounded-2xl border-2 border-dashed border-neutral-400 bg-neutral-50/50;
+}
+.tiptap [data-type="column"]:focus-within {
+  @apply border-solid border-neutral-600 bg-white shadow-sm;
+}
+
+/* Constrain and apply dynamic corner radius to all rich text / editor images */
+.prose img, .tiptap img {
+  height: 700px;
+  width: 100%;
+  object-fit: cover !important;
+  border-radius: var(--editor-image-corner-radius, 0px) !important;
+  transition: border-radius 0.5s ease, transform 0.5s ease !important;
+}
+
+/* Tiptap editor floating toolbars, bubble menus and interactive wrapper elements */
+[data-tippy-root] > div,
+.tiptap-bubble-menu,
+.tiptap-floating-menu,
+.border-dashed,
+.ring-dashed {
+  border-radius: var(--editor-image-corner-radius, 0px) !important;
+  transition: border-radius 0.5s ease, border-color 0.3s ease !important;
+}
