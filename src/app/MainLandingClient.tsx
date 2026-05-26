@@ -92,7 +92,34 @@ export default function MainLandingClient({ creators }: Props) {
       }
       el.addEventListener('mouseleave', onMouseLeave)
       el.addEventListener('mousemove', onMouseMoveMagnetic as any)
-      magneticHandlers.push({ el, leave: onMouseLeave, move: onMouseMoveMagnetic })
+    })
+
+    // 2.5. Kinetic Typography Splitted Letter GSAP Animation
+    const letters = document.querySelectorAll('.gsap-letter')
+    const letterHandlers: { el: Element; enter: () => void; leave: () => void }[] = []
+
+    letters.forEach((el) => {
+      const onMouseEnter = () => {
+        gsap.to(el, {
+          y: -25,
+          scale: 1.15,
+          color: '#FF424D',
+          duration: 0.6,
+          ease: 'back.out(2)'
+        })
+      }
+      const onMouseLeave = () => {
+        gsap.to(el, {
+          y: 0,
+          scale: 1,
+          color: '#111111',
+          duration: 0.8,
+          ease: 'power3.out'
+        })
+      }
+      el.addEventListener('mouseenter', onMouseEnter)
+      el.addEventListener('mouseleave', onMouseLeave)
+      letterHandlers.push({ el, enter: onMouseEnter, leave: onMouseLeave })
     })
 
     // 3. Hero Monolith visual alignment
@@ -424,6 +451,11 @@ export default function MainLandingClient({ creators }: Props) {
         el.removeEventListener('mousemove', move as any)
       })
 
+      letterHandlers.forEach(({ el, enter, leave }) => {
+        el.removeEventListener('mouseenter', enter)
+        el.removeEventListener('mouseleave', leave)
+      })
+
       ScrollTrigger.getAll().forEach(trigger => trigger.kill())
       delete (window as any).scrollToLandingIdx
     }
@@ -592,8 +624,16 @@ export default function MainLandingClient({ creators }: Props) {
         <div className="h-24 md:h-32" />
 
         <div className="relative z-20 w-full px-6 md:px-12 flex flex-col items-center text-center my-auto">
-          <h1 className="hero-kinetic-title text-6xl md:text-9xl lg:text-[10rem] font-black tracking-tighter leading-[0.85] uppercase select-none luxury-text-heavy">
-            BLOCKCANVAS
+          <h1 className="hero-kinetic-title text-6xl md:text-9xl lg:text-[10rem] font-black tracking-tighter leading-[0.85] uppercase select-none luxury-text-heavy flex items-center justify-center gap-0.5 md:gap-1.5">
+            {"BLOCKCANVAS".split("").map((letter, i) => (
+              <span 
+                key={i} 
+                className="gsap-letter inline-block cursor-default"
+                style={{ display: 'inline-block', transformOrigin: 'bottom center' }}
+              >
+                {letter}
+              </span>
+            ))}
           </h1>
         </div>
       </section>
