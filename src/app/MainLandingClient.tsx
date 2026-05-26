@@ -777,17 +777,17 @@ export default function MainLandingClient({ creators }: Props) {
           </span>
 
           {/* Heading - Dynamic contrast layout matching pixelnetwork */}
-          <h2 className="text-3xl md:text-5xl lg:text-[2.8rem] text-neutral-900 leading-snug tracking-tight mb-12 w-full">
+          <h2 className="text-4xl md:text-6xl lg:text-[3.8rem] text-neutral-900 leading-snug tracking-tight mb-12 w-full">
             <span className="font-black text-black">크리에이터의 공간 창작물과 브랜드 가치</span>
             <span className="font-light text-neutral-400 block mt-2">를 온전히 증명하고 세상에 펼치도록.</span>
           </h2>
 
           {/* Core description paragraphs split layout */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-16 w-full mt-6">
-            <p className="text-xs md:text-sm text-[#555555] font-normal leading-relaxed">
+            <p className="text-sm md:text-base text-[#555555] font-normal leading-relaxed">
               BlockCanvas는 가상 공간 디자이너와 빌더들이 단순한 인게임 플레이어에 머무르지 않고, 하나의 완성된 공간 아티스트로서 온전한 가치를 인정받을 수 있는 혁신적인 포트폴리오 빌딩 엔진을 지향합니다. 크리에이터가 중심이 되어 높은 신뢰도와 상상력을 바탕으로 각 분야 최고의 마스터 빌더들이 하나로 뭉쳐있습니다.
             </p>
-            <p className="text-xs md:text-sm text-[#555555] font-normal leading-relaxed">
+            <p className="text-sm md:text-base text-[#555555] font-normal leading-relaxed">
               인게임 빌딩의 디테일한 배치와 구조를 웹 브라우저 상에 그대로 재현하고 마우스 드래그를 통해 누구나 손쉽게 공간을 편집하고 상호작용하도록 함으로써, 크리에이터에게는 온전한 브랜딩 가치를, 파트너사에게는 한 차원 높은 메타버스 브랜딩 솔루션을 긴밀하게 전달합니다.
             </p>
           </div>
