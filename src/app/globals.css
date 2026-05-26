@@ -18,26 +18,50 @@
 
 @keyframes typoGraphicBreathing {
   0% {
-    color: #111111;
-    text-shadow: 0 0 0px rgba(0,0,0,0);
+    color: #ffffff;
+    text-shadow: 0 0 0px rgba(255, 255, 255, 0);
   }
   50% {
-    color: #555555;
-    text-shadow: 0 0 1px rgba(0,0,0,0.05);
+    color: #dddddd;
+    text-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   }
   100% {
-    color: #111111;
-    text-shadow: 0 0 0px rgba(0,0,0,0);
+    color: #ffffff;
+    text-shadow: 0 0 0px rgba(255, 255, 255, 0);
   }
 }
 
 .luxury-text-heavy {
   font-family: 'Uni Sans Heavy', sans-serif;
-  color: #111111;
+  color: #ffffff;
   -webkit-background-clip: unset;
   -webkit-text-fill-color: unset;
   background: none;
   animation: typoGraphicBreathing 6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes typoGraphicBreathingDark {
+  0% {
+    color: #111111;
+    text-shadow: 0 0 0px rgba(0, 0, 0, 0);
+  }
+  50% {
+    color: #555555;
+    text-shadow: 0 0 1px rgba(0, 0, 0, 0.05);
+  }
+  100% {
+    color: #111111;
+    text-shadow: 0 0 0px rgba(0, 0, 0, 0);
+  }
+}
+
+.luxury-text-heavy-dark {
+  font-family: 'Uni Sans Heavy', sans-serif;
+  color: #111111;
+  -webkit-background-clip: unset;
+  -webkit-text-fill-color: unset;
+  background: none;
+  animation: typoGraphicBreathingDark 6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
 .luxury-text-thin {

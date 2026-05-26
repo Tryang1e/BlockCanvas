@@ -156,7 +156,7 @@ export default function MainLandingClient({ creators }: Props) {
       }
       const onMouseLeave = () => {
         gsap.to(el, {
-          color: '#111111',
+          color: '#ffffff',
           duration: 0.8,
           ease: 'power2.out',
           overwrite: 'auto'
@@ -210,18 +210,29 @@ export default function MainLandingClient({ creators }: Props) {
         }, 0)
       }
 
-      const title = mainHeroRef.current.querySelector('.hero-kinetic-title')
-      const tag = mainHeroRef.current.querySelector('.hero-kinetic-tag')
-      if (title) {
-        heroTl.to(title, {
-          yPercent: -40,
-          scale: 0.85,
-          rotateX: -15,
+      // 3.5. Immersive 3D Splitted Letters ScrollTrigger Scatter Effect
+      letters.forEach((el, index) => {
+        const centerOffset = index - 5.5
+        const targetX = centerOffset * 85
+        const targetY = -180 - (Math.abs(centerOffset) * 35)
+        const targetZ = 600 - (Math.abs(centerOffset) * 120)
+        const targetRotY = centerOffset * 22
+        const targetRotX = 65
+
+        heroTl.to(el, {
+          x: targetX,
+          y: targetY,
+          z: targetZ,
+          rotateX: targetRotX,
+          rotateY: targetRotY,
           opacity: 0,
-          duration: 1.2,
-          ease: 'power1.inOut'
+          scale: 1.8,
+          duration: 1.5,
+          ease: 'power2.inOut'
         }, 0)
-      }
+      })
+
+      const tag = mainHeroRef.current.querySelector('.hero-kinetic-tag')
       if (tag) {
         heroTl.to(tag, {
           yPercent: -20,
@@ -764,7 +775,7 @@ export default function MainLandingClient({ creators }: Props) {
             <Users size={11} className="text-neutral-500" />
             <span>GUILD ARCHITECTS</span>
           </span>
-          <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight uppercase luxury-text-heavy">
+          <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight uppercase luxury-text-heavy-dark">
             BlockCanvas Creators
           </h2>
           <p className="text-[10px] md:text-xs text-neutral-400 font-mono mt-2 uppercase tracking-wider block">
