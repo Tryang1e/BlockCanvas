@@ -848,11 +848,8 @@ export default function MainLandingClient({ creators }: Props) {
 
           <InfiniteMarquee speed={30}>
             {mergedCreators.map((creator, index) => {
-              const snapshotImages = ['/example1.png', '/example2.png', '/example4.png']
-              const currentSnapshot = snapshotImages[index % snapshotImages.length]
-              // Resolve dynamic custom portfolio cover banner image from database, fall back to mock placeholder
-              const dynamicCoverBanner = creator.portfolios?.banner_url || currentSnapshot
-              const initials = creator.display_name ? creator.display_name.slice(0, 2).toUpperCase() : 'BC'
+              const avatarSrc = creator.avatar_url || '/default_avatar.png'
+              const bannerSrc = creator.portfolios?.banner_url || '/default_banner.png'
 
               return (
                 <div
@@ -862,14 +859,14 @@ export default function MainLandingClient({ creators }: Props) {
                   {/* Banner Image Area - Acts as the Portfolio Cover Banner (Elegant: h-[170px]) */}
                   <div className="relative w-full h-[170px] bg-neutral-100 overflow-hidden">
                     <Image
-                      src={dynamicCoverBanner}
+                      src={bannerSrc}
                       alt="User Banner"
                       fill
                       className="object-cover group-hover:scale-105 transition-transform duration-1000 brightness-95"
                     />
 
                     {/* Dark gradient mask on top of banner for tech look */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-black/10 pointer-events-none" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-black/5 pointer-events-none" />
 
                     {/* Member sequence number at the top right */}
                     <div className="absolute top-4 right-4 text-white/50 text-[8px] font-mono font-bold">
@@ -877,20 +874,16 @@ export default function MainLandingClient({ creators }: Props) {
                     </div>
                   </div>
 
-                  {/* Avatar overlapping banner bottom boundary - Scaled up profile (90px) for visibility */}
+                  {/* Avatar overlapping banner bottom boundary - Render Avatar with custom 3D placeholder if empty */}
                   <div className="absolute top-[130px] left-1/2 -translate-x-1/2 z-20">
-                    <div className="relative w-[90px] h-[90px] rounded-full flex items-center justify-center bg-neutral-900 text-white font-black text-xl border-4 border-white shadow-[0_6px_16px_rgba(0,0,0,0.12)] group-hover:scale-105 transition-transform duration-500 overflow-hidden">
-                      {creator.avatar_url ? (
-                        <Image src={creator.avatar_url} alt={creator.display_name} fill className="object-cover" />
-                      ) : (
-                        <span>{initials}</span>
-                      )}
+                    <div className="relative w-[90px] h-[90px] rounded-full flex items-center justify-center bg-white text-white font-black text-xl border-4 border-white shadow-[0_6px_16px_rgba(0,0,0,0.12)] group-hover:scale-105 transition-transform duration-500 overflow-hidden">
+                      <Image src={avatarSrc} alt={creator.display_name} fill className="object-cover" />
                       {/* Interactive ring overlay */}
                       <div className="absolute inset-0 rounded-full border-2 border-white/20 opacity-0 group-hover:opacity-100 animate-spin duration-1000 pointer-events-none" style={{ animationDuration: '3s' }} />
                     </div>
                   </div>
 
-                  {/* Content Body */}
+                  {/* Content Body - Perfectly balanced layout padding */}
                   <div className="pt-16 px-6 pb-6 flex flex-col justify-between flex-grow text-center">
                     <div className="mb-4">
                       <h3 className="text-lg font-black text-black tracking-tight group-hover:text-[#3b82f6] transition-colors">{creator.display_name}</h3>
