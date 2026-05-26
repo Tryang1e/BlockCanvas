@@ -660,7 +660,10 @@ export default function MainLandingClient({ creators }: Props) {
       <section 
         id="staff-section" 
         ref={staffPanelRef}
-        className="snap-section w-full bg-[#FAF9F5] flex flex-col justify-center relative overflow-hidden"
+        className={`snap-section w-full bg-[#FAF9F5] flex flex-col justify-center relative overflow-hidden transition-all duration-[800ms] transform ${
+          showFooterPopup ? '-translate-y-[80px] scale-[0.98]' : 'translate-y-0 scale-100'
+        }`}
+        style={{ transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)' }}
       >
         <div className="w-full px-6 md:px-12 text-left mb-12 max-w-6xl mx-auto relative z-10">
           <span className="text-neutral-400 text-[9px] font-bold uppercase tracking-widest mb-2 block flex items-center gap-1.5 font-mono">
