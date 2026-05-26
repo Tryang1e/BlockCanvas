@@ -1,5 +1,26 @@
 ﻿# 개발 노트 (dev_notes)
 
+## 📅 2026-05-26: 🖤 Uni Sans 명품 서체 로드 및 실시간 그라디언트 펄 브리딩 폰트 컬러 애니메이션 최종 완공
+
+### 040. Uni Sans Heavy/Thin 전용 폰트 정의 및 웅장한 오로라 펄 컬러 시프팅 모션 적용
+- **요구사항**:
+  - C:\Github\BlockCanvas\fonts 디렉토리에 있는 전용 폰트 서체(Uni Sans Heavy, Uni Sans Thin)를 프로젝트에 완벽히 탑재할 것.
+  - 대형 헤드라인 폰트 색상에 서서히 변하며 호흡하는 은은한 애니메이션을 적용해 줄 것.
+- **해결책**:
+  - **🏛️ 1. public/fonts/ 에셋 동적 마이그레이션**:
+    - 외부 경로 서체 파일인 Uni Sans Heavy.otf 및 Uni Sans Thin.otf를 프로젝트 정적 웹 서빙 경로인 public/fonts/ 폴더로 완벽히 복사했습니다.
+  - **🎨 2. @font-face 선언 및 글로벌 등록**:
+    - src/app/globals.css 파일에 @font-face 구문을 사용해 Uni Sans Heavy(weight 900)와 Uni Sans Thin(weight 100) 웹 서체를 정교하게 정의하여 선언 완료했습니다.
+  - **🌈 3. 초호화 오로라 펄 컬러 시프팅 (Luxury Gradient Breathing Animation) 탑재**:
+    - 폰트 뼈대에 유체 그라디언트가 오로라처럼 살아 일렁이도록 키프레임 애니메이션 luxuryColorShift을 정의했습니다.
+    - 딥 블랙(#111111)에서 우아한 다크 크롬(#333333), 그리고 BlockCanvas 시그니처 프렌치 레드(#FF424D)와 플래티넘 차콜(#444444)로 물결치는 호화 그라디언트 펄을 -webkit-background-clip: text 방식으로 텍스트 내부에 일렁이게 수놓았습니다.
+    - 10초(10s ease infinite)에 걸쳐 유려하게 호흡하듯 그라디언트 위치가 시프팅되어 시선 집중도와 프리미엄 가치를 최고수준으로 올려줍니다.
+  - **🏛️ 4. 대형 브랜드 헤드라인 클래스 바인딩**:
+    - MainLandingClient.tsx 내의 최상단 히어로 타이틀(BLOCKCANVAS) 및 크리에이터 스태프 타이틀(BlockCanvas Creators) 구역에 luxury-text-heavy 클래스를 전격 적용하여 압도적인 포트폴리오 첫인상을 선사합니다.
+  - **🛠️ 5. 프로덕션 빌드 성공 및 원격 저장소 배포 완료 (Exit code: 0)**:
+    - 빌드 테스트를 완벽 통과시키고 깃허브 메인 저장소에 안전히 동기화 푸시했습니다.
+
+
 ## 📅 2026-05-26: 🖤 푸터 Discord 버튼의 실제 공식 초대 링크 연동 및 아웃바운드 전환 완공
 
 ### 039. Discord 버튼을 텍스트 복사에서 공식 서버 초대장 링크 직접 이동으로 변경

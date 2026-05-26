@@ -592,7 +592,7 @@ export default function MainLandingClient({ creators }: Props) {
         <div className="h-24 md:h-32" />
 
         <div className="relative z-20 w-full px-6 md:px-12 flex flex-col items-center text-center my-auto">
-          <h1 className="hero-kinetic-title text-6xl md:text-9xl lg:text-[10rem] font-black tracking-tighter leading-[0.85] uppercase text-neutral-900 select-none">
+          <h1 className="hero-kinetic-title text-6xl md:text-9xl lg:text-[10rem] font-black tracking-tighter leading-[0.85] uppercase select-none luxury-text-heavy">
             BLOCKCANVAS
           </h1>
         </div>
@@ -669,7 +669,7 @@ export default function MainLandingClient({ creators }: Props) {
             <Users size={11} className="text-neutral-500" />
             <span>GUILD ARCHITECTS</span>
           </span>
-          <h2 className="text-2xl md:text-4xl font-extrabold text-black tracking-tight uppercase">
+          <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight uppercase luxury-text-heavy">
             BlockCanvas Creators
           </h2>
           <p className="text-[10px] md:text-xs text-neutral-400 font-mono mt-2 uppercase tracking-wider block">
