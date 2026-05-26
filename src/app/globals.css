@@ -16,25 +16,25 @@
   font-display: swap;
 }
 
-@keyframes luxuryColorShift {
+@keyframes aeLightSweep {
   0% {
-    background-position: 0% 50%;
+    background-position: 200% 0;
   }
-  50% {
-    background-position: 100% 50%;
+  25% {
+    background-position: -200% 0;
   }
   100% {
-    background-position: 0% 50%;
+    background-position: -200% 0;
   }
 }
 
 .luxury-text-heavy {
   font-family: 'Uni Sans Heavy', sans-serif;
-  background: linear-gradient(135deg, #111111, #333333, #FF424D, #444444, #111111);
-  background-size: 300% 300%;
+  background: linear-gradient(110deg, #111111 40%, #ffffff 50%, #111111 60%);
+  background-size: 250% 100%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  animation: luxuryColorShift 10s ease infinite;
+  animation: aeLightSweep 5s cubic-bezier(0.25, 1, 0.5, 1) infinite;
 }
 
 .luxury-text-thin {
