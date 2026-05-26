@@ -194,6 +194,79 @@ export default function MainLandingClient({ creators }: Props) {
           heroSection.addEventListener('mousemove', handleMouseMoveTilt)
           heroSection.addEventListener('mouseleave', handleMouseLeaveTilt)
         }
+
+        // Initialize ScrollTrigger only AFTER the cinematic intro has perfectly assembled!
+        // This ensures ScrollTrigger memorizes the fully assembled state (opacity: 1, z: 0) as its starting point,
+        // thereby preventing letters from vanishing when users scroll back up to the top!
+        if (mainHeroRef.current) {
+          // Enable 3D perspective context
+          gsap.set(mainHeroRef.current, { perspective: 1200 })
+
+          const heroTl = gsap.timeline({
+            scrollTrigger: {
+              trigger: mainHeroRef.current,
+              start: 'top top',
+              end: 'bottom top',
+              scrub: 1.8,
+              pin: false
+            }
+          })
+
+          if (heroZoomImgRef.current) {
+            heroTl.to(heroZoomImgRef.current, {
+              scale: 0.8,
+              rotateX: 12,
+              rotateY: -4,
+              y: 60,
+              borderRadius: '40px',
+              boxShadow: '0 50px 100px -20px rgba(0,0,0,0.12)',
+              duration: 1.5,
+              ease: 'power2.out'
+            }, 0)
+          }
+
+          const grid = mainHeroRef.current.querySelector('.hero-bg-grid')
+          if (grid) {
+            heroTl.to(grid, {
+              scale: 1.15,
+              opacity: 0.6,
+              duration: 1.5,
+              ease: 'power2.out'
+            }, 0)
+          }
+
+          // 3.5. Immersive 3D Splitted Letters ScrollTrigger Scatter Effect (Fine-tuned for extreme softness)
+          letters.forEach((el, index) => {
+            const centerOffset = index - 5.5
+            const targetX = centerOffset * 65
+            const targetY = -120 - (Math.abs(centerOffset) * 20)
+            const targetZ = 450 - (Math.abs(centerOffset) * 80)
+            const targetRotY = centerOffset * 15
+            const targetRotX = 45
+
+            heroTl.to(el, {
+              x: targetX,
+              y: targetY,
+              z: targetZ,
+              rotateX: targetRotX,
+              rotateY: targetRotY,
+              opacity: 0,
+              scale: 1.5,
+              duration: 1.5,
+              ease: 'power1.out'
+            }, 0)
+          })
+
+          const tag = mainHeroRef.current.querySelector('.hero-kinetic-tag')
+          if (tag) {
+            heroTl.to(tag, {
+              yPercent: -20,
+              opacity: 0,
+              duration: 0.8,
+              ease: 'power1.in'
+            }, 0)
+          }
+        }
       }
     })
 
@@ -222,77 +295,6 @@ export default function MainLandingClient({ creators }: Props) {
       },
       ease: 'elastic.out(0.9, 0.7)'
     }, 0.2)
-
-    // 3. Hero Monolith visual alignment
-    if (mainHeroRef.current) {
-      // Enable 3D perspective context
-      gsap.set(mainHeroRef.current, { perspective: 1200 })
-
-      const heroTl = gsap.timeline({
-        scrollTrigger: {
-          trigger: mainHeroRef.current,
-          start: 'top top',
-          end: 'bottom top',
-          scrub: 1.8,
-          pin: false
-        }
-      })
-
-      if (heroZoomImgRef.current) {
-        heroTl.to(heroZoomImgRef.current, {
-          scale: 0.8,
-          rotateX: 12,
-          rotateY: -4,
-          y: 60,
-          borderRadius: '40px',
-          boxShadow: '0 50px 100px -20px rgba(0,0,0,0.12)',
-          duration: 1.5,
-          ease: 'power2.out'
-        }, 0)
-      }
-
-      const grid = mainHeroRef.current.querySelector('.hero-bg-grid')
-      if (grid) {
-        heroTl.to(grid, {
-          scale: 1.15,
-          opacity: 0.6,
-          duration: 1.5,
-          ease: 'power2.out'
-        }, 0)
-      }
-
-      // 3.5. Immersive 3D Splitted Letters ScrollTrigger Scatter Effect (Fine-tuned for extreme softness)
-      letters.forEach((el, index) => {
-        const centerOffset = index - 5.5
-        const targetX = centerOffset * 65
-        const targetY = -120 - (Math.abs(centerOffset) * 20)
-        const targetZ = 450 - (Math.abs(centerOffset) * 80)
-        const targetRotY = centerOffset * 15
-        const targetRotX = 45
-
-        heroTl.to(el, {
-          x: targetX,
-          y: targetY,
-          z: targetZ,
-          rotateX: targetRotX,
-          rotateY: targetRotY,
-          opacity: 0,
-          scale: 1.5,
-          duration: 1.5,
-          ease: 'power1.out'
-        }, 0)
-      })
-
-      const tag = mainHeroRef.current.querySelector('.hero-kinetic-tag')
-      if (tag) {
-        heroTl.to(tag, {
-          yPercent: -20,
-          opacity: 0,
-          duration: 0.8,
-          ease: 'power1.in'
-        }, 0)
-      }
-    }
 
 
 
