@@ -167,7 +167,7 @@ export default function MainLandingClient({ creators }: Props) {
       const onMouseEnter = () => {
         gsap.to(el, {
           rotateY: '+=360',
-          color: '#FF424D',
+          color: '#B23321',
           duration: 0.9,
           ease: 'back.out(1.8)',
           overwrite: 'auto'
