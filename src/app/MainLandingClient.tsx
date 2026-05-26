@@ -141,6 +141,32 @@ export default function MainLandingClient({ creators }: Props) {
       })
     }
 
+    // good-fella.com Style Y-Axis 360 Spin on direct character hover
+    const spinHandlers: { el: Element; enter: () => void; leave: () => void }[] = []
+
+    letters.forEach((el) => {
+      const onMouseEnter = () => {
+        gsap.to(el, {
+          rotateY: '+=360',
+          color: '#FF424D',
+          duration: 0.9,
+          ease: 'back.out(1.8)',
+          overwrite: 'auto'
+        })
+      }
+      const onMouseLeave = () => {
+        gsap.to(el, {
+          color: '#111111',
+          duration: 0.8,
+          ease: 'power2.out',
+          overwrite: 'auto'
+        })
+      }
+      el.addEventListener('mouseenter', onMouseEnter)
+      el.addEventListener('mouseleave', onMouseLeave)
+      spinHandlers.push({ el, enter: onMouseEnter, leave: onMouseLeave })
+    })
+
     if (heroSection) {
       heroSection.addEventListener('mousemove', handleMouseMoveTilt)
       heroSection.addEventListener('mouseleave', handleMouseLeaveTilt)
@@ -479,6 +505,11 @@ export default function MainLandingClient({ creators }: Props) {
         heroSection.removeEventListener('mousemove', handleMouseMoveTilt)
         heroSection.removeEventListener('mouseleave', handleMouseLeaveTilt)
       }
+
+      spinHandlers.forEach(({ el, enter, leave }) => {
+        el.removeEventListener('mouseenter', enter)
+        el.removeEventListener('mouseleave', leave)
+      })
 
       ScrollTrigger.getAll().forEach(trigger => trigger.kill())
       delete (window as any).scrollToLandingIdx
