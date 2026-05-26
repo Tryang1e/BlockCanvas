@@ -660,10 +660,10 @@ export default function MainLandingClient({ creators }: Props) {
       <section 
         id="staff-section" 
         ref={staffPanelRef}
-        className={`snap-section w-full bg-[#FAF9F5] flex flex-col justify-center relative overflow-hidden transition-all duration-[1200ms] transform ${
+        className={`snap-section w-full bg-[#FAF9F5] flex flex-col justify-center relative overflow-hidden transform ${
           showFooterPopup ? '-translate-y-[80px] scale-[0.98]' : 'translate-y-0 scale-100'
         }`}
-        style={{ transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)' }}
+        style={{ transition: 'all 1.5s cubic-bezier(0.16, 1, 0.3, 1)' }}
       >
         <div className="w-full px-6 md:px-12 text-left mb-12 max-w-6xl mx-auto relative z-10">
           <span className="text-neutral-400 text-[9px] font-bold uppercase tracking-widest mb-2 block flex items-center gap-1.5 font-mono">
@@ -755,10 +755,10 @@ export default function MainLandingClient({ creators }: Props) {
 
       <section 
         id="footer-section" 
-        className={`fixed bottom-0 left-0 w-full bg-[#1A1A1A] border-t border-[#222222] z-40 transition-all duration-[1200ms] transform ${
+        className={`fixed bottom-0 left-0 w-full bg-[#1A1A1A] border-t border-[#222222] z-40 transform ${
           showFooterPopup ? 'translate-y-0 opacity-100 shadow-[0_-30px_60px_rgba(0,0,0,0.4)]' : 'translate-y-full opacity-0 pointer-events-none'
         }`}
-        style={{ transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)' }}
+        style={{ transition: 'all 1.5s cubic-bezier(0.16, 1, 0.3, 1)' }}
       >
         <footer className="w-full text-white pt-10 pb-8 px-6 md:px-12 lg:px-24 pointer-events-auto">
           <div className="max-w-[1200px] mx-auto">
