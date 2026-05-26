@@ -16,25 +16,40 @@
   font-display: swap;
 }
 
-@keyframes aeLightSweep {
+@keyframes dynamicMotionGraphic {
   0% {
-    background-position: 200% 0;
+    background-position: 300% 0;
   }
-  25% {
-    background-position: -200% 0;
+  20% {
+    background-position: 0% 0;
+  }
+  35% {
+    background-position: -100% 0;
   }
   100% {
-    background-position: -200% 0;
+    background-position: -300% 0;
   }
 }
 
 .luxury-text-heavy {
   font-family: 'Uni Sans Heavy', sans-serif;
-  background: linear-gradient(110deg, #111111 40%, #ffffff 50%, #111111 60%);
-  background-size: 250% 100%;
+  background: linear-gradient(
+    90deg, 
+    #111111 0%, 
+    #111111 35%, 
+    #FF424D 35%, 
+    #FF424D 48%, 
+    #0052FF 48%, 
+    #0052FF 60%, 
+    #FFD214 60%, 
+    #FFD214 72%, 
+    #111111 72%, 
+    #111111 100%
+  );
+  background-size: 400% 100%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  animation: aeLightSweep 5s cubic-bezier(0.25, 1, 0.5, 1) infinite;
+  animation: dynamicMotionGraphic 4.5s cubic-bezier(0.76, 0, 0.24, 1) infinite;
 }
 
 .luxury-text-thin {
@@ -95,12 +110,14 @@ html.lenis-scrolling iframe {
 .tiptap [data-type="column"] {
   @apply p-4 rounded-2xl border-2 border-dashed border-neutral-400 bg-neutral-50/50;
 }
+
 .tiptap [data-type="column"]:focus-within {
   @apply border-solid border-neutral-600 bg-white shadow-sm;
 }
 
 /* Constrain and apply dynamic corner radius to all rich text / editor images */
-.prose img, .tiptap img {
+.prose img,
+.tiptap img {
   height: 700px;
   width: 100%;
   object-fit: cover !important;
@@ -109,7 +126,7 @@ html.lenis-scrolling iframe {
 }
 
 /* Tiptap editor floating toolbars, bubble menus and interactive wrapper elements */
-[data-tippy-root] > div,
+[data-tippy-root]>div,
 .tiptap-bubble-menu,
 .tiptap-floating-menu,
 .border-dashed,
