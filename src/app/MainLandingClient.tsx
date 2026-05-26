@@ -236,7 +236,7 @@ export default function MainLandingClient({ creators }: Props) {
     }
 
     // --- 8. Premium Slide Scrolling Controller (pixelnetwork.kr-style slide-by-slide transitions) ---
-    const sections = ['#hero-section', '#about-section', '#staff-section', '#footer-section']
+    const sections = ['#hero-section', '#about-section', '#staff-section']
     let isAnimating = false
     let startY = 0
 
@@ -266,6 +266,20 @@ export default function MainLandingClient({ creators }: Props) {
 
     // Wheel listener (non-passive to allow preventDefault)
     const handleWheelEvent = (e: WheelEvent) => {
+      // If we are at the last section (#staff-section) and scrolling down, release snapping to let compact footer slide up naturally
+      if (currentIdxRef.current === 2 && e.deltaY > 15) {
+        return
+      }
+
+      // If we are deep inside the footer area and scrolling up, let default scroll work until we hit staff-section's top boundary
+      const staffSection = document.getElementById('staff-section')
+      if (staffSection) {
+        const staffTop = staffSection.getBoundingClientRect().top + window.scrollY
+        if (window.scrollY > staffTop + 10 && e.deltaY < -15) {
+          return
+        }
+      }
+
       e.preventDefault()
       if (isAnimating) return
 
@@ -282,12 +296,26 @@ export default function MainLandingClient({ creators }: Props) {
     }
 
     const handleTouchMove = (e: TouchEvent) => {
+      const diffY = startY - e.touches[0].clientY
+
+      // Release touch snap when swiping down from the last section
+      if (currentIdxRef.current === 2 && diffY > 40) {
+        return
+      }
+
+      const staffSection = document.getElementById('staff-section')
+      if (staffSection) {
+        const staffTop = staffSection.getBoundingClientRect().top + window.scrollY
+        if (window.scrollY > staffTop + 10 && diffY < -40) {
+          return
+        }
+      }
+
       if (isAnimating) {
         e.preventDefault()
         return
       }
 
-      const diffY = startY - e.touches[0].clientY
       if (Math.abs(diffY) > 40) {
         e.preventDefault()
         if (diffY > 0) {
@@ -302,12 +330,27 @@ export default function MainLandingClient({ creators }: Props) {
     const handleKeyDown = (e: KeyboardEvent) => {
       const keys = ['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', ' ', 'Spacebar']
       if (keys.includes(e.key)) {
+        const isDown = e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ' || e.key === 'Spacebar'
+
+        // Release keyboard snap when navigating down past the last section
+        if (currentIdxRef.current === 2 && isDown) {
+          return
+        }
+
+        const staffSection = document.getElementById('staff-section')
+        if (staffSection) {
+          const staffTop = staffSection.getBoundingClientRect().top + window.scrollY
+          if (window.scrollY > staffTop + 10 && !isDown) {
+            return
+          }
+        }
+
         e.preventDefault()
         if (isAnimating) return
 
-        if (e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ' || e.key === 'Spacebar') {
+        if (isDown) {
           scrollToIdx(currentIdxRef.current + 1)
-        } else if (e.key === 'ArrowUp' || e.key === 'PageUp') {
+        } else if (!isDown) {
           scrollToIdx(currentIdxRef.current - 1)
         }
       }
@@ -680,7 +723,7 @@ export default function MainLandingClient({ creators }: Props) {
         </div>
       </section>
 
-      <section id="footer-section" className="snap-section w-full bg-[#1A1A1A] flex flex-col justify-center border-t border-[#222222] relative overflow-hidden z-30">
+      <section id="footer-section" className="w-full bg-[#1A1A1A] border-t border-[#222222] relative overflow-hidden z-30">
         <footer className="w-full text-white pt-10 pb-8 px-6 md:px-12 lg:px-24 pointer-events-auto">
           <div className="max-w-[1200px] mx-auto">
             
