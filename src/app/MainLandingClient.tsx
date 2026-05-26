@@ -98,6 +98,25 @@ export default function MainLandingClient({ creators }: Props) {
     const letters = document.querySelectorAll('.gsap-letter')
     const heroSection = mainHeroRef.current
 
+    // Setup initial 3D deep space positions of letters for cinematic opening assembly
+    gsap.set(letters, {
+      opacity: 0,
+      z: -700,
+      scale: 0.15,
+      rotateX: -85,
+      rotateY: (index) => (index - 5.5) * 12,
+      color: '#ffffff'
+    })
+
+    // Setup initial state for back monolith cinematic reveal
+    if (heroZoomImgRef.current) {
+      gsap.set(heroZoomImgRef.current, {
+        scale: 1.35,
+        opacity: 0,
+        filter: 'brightness(0.3) blur(15px)'
+      })
+    }
+
     const handleMouseMoveTilt = (e: MouseEvent) => {
       if (!heroSection) return
       const rect = heroSection.getBoundingClientRect()
@@ -167,10 +186,42 @@ export default function MainLandingClient({ creators }: Props) {
       spinHandlers.push({ el, enter: onMouseEnter, leave: onMouseLeave })
     })
 
-    if (heroSection) {
-      heroSection.addEventListener('mousemove', handleMouseMoveTilt)
-      heroSection.addEventListener('mouseleave', handleMouseLeaveTilt)
+    // Execute Immersive Cinematic Entrance Movie Sequence
+    const introTl = gsap.timeline({
+      onComplete: () => {
+        // Bind dynamic mouse tracking interactions ONLY when the opening cinema is perfectly done!
+        if (heroSection) {
+          heroSection.addEventListener('mousemove', handleMouseMoveTilt)
+          heroSection.addEventListener('mouseleave', handleMouseLeaveTilt)
+        }
+      }
+    })
+
+    // 1. Reveal cinematic monolith (fog dissolves, zoom in)
+    if (heroZoomImgRef.current) {
+      introTl.to(heroZoomImgRef.current, {
+        scale: 1,
+        opacity: 0.9,
+        filter: 'brightness(0.9) blur(0px)',
+        duration: 2.4,
+        ease: 'power3.out'
+      }, 0)
     }
+
+    // 2. Splitted letters kinetic 3D assembly from deep space (staggered elastic snap)
+    introTl.to(letters, {
+      opacity: 1,
+      z: 0,
+      scale: 1,
+      rotateX: 0,
+      rotateY: 0,
+      duration: 1.9,
+      stagger: {
+        each: 0.08,
+        from: 'center'
+      },
+      ease: 'elastic.out(0.9, 0.7)'
+    }, 0.2)
 
     // 3. Hero Monolith visual alignment
     if (mainHeroRef.current) {
