@@ -19,7 +19,8 @@ export default async function Home() {
           headline: true,
           about_text: true,
           theme_bg_color: true,
-          theme_bg_effect: true
+          theme_bg_effect: true,
+          banner_url: true
         }
       }
     },

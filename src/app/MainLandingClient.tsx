@@ -26,6 +26,7 @@ interface CreatorProfile {
     about_text: string | null;
     theme_bg_color: string | null;
     theme_bg_effect: string | null;
+    banner_url: string | null;
   } | null;
 }
 
@@ -167,7 +168,7 @@ export default function MainLandingClient({ creators }: Props) {
       const onMouseEnter = () => {
         gsap.to(el, {
           rotateY: '+=360',
-          color: '#B23321',
+          color: '#000000',
           duration: 0.9,
           ease: 'back.out(1.8)',
           overwrite: 'auto'
@@ -644,11 +645,11 @@ export default function MainLandingClient({ creators }: Props) {
       <CustomCursor />
 
       {/* 🧭 Premium Vertical Section Navigation Indicators */}
-      <div className="fixed right-6 top-1/2 -translate-y-1/2 z-40 hidden md:flex flex-col gap-4">
+      <div className="fixed right-6 top-1/2 -translate-y-1/2 text[1px] z-40 hidden md:flex flex-col gap-4">
         {[
-          { label: '시네마틱', idx: 0 },
-          { label: '브랜드 미션', idx: 1 },
-          { label: '빌더 길드', idx: 2 }
+          { label: 'Main', idx: 0 },
+          { label: 'About Us', idx: 1 },
+          { label: 'Creators', idx: 2 }
         ].map((item) => {
           const isActive = currentIdx === item.idx
           return (
@@ -696,9 +697,9 @@ export default function MainLandingClient({ creators }: Props) {
           </Link>
 
           <nav className="hidden md:flex items-center gap-8 text-[9px] font-bold text-neutral-400 uppercase tracking-widest pointer-events-auto">
-            <a href="#hero-section" className="hover:text-black transition-colors magnetic-target">시네마틱</a>
-            <a href="#about-section" className="hover:text-black transition-colors magnetic-target">브랜드 미션</a>
-            <a href="#staff-section" className="hover:text-black transition-colors magnetic-target">빌더 길드</a>
+            <a href="#hero-section" className="hover:text-black transition-colors magnetic-target">Main</a>
+            <a href="#about-section" className="hover:text-black transition-colors magnetic-target">About Us</a>
+            <a href="#staff-section" className="hover:text-black transition-colors magnetic-target">Creators</a>
           </nav>
 
           <div className="pointer-events-auto">
@@ -849,6 +850,8 @@ export default function MainLandingClient({ creators }: Props) {
             {mergedCreators.map((creator, index) => {
               const snapshotImages = ['/example1.png', '/example2.png', '/example4.png']
               const currentSnapshot = snapshotImages[index % snapshotImages.length]
+              // Resolve dynamic custom portfolio cover banner image from database, fall back to mock placeholder
+              const dynamicCoverBanner = creator.portfolios?.banner_url || currentSnapshot
               const initials = creator.display_name ? creator.display_name.slice(0, 2).toUpperCase() : 'BC'
 
               return (
@@ -859,7 +862,7 @@ export default function MainLandingClient({ creators }: Props) {
                   {/* Banner Image Area - Acts as the Portfolio Cover Banner (Elegant: h-[170px]) */}
                   <div className="relative w-full h-[170px] bg-neutral-100 overflow-hidden">
                     <Image
-                      src={currentSnapshot}
+                      src={dynamicCoverBanner}
                       alt="User Banner"
                       fill
                       className="object-cover group-hover:scale-105 transition-transform duration-1000 brightness-95"
