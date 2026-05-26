@@ -233,7 +233,7 @@ export default function MainLandingClient({ creators }: Props) {
           trigger: mainHeroRef.current,
           start: 'top top',
           end: 'bottom top',
-          scrub: true,
+          scrub: 1.8,
           pin: false
         }
       })
@@ -247,7 +247,7 @@ export default function MainLandingClient({ creators }: Props) {
           borderRadius: '40px',
           boxShadow: '0 50px 100px -20px rgba(0,0,0,0.12)',
           duration: 1.5,
-          ease: 'power2.inOut'
+          ease: 'power2.out'
         }, 0)
       }
 
@@ -257,18 +257,18 @@ export default function MainLandingClient({ creators }: Props) {
           scale: 1.15,
           opacity: 0.6,
           duration: 1.5,
-          ease: 'power2.inOut'
+          ease: 'power2.out'
         }, 0)
       }
 
-      // 3.5. Immersive 3D Splitted Letters ScrollTrigger Scatter Effect
+      // 3.5. Immersive 3D Splitted Letters ScrollTrigger Scatter Effect (Fine-tuned for extreme softness)
       letters.forEach((el, index) => {
         const centerOffset = index - 5.5
-        const targetX = centerOffset * 85
-        const targetY = -180 - (Math.abs(centerOffset) * 35)
-        const targetZ = 600 - (Math.abs(centerOffset) * 120)
-        const targetRotY = centerOffset * 22
-        const targetRotX = 65
+        const targetX = centerOffset * 65
+        const targetY = -120 - (Math.abs(centerOffset) * 20)
+        const targetZ = 450 - (Math.abs(centerOffset) * 80)
+        const targetRotY = centerOffset * 15
+        const targetRotX = 45
 
         heroTl.to(el, {
           x: targetX,
@@ -277,9 +277,9 @@ export default function MainLandingClient({ creators }: Props) {
           rotateX: targetRotX,
           rotateY: targetRotY,
           opacity: 0,
-          scale: 1.8,
+          scale: 1.5,
           duration: 1.5,
-          ease: 'power2.inOut'
+          ease: 'power1.out'
         }, 0)
       })
 
