@@ -730,13 +730,13 @@ export default function MainLandingClient({ creators }: Props) {
             className="absolute inset-0 w-full h-full overflow-hidden origin-center"
           >
             <Image
-              src="/example3.png"
+              src="/Main_Banner.png"
               alt="BlockCanvas Cinematic Monolith"
               fill
               className="object-cover brightness-90 opacity-90"
               priority
             />
-            <div className="absolute inset-0 bg-gradient-to-b from-[#FAF9F5]/15 via-transparent to-[#FAF9F5]" />
+            <div className="absolute inset-0 bg-gradient-to-b from-[#FAF9F5]/3 via-transparent to-[#FAF9F5]" />
           </div>
         </div>
 
