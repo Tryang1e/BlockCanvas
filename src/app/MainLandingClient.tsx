@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { ArrowRight, Sparkles, Move, Users, Shield, Cpu, Compass, ArrowUp } from 'lucide-react'
+import { ArrowRight, Sparkles, Move, Users, Shield, Cpu, Compass, ArrowUp, Mail } from 'lucide-react'
 import InfiniteMarquee from '@/components/ui/InfiniteMarquee'
 import CustomCursor from '@/components/ui/CustomCursor'
 
@@ -35,7 +35,7 @@ interface Props {
 
 export default function MainLandingClient({ creators }: Props) {
   const [scrollProgress, setScrollProgress] = useState(0)
-  
+
   // Track active slide index for vertical side dot navigation
   const [currentIdx, setCurrentIdx] = useState(0)
   const currentIdxRef = useRef(0)
@@ -55,7 +55,7 @@ export default function MainLandingClient({ creators }: Props) {
   const mainHeroRef = useRef<HTMLElement>(null)
   const staffPanelRef = useRef<HTMLElement>(null)
   const statsContainerRef = useRef<HTMLDivElement>(null)
-  
+
   const heroZoomImgRef = useRef<HTMLDivElement>(null)
   const milestoneRefs = useRef<(HTMLSpanElement | null)[]>([])
 
@@ -74,7 +74,7 @@ export default function MainLandingClient({ creators }: Props) {
     // 2. High-performance Magnetic Effect (creator page DNA)
     const magneticElements = document.querySelectorAll('.magnetic-target')
     const magneticHandlers: { el: Element; leave: () => void; move: (e: MouseEvent) => void }[] = []
-    
+
     magneticElements.forEach((el) => {
       const onMouseLeave = () => {
         gsap.to(el, { x: 0, y: 0, duration: 0.5, ease: 'power2.out' })
@@ -136,21 +136,21 @@ export default function MainLandingClient({ creators }: Props) {
       const title = mainHeroRef.current.querySelector('.hero-kinetic-title')
       const tag = mainHeroRef.current.querySelector('.hero-kinetic-tag')
       if (title) {
-        heroTl.to(title, { 
-          yPercent: -40, 
-          scale: 0.85, 
-          rotateX: -15, 
-          opacity: 0, 
-          duration: 1.2, 
-          ease: 'power1.inOut' 
+        heroTl.to(title, {
+          yPercent: -40,
+          scale: 0.85,
+          rotateX: -15,
+          opacity: 0,
+          duration: 1.2,
+          ease: 'power1.inOut'
         }, 0)
       }
       if (tag) {
-        heroTl.to(tag, { 
-          yPercent: -20, 
-          opacity: 0, 
-          duration: 0.8, 
-          ease: 'power1.in' 
+        heroTl.to(tag, {
+          yPercent: -20,
+          opacity: 0,
+          duration: 0.8,
+          ease: 'power1.in'
         }, 0)
       }
     }
@@ -164,7 +164,7 @@ export default function MainLandingClient({ creators }: Props) {
         if (ref) {
           const targetVal = statsTargets[index]
           const obj = { value: 0 }
-          
+
           gsap.to(obj, {
             value: targetVal,
             scrollTrigger: {
@@ -193,11 +193,11 @@ export default function MainLandingClient({ creators }: Props) {
       const header = staffPanelRef.current.querySelector('div')
       const track = staffPanelRef.current.querySelector('.my-auto') || staffPanelRef.current.querySelector('.py-6') || staffPanelRef.current.querySelector('.py-8')
       if (header && track) {
-        gsap.fromTo(header, 
+        gsap.fromTo(header,
           { opacity: 0, y: 30 },
           { opacity: 1, y: 0, duration: 1, ease: 'power3.out', scrollTrigger: { trigger: header, start: 'top 85%' } }
         )
-        gsap.fromTo(track, 
+        gsap.fromTo(track,
           { opacity: 0, scale: 0.96 },
           { opacity: 1, scale: 1, duration: 1.2, ease: 'power3.out', scrollTrigger: { trigger: track, start: 'top 85%' } }
         )
@@ -209,7 +209,7 @@ export default function MainLandingClient({ creators }: Props) {
     if (aboutSection) {
       const watermark = aboutSection.querySelector('.about-watermark')
       const content = aboutSection.querySelector('.about-content-box')
-      
+
       if (watermark && content) {
         gsap.fromTo(watermark,
           { opacity: 0, x: -50 },
@@ -225,7 +225,7 @@ export default function MainLandingClient({ creators }: Props) {
             }
           }
         )
-        
+
         gsap.fromTo(content,
           { opacity: 0, y: 40 },
           {
@@ -269,8 +269,8 @@ export default function MainLandingClient({ creators }: Props) {
       }, 1000)
     }
 
-    // Expose scrollToIdx for JSX elements (side indicators & footer circular button)
-    ;(window as any).scrollToLandingIdx = scrollToIdx
+      // Expose scrollToIdx for JSX elements (side indicators & footer circular button)
+      ; (window as any).scrollToLandingIdx = scrollToIdx
 
     // Wheel listener (non-passive to allow preventDefault)
     const handleWheelEvent = (e: WheelEvent) => {
@@ -386,7 +386,7 @@ export default function MainLandingClient({ creators }: Props) {
     // Direct header nav click synchronization
     const navLinks = document.querySelectorAll('header nav a, header a[href^="#"]')
     const linkClickHandlers: { el: Element; handler: (e: Event) => void }[] = []
-    
+
     navLinks.forEach((link) => {
       const href = link.getAttribute('href')
       const targetIdx = sections.indexOf(href || '')
@@ -414,16 +414,16 @@ export default function MainLandingClient({ creators }: Props) {
       window.removeEventListener('touchstart', handleTouchStart)
       window.removeEventListener('touchmove', handleTouchMove)
       window.removeEventListener('keydown', handleKeyDown)
-      
+
       linkClickHandlers.forEach(({ el, handler }) => {
         el.removeEventListener('click', handler)
       })
-      
+
       magneticHandlers.forEach(({ el, leave, move }) => {
         el.removeEventListener('mouseleave', leave)
         el.removeEventListener('mousemove', move as any)
       })
-      
+
       ScrollTrigger.getAll().forEach(trigger => trigger.kill())
       delete (window as any).scrollToLandingIdx
     }
@@ -469,12 +469,13 @@ export default function MainLandingClient({ creators }: Props) {
   ] as any[]
 
   return (
-    <div 
+    <div
       ref={mainContainerRef}
       className="min-h-screen bg-[#FAF9F5] text-[#1E2022] font-sans overflow-x-hidden selection:bg-black selection:text-white relative cursor-default w-full"
     >
       {/* 📐 Premium Native CSS Scroll Snapping Engine - Delegated to high-perf JS sweep controller */}
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         html, body {
           scroll-behavior: smooth !important;
           overflow-y: auto !important;
@@ -487,7 +488,7 @@ export default function MainLandingClient({ creators }: Props) {
           overflow: hidden !important;
         }
       `}} />
-      
+
       {/* 🎯 Premium Dynamic Mix-blend Custom Circle Cursor */}
       <CustomCursor />
 
@@ -512,12 +513,11 @@ export default function MainLandingClient({ creators }: Props) {
               <span className="absolute right-8 bg-neutral-900/90 backdrop-blur-md text-white text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md opacity-0 translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 pointer-events-none whitespace-nowrap shadow-md">
                 {item.label}
               </span>
-              <div 
-                className={`w-3.5 h-3.5 rounded-full flex items-center justify-center transition-all duration-300 ${
-                  isActive 
-                    ? 'border-2 border-black bg-transparent scale-110' 
-                    : 'bg-neutral-300 hover:bg-neutral-500 scale-75'
-                }`}
+              <div
+                className={`w-3.5 h-3.5 rounded-full flex items-center justify-center transition-all duration-300 ${isActive
+                  ? 'border-2 border-black bg-transparent scale-110'
+                  : 'bg-neutral-300 hover:bg-neutral-500 scale-75'
+                  }`}
               >
                 {isActive && <div className="w-1.5 h-1.5 bg-black rounded-full" />}
               </div>
@@ -527,8 +527,8 @@ export default function MainLandingClient({ creators }: Props) {
       </div>
 
       {/* Top thin progress scroll tracking bar */}
-      <div 
-        className="fixed top-0 left-0 h-[3px] bg-black z-50 transition-all duration-100 ease-out" 
+      <div
+        className="fixed top-0 left-0 h-[3px] bg-black z-50 transition-all duration-100 ease-out"
         style={{ width: `${scrollProgress}%` }}
       />
 
@@ -551,8 +551,8 @@ export default function MainLandingClient({ creators }: Props) {
           </nav>
 
           <div className="pointer-events-auto">
-            <Link 
-              href="/login" 
+            <Link
+              href="/login"
               className="text-[9px] font-bold text-neutral-400 hover:text-black transition-colors py-1.5 px-4 border border-neutral-200 bg-white hover:bg-neutral-50 magnetic-target"
             >
               로그인
@@ -562,27 +562,27 @@ export default function MainLandingClient({ creators }: Props) {
       </header>
 
       {/* 🚀 STAGE 1: Hero Section - Extreme Wide Monolith Parallax */}
-      <section 
-        id="hero-section" 
+      <section
+        id="hero-section"
         ref={mainHeroRef}
         className="snap-section w-full bg-[#FAF9F5] flex flex-col justify-center border-b border-neutral-200 relative overflow-hidden"
       >
         {/* Dynamic Space Particles background aligned with creator portfolios */}
         <div className="absolute inset-0 bg-[#FAF9F5] z-0">
-          <div 
-            className="hero-bg-grid absolute inset-0 opacity-30 pointer-events-none origin-center" 
-            style={{ backgroundImage: 'linear-gradient(to right, #E2E2D9 1px, transparent 1px), linear-gradient(to bottom, #E2E2D9 1px, transparent 1px)', backgroundSize: '48px 48px' }} 
+          <div
+            className="hero-bg-grid absolute inset-0 opacity-30 pointer-events-none origin-center"
+            style={{ backgroundImage: 'linear-gradient(to right, #E2E2D9 1px, transparent 1px), linear-gradient(to bottom, #E2E2D9 1px, transparent 1px)', backgroundSize: '48px 48px' }}
           />
-          <div 
+          <div
             ref={heroZoomImgRef}
             className="absolute inset-0 w-full h-full overflow-hidden origin-center"
           >
-            <Image 
-               src="/example3.png" 
-               alt="BlockCanvas Cinematic Monolith" 
-               fill 
-               className="object-cover brightness-90 opacity-90"
-               priority
+            <Image
+              src="/example3.png"
+              alt="BlockCanvas Cinematic Monolith"
+              fill
+              className="object-cover brightness-90 opacity-90"
+              priority
             />
             <div className="absolute inset-0 bg-gradient-to-b from-[#FAF9F5]/15 via-transparent to-[#FAF9F5]" />
           </div>
@@ -599,7 +599,7 @@ export default function MainLandingClient({ creators }: Props) {
       </section>
 
       {/* 🏛️ STAGE 2.5: Brand Mission About Section (pixelnetwork.kr/#about 레이아웃 구조 차용, 디자인 톤앤매너 완벽 유지) */}
-      <section 
+      <section
         id="about-section"
         className="snap-section w-full bg-[#FAF9F5] flex flex-col justify-center px-6 md:px-12 relative overflow-hidden z-20 border-b border-neutral-200"
       >
@@ -637,16 +637,16 @@ export default function MainLandingClient({ creators }: Props) {
 
           {/* Premium call-to-action buttons */}
           <div className="flex flex-row gap-4 items-center mt-12 md:mt-16 w-full pointer-events-auto">
-            <Link 
-              href="#staff-section" 
+            <Link
+              href="#staff-section"
               className="rounded-full bg-neutral-900 text-[#FAF9F5] hover:bg-neutral-800 px-8 py-3.5 text-[9px] font-bold uppercase tracking-widest flex items-center gap-2 transition-all duration-300 shadow-sm hover:shadow-lg magnetic-target"
             >
               <Users size={12} />
               <span>explore creators</span>
             </Link>
-            
-            <Link 
-              href="/login" 
+
+            <Link
+              href="/login"
               className="rounded-full border border-neutral-900 bg-transparent text-neutral-900 hover:bg-neutral-900 hover:text-[#FAF9F5] px-8 py-3.5 text-[9px] font-bold uppercase tracking-widest transition-all duration-300 magnetic-target"
             >
               <span>start building</span>
@@ -657,12 +657,11 @@ export default function MainLandingClient({ creators }: Props) {
 
 
       {/* 👥 STAGE 4: Guild Architects (수석 빌더 스태프 - 럭셔리 마키 프로필 트랙 + 통합 푸터) */}
-      <section 
-        id="staff-section" 
+      <section
+        id="staff-section"
         ref={staffPanelRef}
-        className={`snap-section w-full bg-[#FAF9F5] flex flex-col justify-center relative overflow-hidden transform ${
-          showFooterPopup ? '-translate-y-[80px] scale-[0.98]' : 'translate-y-0 scale-100'
-        }`}
+        className={`snap-section w-full bg-[#FAF9F5] flex flex-col justify-center relative overflow-hidden transform ${showFooterPopup ? '-translate-y-[80px] scale-[0.98]' : 'translate-y-0 scale-100'
+          }`}
         style={{ transition: 'all 1.5s cubic-bezier(0.16, 1, 0.3, 1)' }}
       >
         <div className="w-full px-6 md:px-12 text-left mb-12 max-w-6xl mx-auto relative z-10">
@@ -700,16 +699,16 @@ export default function MainLandingClient({ creators }: Props) {
                 >
                   {/* Banner Image Area - Acts as the Portfolio Cover Banner (Elegant: h-[170px]) */}
                   <div className="relative w-full h-[170px] bg-neutral-100 overflow-hidden">
-                    <Image 
-                      src={currentSnapshot} 
-                      alt="User Banner" 
-                      fill 
-                      className="object-cover group-hover:scale-105 transition-transform duration-1000 brightness-95" 
+                    <Image
+                      src={currentSnapshot}
+                      alt="User Banner"
+                      fill
+                      className="object-cover group-hover:scale-105 transition-transform duration-1000 brightness-95"
                     />
-                    
+
                     {/* Dark gradient mask on top of banner for tech look */}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-black/10 pointer-events-none" />
-                    
+
                     {/* Member sequence number at the top right */}
                     <div className="absolute top-4 right-4 text-white/50 text-[8px] font-mono font-bold">
                       #{String(index + 1).padStart(2, '0')}
@@ -737,7 +736,7 @@ export default function MainLandingClient({ creators }: Props) {
 
                     {/* Premium action button at the bottom */}
                     <div className="w-full">
-                      <Link 
+                      <Link
                         href={`/creator/${creator.creator_name}`}
                         className="text-[9px] font-black text-black hover:bg-neutral-900 hover:text-[#FAF9F5] transition-all inline-flex items-center gap-1 justify-center py-2.5 px-4 border border-neutral-200 rounded-full w-full hover:border-black transition-all duration-300 magnetic-target"
                       >
@@ -753,33 +752,37 @@ export default function MainLandingClient({ creators }: Props) {
         </div>
       </section>
 
-      <section 
-        id="footer-section" 
-        className={`fixed bottom-0 left-0 w-full bg-[#1A1A1A] border-t border-[#222222] z-40 transform ${
-          showFooterPopup ? 'translate-y-0 opacity-100 shadow-[0_-30px_60px_rgba(0,0,0,0.4)]' : 'translate-y-full opacity-0 pointer-events-none'
-        }`}
+      <section
+        id="footer-section"
+        className={`fixed bottom-0 left-0 w-full bg-[#1A1A1A] border-t border-[#222222] z-40 transform ${showFooterPopup ? 'translate-y-0 opacity-100 shadow-[0_-30px_60px_rgba(0,0,0,0.4)]' : 'translate-y-full opacity-0 pointer-events-none'
+          }`}
         style={{ transition: 'all 1.5s cubic-bezier(0.16, 1, 0.3, 1)' }}
       >
         <footer className="w-full text-white pt-10 pb-8 px-6 md:px-12 lg:px-24 pointer-events-auto">
           <div className="max-w-[1200px] mx-auto">
-            
+
             {/* Top Grid */}
             <div className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-8 mb-8 text-left">
-              
+
               {/* Column 1: Support / Inquiry */}
               <div className="md:col-span-4 flex flex-col">
                 <h3 className="text-[#888888] font-bold text-xs mb-6 tracking-widest uppercase">Support Canvas</h3>
-                
-                <Link href="/login" className="bg-transparent hover:bg-[#222222] border border-transparent hover:border-[#333333] transition-all rounded-lg p-4 flex items-center justify-between group mb-2 cursor-pointer">
+
+                <div 
+                  onClick={(e) => {
+                    e.preventDefault()
+                  }}
+                  className="bg-transparent hover:bg-[#222222] border border-transparent hover:border-[#333333] transition-all rounded-lg p-4 flex items-center justify-between group mb-2 cursor-default select-none"
+                >
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded bg-[#333333] flex items-center justify-center text-[#AAAAAA] group-hover:text-[#FF424D] transition-colors">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M15.386 0.524c-4.764 0-8.64 3.876-8.64 8.64 0 4.75 3.876 8.613 8.64 8.613 4.75 0 8.614-3.864 8.614-8.613C24 4.4 20.136.524 15.386.524zM0 24h3.618V.524H0V24z"/></svg>
+                      <Mail size={16} />
                     </div>
-                    <span className="font-semibold text-xs text-[#CCCCCC] group-hover:text-white transition-colors">Become a Patreon</span>
+                    <span className="font-semibold text-xs text-[#CCCCCC] group-hover:text-white transition-colors">Contact Us</span>
                   </div>
-                  <span className="text-[#666666] group-hover:text-white transition-colors">↗</span>
-                </Link>
-                
+                  <span className="text-[#666666] group-hover:text-white transition-colors">→</span>
+                </div>
+
                 <a href="mailto:support@blockcanvas.com" className="bg-transparent hover:bg-[#222222] border border-transparent hover:border-[#333333] transition-all rounded-lg p-4 flex items-center justify-between group cursor-pointer">
                   <span className="font-semibold text-xs text-[#CCCCCC] group-hover:text-white transition-colors ml-11">Business Inquiry</span>
                   <span className="text-[#666666] group-hover:text-white transition-colors">↗</span>
@@ -791,7 +794,7 @@ export default function MainLandingClient({ creators }: Props) {
                 <h3 className="text-[#888888] font-bold text-xs mb-6 tracking-widest uppercase">Site</h3>
                 <ul className="space-y-1">
                   <li>
-                    <button 
+                    <button
                       onClick={() => {
                         toggleFooterPopup(false)
                         if (typeof window !== 'undefined' && (window as any).scrollToLandingIdx) {
@@ -805,7 +808,7 @@ export default function MainLandingClient({ creators }: Props) {
                     </button>
                   </li>
                   <li>
-                    <button 
+                    <button
                       onClick={() => {
                         toggleFooterPopup(false)
                         if (typeof window !== 'undefined' && (window as any).scrollToLandingIdx) {
@@ -814,12 +817,12 @@ export default function MainLandingClient({ creators }: Props) {
                       }}
                       className="flex items-center justify-between w-full p-3 rounded-lg hover:bg-[#222222] group transition-all text-[#CCCCCC] hover:text-white text-xs cursor-pointer focus:outline-none"
                     >
-                      <span className="font-semibold">Brand Mission</span>
+                      <span className="font-semibold">About Us</span>
                       <span className="text-[#666666] group-hover:text-white transition-colors text-sm">↓</span>
                     </button>
                   </li>
                   <li>
-                    <button 
+                    <button
                       onClick={() => {
                         toggleFooterPopup(false)
                         if (typeof window !== 'undefined' && (window as any).scrollToLandingIdx) {
@@ -828,7 +831,7 @@ export default function MainLandingClient({ creators }: Props) {
                       }}
                       className="flex items-center justify-between w-full p-3 rounded-lg hover:bg-[#222222] group transition-all text-[#CCCCCC] hover:text-white text-xs cursor-pointer focus:outline-none"
                     >
-                      <span className="font-semibold">Builder Guild</span>
+                      <span className="font-semibold">Creators list</span>
                       <span className="text-[#666666] group-hover:text-white transition-colors text-sm">↓</span>
                     </button>
                   </li>
@@ -846,14 +849,8 @@ export default function MainLandingClient({ creators }: Props) {
                     </a>
                   </li>
                   <li>
-                    <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="flex items-center justify-between w-full p-3 rounded-lg hover:bg-[#222222] group transition-all text-[#CCCCCC] hover:text-white text-xs cursor-pointer">
-                      <span className="font-semibold">Instagram</span>
-                      <span className="text-[#666666] group-hover:text-white transition-colors text-xs">↗</span>
-                    </a>
-                  </li>
-                  <li>
-                    <div 
-                      className="flex items-center justify-between w-full p-3 rounded-lg hover:bg-[#222222] group transition-all text-[#CCCCCC] hover:text-white cursor-pointer text-xs" 
+                    <div
+                      className="flex items-center justify-between w-full p-3 rounded-lg hover:bg-[#222222] group transition-all text-[#CCCCCC] hover:text-white cursor-pointer text-xs"
                       onClick={() => {
                         navigator.clipboard.writeText('BlockCanvas#0001')
                         alert('Discord ID Copied!')
@@ -869,7 +866,7 @@ export default function MainLandingClient({ creators }: Props) {
 
             {/* Bottom Bar with Centered Circular Top Button */}
             <div className="flex flex-col items-center justify-center pt-6 border-t border-[#222222] relative">
-              <button 
+              <button
                 onClick={() => {
                   toggleFooterPopup(false)
                   if (typeof window !== 'undefined' && (window as any).scrollToLandingIdx) {
