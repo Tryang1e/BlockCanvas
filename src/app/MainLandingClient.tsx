@@ -94,33 +94,57 @@ export default function MainLandingClient({ creators }: Props) {
       el.addEventListener('mousemove', onMouseMoveMagnetic as any)
     })
 
-    // 2.5. Kinetic Typography Splitted Letter GSAP Animation
+    // 2.5. andrewreff.com Style 3D Mouse Tracking Tilt & Liquid Wave Typography Animation
     const letters = document.querySelectorAll('.gsap-letter')
-    const letterHandlers: { el: Element; enter: () => void; leave: () => void }[] = []
+    const heroSection = mainHeroRef.current
 
-    letters.forEach((el) => {
-      const onMouseEnter = () => {
+    const handleMouseMoveTilt = (e: MouseEvent) => {
+      if (!heroSection) return
+      const rect = heroSection.getBoundingClientRect()
+      const centerX = rect.left + rect.width / 2
+      const centerY = rect.top + rect.height / 2
+      const diffX = e.clientX - centerX
+      const diffY = e.clientY - centerY
+
+      // Calculate smooth tilt values (max 22 degrees of immersive 3D tilting)
+      const rotateY = (diffX / window.innerWidth) * 35
+      const rotateX = -(diffY / window.innerHeight) * 35
+
+      letters.forEach((el, index) => {
+        // Apply micro stagger factor for laggy liquid waves dynamics
+        const factor = 0.8 + index * 0.05
         gsap.to(el, {
-          y: -25,
-          scale: 1.15,
-          color: '#FF424D',
-          duration: 0.6,
-          ease: 'back.out(2)'
+          rotateX: rotateX * factor,
+          rotateY: rotateY * factor,
+          x: (diffX * 0.04) * factor,
+          y: (diffY * 0.04) * factor,
+          z: 35 * factor,
+          duration: 0.7,
+          ease: 'power2.out',
+          overwrite: 'auto'
         })
-      }
-      const onMouseLeave = () => {
+      })
+    }
+
+    const handleMouseLeaveTilt = () => {
+      letters.forEach((el) => {
         gsap.to(el, {
+          rotateX: 0,
+          rotateY: 0,
+          x: 0,
           y: 0,
-          scale: 1,
-          color: '#111111',
-          duration: 0.8,
-          ease: 'power3.out'
+          z: 0,
+          duration: 1.6,
+          ease: 'elastic.out(1, 0.6)',
+          overwrite: 'auto'
         })
-      }
-      el.addEventListener('mouseenter', onMouseEnter)
-      el.addEventListener('mouseleave', onMouseLeave)
-      letterHandlers.push({ el, enter: onMouseEnter, leave: onMouseLeave })
-    })
+      })
+    }
+
+    if (heroSection) {
+      heroSection.addEventListener('mousemove', handleMouseMoveTilt)
+      heroSection.addEventListener('mouseleave', handleMouseLeaveTilt)
+    }
 
     // 3. Hero Monolith visual alignment
     if (mainHeroRef.current) {
@@ -451,10 +475,10 @@ export default function MainLandingClient({ creators }: Props) {
         el.removeEventListener('mousemove', move as any)
       })
 
-      letterHandlers.forEach(({ el, enter, leave }) => {
-        el.removeEventListener('mouseenter', enter)
-        el.removeEventListener('mouseleave', leave)
-      })
+      if (heroSection) {
+        heroSection.removeEventListener('mousemove', handleMouseMoveTilt)
+        heroSection.removeEventListener('mouseleave', handleMouseLeaveTilt)
+      }
 
       ScrollTrigger.getAll().forEach(trigger => trigger.kill())
       delete (window as any).scrollToLandingIdx
