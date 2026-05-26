@@ -743,8 +743,8 @@ export default function MainLandingClient({ creators }: Props) {
         <div className="relative z-20 w-full px-6 md:px-12 flex flex-col items-center text-center my-auto">
           <h1 className="hero-kinetic-title text-6xl md:text-9xl lg:text-[10rem] font-black tracking-tighter leading-[0.85] uppercase select-none luxury-text-heavy flex items-center justify-center gap-0.5 md:gap-1.5">
             {"BLOCKCANVAS".split("").map((letter, i) => (
-              <span 
-                key={i} 
+              <span
+                key={i}
                 className="gsap-letter inline-block cursor-default"
                 style={{ display: 'inline-block', transformOrigin: 'bottom center' }}
               >
@@ -777,17 +777,17 @@ export default function MainLandingClient({ creators }: Props) {
           </span>
 
           {/* Heading - Dynamic contrast layout matching pixelnetwork */}
-          <h2 className="text-4xl md:text-6xl lg:text-[3.8rem] text-neutral-900 leading-snug tracking-tight mb-12 w-full">
-            <span className="font-black text-black">크리에이터의 공간 창작물과 브랜드 가치</span>
-            <span className="font-light text-neutral-400 block mt-2">를 온전히 증명하고 세상에 펼치도록.</span>
+          <h2 className="text-5xl md:text-7xl lg:text-[5.4rem] text-neutral-900 leading-[1.1] tracking-tighter mb-12 w-full">
+            <span className="font-black text-black uppercase block">BLOCKCANVAS</span>
+            <span className="font-light text-neutral-400 block mt-4 text-3xl md:text-5xl lg:text-[2.8rem] tracking-tight">크리에이터들을 위한 공간</span>
           </h2>
 
           {/* Core description paragraphs split layout */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-16 w-full mt-6">
-            <p className="text-sm md:text-base text-[#555555] font-normal leading-relaxed">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-24 w-full mt-6">
+            <p className="text-base md:text-[1.125rem] text-[#333333] font-normal leading-relaxed">
               BlockCanvas는 가상 공간 디자이너와 빌더들이 단순한 인게임 플레이어에 머무르지 않고, 하나의 완성된 공간 아티스트로서 온전한 가치를 인정받을 수 있는 혁신적인 포트폴리오 빌딩 엔진을 지향합니다. 크리에이터가 중심이 되어 높은 신뢰도와 상상력을 바탕으로 각 분야 최고의 마스터 빌더들이 하나로 뭉쳐있습니다.
             </p>
-            <p className="text-sm md:text-base text-[#555555] font-normal leading-relaxed">
+            <p className="text-base md:text-[1.125rem] text-[#333333] font-normal leading-relaxed">
               인게임 빌딩의 디테일한 배치와 구조를 웹 브라우저 상에 그대로 재현하고 마우스 드래그를 통해 누구나 손쉽게 공간을 편집하고 상호작용하도록 함으로써, 크리에이터에게는 온전한 브랜딩 가치를, 파트너사에게는 한 차원 높은 메타버스 브랜딩 솔루션을 긴밀하게 전달합니다.
             </p>
           </div>
@@ -925,7 +925,7 @@ export default function MainLandingClient({ creators }: Props) {
               <div className="md:col-span-4 flex flex-col">
                 <h3 className="text-[#888888] font-bold text-xs mb-6 tracking-widest uppercase">Support Canvas</h3>
 
-                <div 
+                <div
                   onClick={(e) => {
                     e.preventDefault()
                   }}
@@ -1006,10 +1006,10 @@ export default function MainLandingClient({ creators }: Props) {
                     </a>
                   </li>
                   <li>
-                    <a 
-                      href="https://discord.gg/xbA5Y5QWf5" 
-                      target="_blank" 
-                      rel="noopener noreferrer" 
+                    <a
+                      href="https://discord.gg/xbA5Y5QWf5"
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="flex items-center justify-between w-full p-3 rounded-lg hover:bg-[#222222] group transition-all text-[#CCCCCC] hover:text-white text-xs cursor-pointer"
                     >
                       <span className="font-semibold">Discord</span>
