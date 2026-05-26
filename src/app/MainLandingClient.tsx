@@ -1,10 +1,11 @@
 'use client'
 
-import React, { useEffect, useRef, useState, useTransition } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { submitContactMessage } from '@/app/actions/contact'
-import { ArrowRight, Sparkles, Move, Users, Award, Shield, Cpu, Compass } from 'lucide-react'
+import { ArrowRight, Sparkles, Move, Users, Shield, Cpu, Compass, ArrowUp } from 'lucide-react'
+import InfiniteMarquee from '@/components/ui/InfiniteMarquee'
+import CustomCursor from '@/components/ui/CustomCursor'
 
 // Import GSAP safely
 import { gsap } from 'gsap'
@@ -34,29 +35,18 @@ interface Props {
 
 export default function MainLandingClient({ creators }: Props) {
   const [scrollProgress, setScrollProgress] = useState(0)
-  const [isPending, startTransition] = useTransition()
-  const [formStatus, setFormStatus] = useState<{ success?: boolean; error?: string } | null>(null)
   
-  // Custom precise crosshair cursor state
-  const [cursorState, setCursorState] = useState<'default' | 'hover' | 'magnetic'>('default')
+  // Track active slide index for vertical side dot navigation
+  const [currentIdx, setCurrentIdx] = useState(0)
+  const currentIdxRef = useRef(0)
 
   // Top level DOM Refs
   const mainContainerRef = useRef<HTMLDivElement>(null)
-  const customCursorRef = useRef<HTMLDivElement>(null)
-  const cursorRingRef = useRef<HTMLDivElement>(null)
-  const cursorCrosshairRef = useRef<HTMLDivElement>(null)
 
   // Dynamic Workspace Page Alignments
   const mainHeroRef = useRef<HTMLElement>(null)
-  const interactiveCanvasRef = useRef<HTMLElement>(null)
   const staffPanelRef = useRef<HTMLElement>(null)
   const statsContainerRef = useRef<HTMLDivElement>(null)
-  const inquirySectionRef = useRef<HTMLElement>(null)
-  const inquiryBoxRef = useRef<HTMLDivElement>(null)
-
-  // Floating Draggable Mockups (aligned with the creator portfolio card aesthetic)
-  const dragContainerRef = useRef<HTMLDivElement>(null)
-  const floatingBlockRefs = useRef<(HTMLDivElement | null)[]>([])
   
   const heroZoomImgRef = useRef<HTMLDivElement>(null)
   const milestoneRefs = useRef<(HTMLSpanElement | null)[]>([])
@@ -64,23 +54,7 @@ export default function MainLandingClient({ creators }: Props) {
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    const cursor = customCursorRef.current
-    const ring = cursorRingRef.current
-    const cross = cursorCrosshairRef.current
-
-    // 1. Dynamic kinetic custom cursor
-    const onMouseMove = (e: MouseEvent) => {
-      if (cursor) {
-        gsap.to(cursor, {
-          x: e.clientX,
-          y: e.clientY,
-          duration: 0.05,
-          ease: 'power2.out'
-        })
-      }
-    }
-    window.addEventListener('mousemove', onMouseMove, { passive: true })
-
+    // 1. Scroll progress listener
     const handleScroll = () => {
       const totalScroll = document.documentElement.scrollHeight - window.innerHeight
       if (totalScroll > 0) {
@@ -91,16 +65,10 @@ export default function MainLandingClient({ creators }: Props) {
 
     // 2. High-performance Magnetic Effect (creator page DNA)
     const magneticElements = document.querySelectorAll('.magnetic-target')
+    const magneticHandlers: { el: Element; leave: () => void; move: (e: MouseEvent) => void }[] = []
+    
     magneticElements.forEach((el) => {
-      const onMouseEnter = () => {
-        setCursorState('magnetic')
-        gsap.to(ring, { scale: 2.2, borderColor: '#1A1A1A', backgroundColor: 'rgba(26,26,26,0.06)', duration: 0.3 })
-        gsap.to(cross, { opacity: 1, scale: 1, rotate: 45, duration: 0.4, ease: 'back.out(2)' })
-      }
       const onMouseLeave = () => {
-        setCursorState('default')
-        gsap.to(ring, { scale: 1, borderColor: 'rgba(26,26,26,0.3)', backgroundColor: 'transparent', duration: 0.3 })
-        gsap.to(cross, { opacity: 0, scale: 0.5, rotate: 0, duration: 0.3 })
         gsap.to(el, { x: 0, y: 0, duration: 0.5, ease: 'power2.out' })
       }
       const onMouseMoveMagnetic = (e: MouseEvent) => {
@@ -114,28 +82,44 @@ export default function MainLandingClient({ creators }: Props) {
           ease: 'power2.out'
         })
       }
-      el.addEventListener('mouseenter', onMouseEnter)
       el.addEventListener('mouseleave', onMouseLeave)
       el.addEventListener('mousemove', onMouseMoveMagnetic as any)
+      magneticHandlers.push({ el, leave: onMouseLeave, move: onMouseMoveMagnetic })
     })
 
     // 3. Hero Monolith visual alignment
     if (mainHeroRef.current) {
+      // Enable 3D perspective context
+      gsap.set(mainHeroRef.current, { perspective: 1200 })
+
       const heroTl = gsap.timeline({
         scrollTrigger: {
           trigger: mainHeroRef.current,
           start: 'top top',
           end: 'bottom top',
           scrub: true,
-          pin: true,
-          pinSpacing: true
+          pin: false
         }
       })
 
       if (heroZoomImgRef.current) {
         heroTl.to(heroZoomImgRef.current, {
-          scale: 0.84,
-          borderRadius: '32px',
+          scale: 0.8,
+          rotateX: 12,
+          rotateY: -4,
+          y: 60,
+          borderRadius: '40px',
+          boxShadow: '0 50px 100px -20px rgba(0,0,0,0.12)',
+          duration: 1.5,
+          ease: 'power2.inOut'
+        }, 0)
+      }
+
+      const grid = mainHeroRef.current.querySelector('.hero-bg-grid')
+      if (grid) {
+        heroTl.to(grid, {
+          scale: 1.15,
+          opacity: 0.6,
           duration: 1.5,
           ease: 'power2.inOut'
         }, 0)
@@ -143,57 +127,27 @@ export default function MainLandingClient({ creators }: Props) {
 
       const title = mainHeroRef.current.querySelector('.hero-kinetic-title')
       const tag = mainHeroRef.current.querySelector('.hero-kinetic-tag')
-      if (title && tag) {
-        heroTl.to(title, { yPercent: -15, scale: 0.94, opacity: 0.2, duration: 1.2 }, 0)
-        heroTl.to(tag, { yPercent: 15, opacity: 0, duration: 0.8 }, 0)
+      if (title) {
+        heroTl.to(title, { 
+          yPercent: -40, 
+          scale: 0.85, 
+          rotateX: -15, 
+          opacity: 0, 
+          duration: 1.2, 
+          ease: 'power1.inOut' 
+        }, 0)
+      }
+      if (tag) {
+        heroTl.to(tag, { 
+          yPercent: -20, 
+          opacity: 0, 
+          duration: 0.8, 
+          ease: 'power1.in' 
+        }, 0)
       }
     }
 
-    // 4. Interactive Drag Sandbox logic (aligned with creator's DraggablePortfolio)
-    floatingBlockRefs.current.forEach((block) => {
-      if (!block) return
 
-      let isDragging = false
-      let startX = 0
-      let startY = 0
-      let currentX = 0
-      let currentY = 0
-
-      // Natural spread positions
-      const initX = (Math.random() - 0.5) * 240
-      const initY = (Math.random() - 0.5) * 160
-      const initRotate = (Math.random() - 0.5) * 12
-      
-      gsap.set(block, { x: initX, y: initY, rotate: initRotate })
-
-      const onMouseDown = (e: MouseEvent) => {
-        isDragging = true
-        startX = e.clientX - currentX
-        startY = e.clientY - currentY
-        block.style.cursor = 'grabbing'
-        block.style.zIndex = '35'
-        gsap.to(block, { scale: 1.04, rotate: initRotate + 4, boxShadow: '0 30px 60px -15px rgba(0,0,0,0.2)', duration: 0.3 })
-      }
-
-      const onMouseMoveDrag = (e: MouseEvent) => {
-        if (!isDragging) return
-        currentX = e.clientX - startX
-        currentY = e.clientY - startY
-        gsap.set(block, { x: currentX, y: currentY })
-      }
-
-      const onMouseUp = () => {
-        if (!isDragging) return
-        isDragging = false
-        block.style.cursor = 'grab'
-        block.style.zIndex = '30'
-        gsap.to(block, { scale: 1.0, rotate: initRotate, boxShadow: '0 15px 30px -5px rgba(0,0,0,0.08)', duration: 0.4, ease: 'back.out(1.4)' })
-      }
-
-      block.addEventListener('mousedown', onMouseDown)
-      window.addEventListener('mousemove', onMouseMoveDrag)
-      window.addEventListener('mouseup', onMouseUp)
-    })
 
     // 5. Dynamic Stats Counter
     if (statsContainerRef.current) {
@@ -226,130 +180,280 @@ export default function MainLandingClient({ creators }: Props) {
       })
     }
 
-    // 6. Artists Card Entrance Animation
+    // 6. Artists Panel Entrance Animation
     if (staffPanelRef.current) {
-      const cards = staffPanelRef.current.querySelectorAll('.artist-cinema-card')
-      cards.forEach((card) => {
-        gsap.fromTo(card,
-          { opacity: 0, y: 40 },
+      const header = staffPanelRef.current.querySelector('div')
+      const track = staffPanelRef.current.querySelector('.my-auto') || staffPanelRef.current.querySelector('.py-6') || staffPanelRef.current.querySelector('.py-8')
+      if (header && track) {
+        gsap.fromTo(header, 
+          { opacity: 0, y: 30 },
+          { opacity: 1, y: 0, duration: 1, ease: 'power3.out', scrollTrigger: { trigger: header, start: 'top 85%' } }
+        )
+        gsap.fromTo(track, 
+          { opacity: 0, scale: 0.96 },
+          { opacity: 1, scale: 1, duration: 1.2, ease: 'power3.out', scrollTrigger: { trigger: track, start: 'top 85%' } }
+        )
+      }
+    }
+
+    // 7. About Section Entrance Animation
+    const aboutSection = document.getElementById('about-section')
+    if (aboutSection) {
+      const watermark = aboutSection.querySelector('.about-watermark')
+      const content = aboutSection.querySelector('.about-content-box')
+      
+      if (watermark && content) {
+        gsap.fromTo(watermark,
+          { opacity: 0, x: -50 },
           {
-            opacity: 1,
-            y: 0,
-            duration: 0.8,
-            ease: 'power3.out',
+            opacity: 0.02,
+            x: 0,
+            duration: 1.5,
+            ease: 'power2.out',
             scrollTrigger: {
-              trigger: card,
-              start: 'top 90%',
+              trigger: aboutSection,
+              start: 'top 80%',
               toggleActions: 'play none none reverse'
             }
           }
         )
-      })
+        
+        gsap.fromTo(content,
+          { opacity: 0, y: 40 },
+          {
+            opacity: 1,
+            y: 0,
+            duration: 1.2,
+            ease: 'power3.out',
+            scrollTrigger: {
+              trigger: aboutSection,
+              start: 'top 75%',
+              toggleActions: 'play none none reverse'
+            }
+          }
+        )
+      }
     }
 
+    // --- 8. Premium Slide Scrolling Controller (pixelnetwork.kr-style slide-by-slide transitions) ---
+    const sections = ['#hero-section', '#about-section', '#staff-section']
+    let isAnimating = false
+    let startY = 0
+
+    const scrollToIdx = (idx: number) => {
+      if (idx < 0 || idx >= sections.length || isAnimating) return
+      isAnimating = true
+      currentIdxRef.current = idx
+      setCurrentIdx(idx)
+
+      const target = document.querySelector(sections[idx]) as HTMLElement
+      if (target) {
+        const targetTop = target.getBoundingClientRect().top + window.scrollY
+        window.scrollTo({
+          top: targetTop,
+          behavior: 'smooth'
+        })
+      }
+
+      // Lock scroll gestures during smooth sweep transition (1000ms)
+      setTimeout(() => {
+        isAnimating = false
+      }, 1000)
+    }
+
+    // Expose scrollToIdx for JSX elements (side indicators & footer circular button)
+    ;(window as any).scrollToLandingIdx = scrollToIdx
+
+    // Wheel listener (non-passive to allow preventDefault)
+    const handleWheelEvent = (e: WheelEvent) => {
+      e.preventDefault()
+      if (isAnimating) return
+
+      if (e.deltaY > 15) {
+        scrollToIdx(currentIdxRef.current + 1)
+      } else if (e.deltaY < -15) {
+        scrollToIdx(currentIdxRef.current - 1)
+      }
+    }
+
+    // Touch handlers to capture mobile swipe gestures
+    const handleTouchStart = (e: TouchEvent) => {
+      startY = e.touches[0].clientY
+    }
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (isAnimating) {
+        e.preventDefault()
+        return
+      }
+
+      const diffY = startY - e.touches[0].clientY
+      if (Math.abs(diffY) > 40) {
+        e.preventDefault()
+        if (diffY > 0) {
+          scrollToIdx(currentIdxRef.current + 1)
+        } else {
+          scrollToIdx(currentIdxRef.current - 1)
+        }
+      }
+    }
+
+    // Keydown handlers for arrow & page keys
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const keys = ['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', ' ', 'Spacebar']
+      if (keys.includes(e.key)) {
+        e.preventDefault()
+        if (isAnimating) return
+
+        if (e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ' || e.key === 'Spacebar') {
+          scrollToIdx(currentIdxRef.current + 1)
+        } else if (e.key === 'ArrowUp' || e.key === 'PageUp') {
+          scrollToIdx(currentIdxRef.current - 1)
+        }
+      }
+    }
+
+    // Direct header nav click synchronization
+    const navLinks = document.querySelectorAll('header nav a, header a[href^="#"]')
+    const linkClickHandlers: { el: Element; handler: (e: Event) => void }[] = []
+    
+    navLinks.forEach((link) => {
+      const href = link.getAttribute('href')
+      const targetIdx = sections.indexOf(href || '')
+      if (targetIdx !== -1) {
+        const clickHandler = (e: Event) => {
+          e.preventDefault()
+          scrollToIdx(targetIdx)
+        }
+        link.addEventListener('click', clickHandler)
+        linkClickHandlers.push({ el: link, handler: clickHandler })
+      }
+    })
+
+    window.addEventListener('wheel', handleWheelEvent, { passive: false })
+    window.addEventListener('touchstart', handleTouchStart, { passive: true })
+    window.addEventListener('touchmove', handleTouchMove, { passive: false })
+    window.addEventListener('keydown', handleKeyDown, { passive: false })
+
+    // Refresh ScrollTrigger to align all start/end positions perfectly with the snapping offsets
+    ScrollTrigger.refresh()
+
     return () => {
-      window.removeEventListener('mousemove', onMouseMove)
       window.removeEventListener('scroll', handleScroll)
+      window.removeEventListener('wheel', handleWheelEvent)
+      window.removeEventListener('touchstart', handleTouchStart)
+      window.removeEventListener('touchmove', handleTouchMove)
+      window.removeEventListener('keydown', handleKeyDown)
+      
+      linkClickHandlers.forEach(({ el, handler }) => {
+        el.removeEventListener('click', handler)
+      })
+      
+      magneticHandlers.forEach(({ el, leave, move }) => {
+        el.removeEventListener('mouseleave', leave)
+        el.removeEventListener('mousemove', move as any)
+      })
+      
       ScrollTrigger.getAll().forEach(trigger => trigger.kill())
+      delete (window as any).scrollToLandingIdx
     }
   }, [creators])
 
-  // Handle cooperation inquiry submit
-  const handleInquirySubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setFormStatus(null)
-    
-    const formData = new FormData(e.currentTarget)
-    const name = formData.get('name') as string
-    const email = formData.get('email') as string
-    const message = formData.get('message') as string
-
-    if (!name || !email || !message) {
-      setFormStatus({ error: '모든 항목을 기재해 주십시오.' })
-      return
-    }
-
-    startTransition(async () => {
-      const targetName = creators[0]?.creator_name || 'steve_builder'
-      const res = await submitContactMessage(targetName, { name, email, message })
-      
-      if (res.success) {
-        setFormStatus({ success: true })
-        const form = document.getElementById('inquiry-form') as HTMLFormElement
-        if (form) form.reset()
-      } else {
-        setFormStatus({ error: res.error || '송신 중 오류가 발생했습니다.' })
+  const mergedCreators = [
+    ...creators,
+    ...(creators.length < 5 ? [
+      {
+        id: 'staff-1',
+        creator_name: 'steve_builder',
+        display_name: 'Steve Buildmaster',
+        avatar_url: null,
+        role: 'creator',
+        portfolios: {
+          headline: 'Chief Spatial & Monolith Architect',
+          about_text: '웅장한 천상 제국 돔 성곽 및 판타지 요새 총괄 설계 담당 주석 아티스트'
+        }
+      },
+      {
+        id: 'staff-2',
+        creator_name: 'level_designer_x',
+        display_name: 'Alex Design',
+        avatar_url: null,
+        role: 'creator',
+        portfolios: {
+          headline: 'Lead Megacity Level Designer',
+          about_text: '한 칸의 오차도 없는 완벽한 하이테크 미래 메트로폴리스 도시 구획 감독'
+        }
+      },
+      {
+        id: 'staff-3',
+        creator_name: 'mc_pixel_art',
+        display_name: 'PixelCraft',
+        avatar_url: null,
+        role: 'creator',
+        portfolios: {
+          headline: 'Asset Architecture Director',
+          about_text: '인게임 거대 3D 입체 조형물 및 자산 모듈 총괄 관리 이사'
+        }
       }
-    })
-  }
-
-  const demoCreators = creators.length > 0 ? creators : [
-    {
-      id: 'staff-1',
-      creator_name: 'steve_builder',
-      display_name: 'Steve Buildmaster',
-      avatar_url: null,
-      role: 'creator',
-      portfolios: {
-        headline: 'Chief Spatial & Monolith Architect',
-        about_text: '웅장한 천상 제국 돔 성곽 및 판타지 요새 총괄 설계 담당 주석 아티스트',
-        theme_bg_color: '#B5A28C',
-        theme_bg_effect: 'none'
-      }
-    },
-    {
-      id: 'staff-2',
-      creator_name: 'level_designer_x',
-      display_name: 'Alex Design',
-      avatar_url: null,
-      role: 'creator',
-      portfolios: {
-        headline: 'Lead Megacity Level Designer',
-        about_text: '한 칸의 오차도 없는 완벽한 하이테크 미래 메트로폴리스 도시 구획 감독',
-        theme_bg_color: '#4B3F72',
-        theme_bg_effect: 'none'
-      }
-    },
-    {
-      id: 'staff-3',
-      creator_name: 'mc_pixel_art',
-      display_name: 'PixelCraft',
-      avatar_url: null,
-      role: 'creator',
-      portfolios: {
-        headline: 'Asset Architecture Director',
-        about_text: '인게임 거대 3D 입체 조형물 및 자산 모듈 총괄 관리 이사',
-        theme_bg_color: '#2A9D8F',
-        theme_bg_effect: 'none'
-      }
-    }
+    ] : [])
   ] as any[]
 
   return (
     <div 
       ref={mainContainerRef}
-      className="min-h-screen bg-[#FAF9F5] text-[#1E2022] font-sans overflow-x-hidden selection:bg-black selection:text-white relative cursor-none w-full"
+      className="min-h-screen bg-[#FAF9F5] text-[#1E2022] font-sans overflow-x-hidden selection:bg-black selection:text-white relative cursor-default w-full"
     >
+      {/* 📐 Premium Native CSS Scroll Snapping Engine - Delegated to high-perf JS sweep controller */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        html, body {
+          scroll-behavior: smooth !important;
+          overflow-y: auto !important;
+          overflow-x: hidden !important;
+        }
+        .snap-section {
+          height: 100vh !important;
+          height: 100dvh !important;
+          position: relative !important;
+          overflow: hidden !important;
+        }
+      `}} />
       
-      {/* 🎯 Custom precise tracking reticle cursor */}
-      <div 
-        ref={customCursorRef}
-        className="fixed w-6 h-6 pointer-events-none z-50 -translate-x-1/2 -translate-y-1/2 hidden md:block"
-        style={{ transform: 'translate3d(-100px, -100px, 0)' }}
-      >
-        <div 
-          ref={cursorRingRef}
-          className="absolute inset-0 rounded-full border border-black/30 transition-transform duration-300 ease-out" 
-        />
-        <div className="absolute inset-2 bg-black rounded-full scale-[0.4]" />
-        
-        <div 
-          ref={cursorCrosshairRef}
-          className="absolute inset-0 opacity-0 scale-50 transition-all duration-300 ease-out pointer-events-none"
-        >
-          <div className="absolute top-0 bottom-0 left-[50%] w-[1px] bg-black/40" />
-          <div className="absolute left-0 right-0 top-[50%] h-[1px] bg-black/40" />
-        </div>
+      {/* 🎯 Premium Dynamic Mix-blend Custom Circle Cursor */}
+      <CustomCursor />
+
+      {/* 🧭 Premium Vertical Section Navigation Indicators */}
+      <div className="fixed right-6 top-1/2 -translate-y-1/2 z-40 hidden md:flex flex-col gap-4">
+        {[
+          { label: '시네마틱', idx: 0 },
+          { label: '브랜드 미션', idx: 1 },
+          { label: '빌더 길드', idx: 2 }
+        ].map((item) => {
+          const isActive = currentIdx === item.idx
+          return (
+            <button
+              key={item.idx}
+              onClick={() => {
+                if (typeof window !== 'undefined' && (window as any).scrollToLandingIdx) {
+                  (window as any).scrollToLandingIdx(item.idx)
+                }
+              }}
+              className="group relative flex items-center justify-end focus:outline-none pointer-events-auto"
+            >
+              <span className="absolute right-8 bg-neutral-900/90 backdrop-blur-md text-white text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md opacity-0 translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 pointer-events-none whitespace-nowrap shadow-md">
+                {item.label}
+              </span>
+              <div 
+                className={`w-3.5 h-3.5 rounded-full flex items-center justify-center transition-all duration-300 ${
+                  isActive 
+                    ? 'border-2 border-black bg-transparent scale-110' 
+                    : 'bg-neutral-300 hover:bg-neutral-500 scale-75'
+                }`}
+              >
+                {isActive && <div className="w-1.5 h-1.5 bg-black rounded-full" />}
+              </div>
+            </button>
+          )
+        })}
       </div>
 
       {/* Top thin progress scroll tracking bar */}
@@ -359,9 +463,9 @@ export default function MainLandingClient({ creators }: Props) {
       />
 
       {/* 🏛️ Pure Minimal Translucent Header Bar */}
-      <header className="fixed top-0 left-0 right-0 z-45 bg-[#FAF9F5]/75 backdrop-blur-md border-b border-neutral-200/40 py-5 w-full">
+      <header className="fixed top-0 left-0 right-0 z-[45] bg-[#FAF9F5]/75 backdrop-blur-md border-b border-neutral-200/40 py-5 w-full pointer-events-none">
         <div className="w-full px-6 md:px-12 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3 group magnetic-target">
+          <Link href="/" className="flex items-center gap-3 group magnetic-target pointer-events-auto">
             <div className="relative w-5 h-5 transition-transform duration-500 group-hover:rotate-90">
               <Image src="/logo_icon.png" alt="BlockCanvas Logo" fill className="object-contain" />
             </div>
@@ -370,14 +474,13 @@ export default function MainLandingClient({ creators }: Props) {
             </span>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-8 text-[9px] font-bold text-neutral-400 uppercase tracking-widest">
+          <nav className="hidden md:flex items-center gap-8 text-[9px] font-bold text-neutral-400 uppercase tracking-widest pointer-events-auto">
             <a href="#hero-section" className="hover:text-black transition-colors magnetic-target">시네마틱</a>
-            <a href="#interactive-canvas" className="hover:text-black transition-colors magnetic-target">캔버스 시뮬레이터</a>
+            <a href="#about-section" className="hover:text-black transition-colors magnetic-target">브랜드 미션</a>
             <a href="#staff-section" className="hover:text-black transition-colors magnetic-target">빌더 길드</a>
-            <a href="#cooperation-section" className="hover:text-black transition-colors magnetic-target">공식 협업</a>
           </nav>
 
-          <div>
+          <div className="pointer-events-auto">
             <Link 
               href="/login" 
               className="text-[9px] font-bold text-neutral-400 hover:text-black transition-colors py-1.5 px-4 border border-neutral-200 bg-white hover:bg-neutral-50 magnetic-target"
@@ -392,332 +495,328 @@ export default function MainLandingClient({ creators }: Props) {
       <section 
         id="hero-section" 
         ref={mainHeroRef}
-        className="relative h-[100vh] w-full bg-[#FAF9F5] flex items-center justify-center overflow-hidden z-20 border-b border-neutral-200"
+        className="snap-section w-full bg-[#FAF9F5] flex flex-col justify-center border-b border-neutral-200 relative overflow-hidden"
       >
         {/* Dynamic Space Particles background aligned with creator portfolios */}
-        <div className="absolute inset-0 bg-neutral-950 z-0">
-          <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle, #333 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+        <div className="absolute inset-0 bg-[#FAF9F5] z-0">
+          <div 
+            className="hero-bg-grid absolute inset-0 opacity-30 pointer-events-none origin-center" 
+            style={{ backgroundImage: 'linear-gradient(to right, #E2E2D9 1px, transparent 1px), linear-gradient(to bottom, #E2E2D9 1px, transparent 1px)', backgroundSize: '48px 48px' }} 
+          />
           <div 
             ref={heroZoomImgRef}
             className="absolute inset-0 w-full h-full overflow-hidden origin-center"
           >
             <Image 
-              src="/example3.png" 
-              alt="BlockCanvas Cinematic Monolith" 
-              fill 
-              className="object-cover brightness-75 opacity-75"
-              priority
+               src="/example3.png" 
+               alt="BlockCanvas Cinematic Monolith" 
+               fill 
+               className="object-cover brightness-90 opacity-90"
+               priority
             />
-            <div className="absolute inset-0 bg-gradient-to-b from-[#FAF9F5]/10 via-transparent to-[#FAF9F5]" />
+            <div className="absolute inset-0 bg-gradient-to-b from-[#FAF9F5]/15 via-transparent to-[#FAF9F5]" />
           </div>
         </div>
 
-        <div className="relative z-20 w-full px-6 md:px-12 flex flex-col items-center text-center">
-          <div className="hero-kinetic-tag inline-flex items-center gap-1.5 px-3 py-1 bg-white border border-neutral-200 text-black text-[8px] font-bold uppercase tracking-widest mb-6 select-none rounded-full shadow-sm">
-            <Sparkles size={10} className="text-yellow-500 animate-pulse" />
-            <span>THE ULTIMATE PORTFOLIO BUILDER ENGINE</span>
-          </div>
+        {/* Top spacer to account for header heights */}
+        <div className="h-24 md:h-32" />
 
-          <h1 className="hero-kinetic-title text-6xl md:text-9xl lg:text-[10rem] font-black tracking-tighter leading-[0.85] uppercase text-white select-none drop-shadow-lg">
+        <div className="relative z-20 w-full px-6 md:px-12 flex flex-col items-center text-center my-auto">
+          <h1 className="hero-kinetic-title text-6xl md:text-9xl lg:text-[10rem] font-black tracking-tighter leading-[0.85] uppercase text-neutral-900 select-none">
             BLOCKCANVAS
           </h1>
         </div>
       </section>
 
-      {/* 📊 STAGE 2: Stats Grid Panel */}
+      {/* 🏛️ STAGE 2.5: Brand Mission About Section (pixelnetwork.kr/#about 레이아웃 구조 차용, 디자인 톤앤매너 완벽 유지) */}
       <section 
-        ref={statsContainerRef} 
-        className="py-12 bg-[#FAF9F5] border-b border-neutral-200 w-full px-6 md:px-12 relative z-20"
+        id="about-section"
+        className="snap-section w-full bg-[#FAF9F5] flex flex-col justify-center px-6 md:px-12 relative overflow-hidden z-20 border-b border-neutral-200"
       >
-        <div className="w-full grid grid-cols-2 md:grid-cols-4 gap-6">
-          <div className="flex flex-col items-start p-4 border-l border-neutral-200 text-left">
-            <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-widest mb-2">Block Volume</span>
-            <span ref={(el) => { milestoneRefs.current[0] = el }} className="text-2xl md:text-3xl font-extrabold text-black font-mono">0+</span>
-          </div>
-
-          <div className="flex flex-col items-start p-4 border-l border-neutral-200 text-left">
-            <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-widest mb-2">Lead Architects</span>
-            <span ref={(el) => { milestoneRefs.current[1] = el }} className="text-2xl md:text-3xl font-extrabold text-black font-mono">0+</span>
-          </div>
-
-          <div className="flex flex-col items-start p-4 border-l border-neutral-200 text-left">
-            <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-widest mb-2">Citadels Built</span>
-            <span ref={(el) => { milestoneRefs.current[2] = el }} className="text-2xl md:text-3xl font-extrabold text-black font-mono">0+</span>
-          </div>
-
-          <div className="flex flex-col items-start p-4 border-l border-neutral-200 text-left">
-            <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-widest mb-2">Contract Rate</span>
-            <span ref={(el) => { milestoneRefs.current[3] = el }} className="text-2xl md:text-3xl font-extrabold text-black font-mono">0%</span>
+        {/* Dynamic Watermark Background Layer wrapped safely to prevent horizontal overflow */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+          <div className="about-watermark absolute top-[-5%] left-[-2%] text-[24vw] font-black text-neutral-900 opacity-[0.02] select-none tracking-tighter uppercase leading-none">
+            canvas
           </div>
         </div>
-      </section>
 
-      {/* 🎡 STAGE 3: 진짜 크리에이터 페이지의 "드래그 감성"과 100% 매칭시킨 "인터랙티브 블루프린트 캔버스" */}
-      <section 
-        id="interactive-canvas"
-        ref={interactiveCanvasRef}
-        className="w-full min-h-[105vh] bg-[#FAF9F5] py-24 px-6 md:px-12 relative overflow-hidden z-20 border-b border-neutral-200 flex flex-col justify-between"
-      >
-        {/* Dynamic deep space visual alignment grid inside interactive canvas */}
-        <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#000 1.5px, transparent 1.5px)', backgroundSize: '36px 36px' }} />
+        {/* CAD Blueprint grid overlay matching drawing-board aesthetic */}
+        <div className="absolute inset-0 opacity-[0.015] pointer-events-none" style={{ backgroundImage: 'linear-gradient(to right, #000 1px, transparent 1px), linear-gradient(to bottom, #000 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
 
-        <div className="w-full text-left z-30 relative max-w-4xl">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white border border-neutral-200 text-neutral-600 text-[8px] font-bold uppercase tracking-widest mb-4 rounded-full shadow-sm">
-            <Cpu size={10} className="text-black" />
-            <span>INTERACTIVE WORKSPACE SIMULATOR</span>
-          </div>
-          <h2 className="text-4xl md:text-6xl font-black text-black uppercase tracking-tighter leading-tight">
-            당신의 포트폴리오를<br />자유롭게 드래그하세요.
+        <div className="about-content-box w-full max-w-5xl mx-auto text-left relative z-10 flex flex-col justify-center items-start">
+          <span className="text-neutral-400 text-[9px] font-bold uppercase tracking-widest mb-4 block flex items-center gap-1.5 font-mono">
+            <Compass size={11} className="text-neutral-400 animate-spin" style={{ animationDuration: '6s' }} />
+            <span>BRAND MISSION</span>
+          </span>
+
+          {/* Heading - Dynamic contrast layout matching pixelnetwork */}
+          <h2 className="text-3xl md:text-5xl lg:text-[2.8rem] text-neutral-900 leading-snug tracking-tight mb-12 w-full">
+            <span className="font-black text-black">크리에이터의 공간 창작물과 브랜드 가치</span>
+            <span className="font-light text-neutral-400 block mt-2">를 온전히 증명하고 세상에 펼치도록.</span>
           </h2>
-          <p className="text-[11px] md:text-xs text-neutral-400 font-mono mt-3 uppercase tracking-wider block">
-            [ MOUSE DRAG THE BLOCKS BELOW TO BUILD YOUR UNIQUE LANDSCAPE ]
-          </p>
-        </div>
 
-        {/* Dynamic Sandbox area matching creator portfolio theme parameters */}
-        <div 
-          ref={dragContainerRef}
-          className="w-full flex-1 min-h-[55vh] relative flex items-center justify-center my-12"
-        >
-          {/* Draggable Block Card 1 */}
-          <div 
-            ref={(el) => { floatingBlockRefs.current[0] = el }}
-            className="absolute w-[240px] md:w-[320px] bg-white border border-neutral-200 p-4 shadow-xl select-none cursor-grab active:cursor-grabbing hover:border-black transition-colors duration-300 z-30 rounded-2xl"
-          >
-            <div className="relative w-full aspect-video bg-neutral-900 overflow-hidden rounded-xl mb-3 border border-neutral-100">
-              <Image src="/example1.png" alt="Steve Works" fill className="object-cover pointer-events-none" />
-            </div>
-            <div className="flex justify-between items-center border-t border-neutral-100 pt-3 text-left">
-              <div>
-                <span className="text-[8px] font-bold text-neutral-400 font-mono">01 / LANDSCAPE</span>
-                <h4 className="text-[11.5px] font-extrabold text-black uppercase">발할라 황실 성당</h4>
-              </div>
-              <Link href="/creator/steve_builder" className="text-[8px] font-bold text-white bg-black px-2.5 py-1.5 hover:bg-neutral-800 transition-colors rounded-lg">
-                VIEW
-              </Link>
-            </div>
-            <div className="absolute top-2 right-2 flex items-center gap-1 text-[7px] font-bold bg-white/90 border border-neutral-200 px-1.5 py-0.5 rounded-full text-neutral-600 shadow-sm pointer-events-none">
-              <Move size={8} />
-              <span>DRAG</span>
-            </div>
+          {/* Core description paragraphs split layout */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-16 w-full mt-6">
+            <p className="text-xs md:text-sm text-[#555555] font-normal leading-relaxed">
+              BlockCanvas는 가상 공간 디자이너와 빌더들이 단순한 인게임 플레이어에 머무르지 않고, 하나의 완성된 공간 아티스트로서 온전한 가치를 인정받을 수 있는 혁신적인 포트폴리오 빌딩 엔진을 지향합니다. 크리에이터가 중심이 되어 높은 신뢰도와 상상력을 바탕으로 각 분야 최고의 마스터 빌더들이 하나로 뭉쳐있습니다.
+            </p>
+            <p className="text-xs md:text-sm text-[#555555] font-normal leading-relaxed">
+              인게임 빌딩의 디테일한 배치와 구조를 웹 브라우저 상에 그대로 재현하고 마우스 드래그를 통해 누구나 손쉽게 공간을 편집하고 상호작용하도록 함으로써, 크리에이터에게는 온전한 브랜딩 가치를, 파트너사에게는 한 차원 높은 메타버스 브랜딩 솔루션을 긴밀하게 전달합니다.
+            </p>
           </div>
 
-          {/* Draggable Block Card 2 */}
-          <div 
-            ref={(el) => { floatingBlockRefs.current[1] = el }}
-            className="absolute w-[240px] md:w-[320px] bg-white border border-neutral-200 p-4 shadow-xl select-none cursor-grab active:cursor-grabbing hover:border-black transition-colors duration-300 z-30 rounded-2xl"
-          >
-            <div className="relative w-full aspect-video bg-neutral-900 overflow-hidden rounded-xl mb-3 border border-neutral-100">
-              <Image src="/example2.png" alt="Alex Works" fill className="object-cover pointer-events-none" />
-            </div>
-            <div className="flex justify-between items-center border-t border-neutral-100 pt-3 text-left">
-              <div>
-                <span className="text-[8px] font-bold text-neutral-400 font-mono">02 / CYBERPUNK</span>
-                <h4 className="text-[11.5px] font-extrabold text-black uppercase">사이버 넥서스 시티</h4>
-              </div>
-              <Link href="/creator/level_designer_x" className="text-[8px] font-bold text-white bg-black px-2.5 py-1.5 hover:bg-neutral-800 transition-colors rounded-lg">
-                VIEW
-              </Link>
-            </div>
-            <div className="absolute top-2 right-2 flex items-center gap-1 text-[7px] font-bold bg-white/90 border border-neutral-200 px-1.5 py-0.5 rounded-full text-neutral-600 shadow-sm pointer-events-none">
-              <Move size={8} />
-              <span>DRAG</span>
-            </div>
+          {/* Premium call-to-action buttons */}
+          <div className="flex flex-row gap-4 items-center mt-12 md:mt-16 w-full pointer-events-auto">
+            <Link 
+              href="#staff-section" 
+              className="rounded-full bg-neutral-900 text-[#FAF9F5] hover:bg-neutral-800 px-8 py-3.5 text-[9px] font-bold uppercase tracking-widest flex items-center gap-2 transition-all duration-300 shadow-sm hover:shadow-lg magnetic-target"
+            >
+              <Users size={12} />
+              <span>explore creators</span>
+            </Link>
+            
+            <Link 
+              href="/login" 
+              className="rounded-full border border-neutral-900 bg-transparent text-neutral-900 hover:bg-neutral-900 hover:text-[#FAF9F5] px-8 py-3.5 text-[9px] font-bold uppercase tracking-widest transition-all duration-300 magnetic-target"
+            >
+              <span>start building</span>
+            </Link>
           </div>
-
-          {/* Draggable Block Card 3 */}
-          <div 
-            ref={(el) => { floatingBlockRefs.current[2] = el }}
-            className="absolute w-[240px] md:w-[320px] bg-white border border-neutral-200 p-4 shadow-xl select-none cursor-grab active:cursor-grabbing hover:border-black transition-colors duration-300 z-30 rounded-2xl"
-          >
-            <div className="relative w-full aspect-video bg-neutral-900 overflow-hidden rounded-xl mb-3 border border-neutral-100">
-              <Image src="/example4.png" alt="Pixel Works" fill className="object-cover pointer-events-none" />
-            </div>
-            <div className="flex justify-between items-center border-t border-neutral-100 pt-3 text-left">
-              <div>
-                <span className="text-[8px] font-bold text-neutral-400 font-mono">03 / VOXEL MUSEUM</span>
-                <h4 className="text-[11.5px] font-extrabold text-black uppercase">복셀 도트 미술관</h4>
-              </div>
-              <Link href="/creator/mc_pixel_art" className="text-[8px] font-bold text-white bg-black px-2.5 py-1.5 hover:bg-neutral-800 transition-colors rounded-lg">
-                VIEW
-              </Link>
-            </div>
-            <div className="absolute top-2 right-2 flex items-center gap-1 text-[7px] font-bold bg-white/90 border border-neutral-200 px-1.5 py-0.5 rounded-full text-neutral-600 shadow-sm pointer-events-none">
-              <Move size={8} />
-              <span>DRAG</span>
-            </div>
-          </div>
-
-        </div>
-
-        {/* Dynamic lower bar describing platform value */}
-        <div className="w-full border-t border-neutral-200/80 pt-6 flex flex-col md:flex-row items-center justify-between text-neutral-400 text-[10px] font-bold font-mono">
-          <span>[ BLOCKCANVAS DRAGGABLE BLUEPRINT SANDBOX V1.0 ]</span>
-          <span className="mt-2 md:mt-0">[ DRAG AND INTERACT FREELY TO UNLEASH CREATIVE SPATIAL FLOW ]</span>
         </div>
       </section>
 
-      {/* 👥 STAGE 4: Guild Architects (수석 빌더 3열 정렬 시네마틱 보드) */}
+
+      {/* 👥 STAGE 4: Guild Architects (수석 빌더 스태프 - 럭셔리 마키 프로필 트랙 + 통합 푸터) */}
       <section 
         id="staff-section" 
         ref={staffPanelRef}
-        className="py-24 bg-[#F5F4F0] w-full relative z-20 border-b border-neutral-200"
+        className="snap-section w-full bg-[#FAF9F5] flex flex-col justify-between"
       >
-        <div className="w-full px-6 md:px-12 text-left mb-16">
+        <div className="w-full px-6 md:px-12 text-left pt-16 max-w-6xl mx-auto">
           <span className="text-neutral-400 text-[9px] font-bold uppercase tracking-widest mb-2 block flex items-center gap-1.5">
             <Users size={11} />
             <span>GUILD ARCHITECTS</span>
           </span>
           <h2 className="text-2xl md:text-4xl font-extrabold text-black tracking-tight uppercase">
-            수석 빌더 스태프
+            BlockCanvas Creators
           </h2>
+          <p className="text-[10px] md:text-xs text-neutral-400 font-mono mt-2 uppercase tracking-wider block">
+            [ HOVER OVER CARDS TO PREVIEW THEIR MASTERPIECES & VIEW PORTFOLIOS ]
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 w-full border-y border-neutral-200 bg-white">
-          {demoCreators.map((creator, index) => {
-            const snapshotImages = ['/example1.png', '/example2.png', '/example4.png']
-            const currentSnapshot = snapshotImages[index % snapshotImages.length]
+        <div className="w-full py-6 border-y border-neutral-200/60 bg-[#FAF9F5]/40 backdrop-blur-sm relative overflow-hidden my-auto">
+          {/* CAD Blueprint grid overlay matching drawing-board aesthetic */}
+          <div className="absolute inset-0 opacity-[0.012] pointer-events-none z-0" style={{ backgroundImage: 'linear-gradient(to right, #000 1px, transparent 1px), linear-gradient(to bottom, #000 1px, transparent 1px)', backgroundSize: '30px 30px' }} />
 
-            return (
-              <div
-                key={creator.id}
-                className="artist-cinema-card bg-white border-b md:border-b-0 md:border-r border-neutral-200 overflow-hidden flex flex-col justify-between aspect-[1/1] hover:bg-neutral-50/70 transition-colors w-full p-8 md:p-12 last:border-r-0"
-              >
-                <div className="w-full h-56 bg-neutral-900 relative overflow-hidden mb-6 border border-neutral-200/80 rounded-2xl">
-                  <Image 
-                    src={currentSnapshot} 
-                    alt={`${creator.display_name} 대표작 스냅`} 
-                    fill 
-                    className="object-cover brightness-95"
-                  />
-                  <span className="absolute bottom-3 left-3 px-2 py-0.5 bg-black/85 text-white text-[8px] font-bold font-mono tracking-widest rounded-full">
-                    SNAP 0{index + 1}
-                  </span>
-                </div>
-
-                <div className="flex flex-col justify-between flex-1 text-left">
-                  <div>
-                    <p className="text-sm font-extrabold text-black">{creator.display_name}</p>
-                    <p className="text-[10px] text-neutral-400 font-mono mt-0.5">@{creator.creator_name}</p>
-                  </div>
-
-                  <div className="pt-4 border-t border-neutral-200/50 flex items-center justify-between mt-4">
-                    <span className="text-[9px] text-neutral-400 font-mono font-bold">GUILD STAFF</span>
-                    <Link 
-                      href={`/creator/${creator.creator_name}`}
-                      className="text-[10px] font-extrabold text-black hover:text-neutral-500 transition-colors inline-flex items-center gap-1.5 magnetic-target"
-                    >
-                      <span>EXPLORE CANVAS</span>
-                      <ArrowRight size={10} />
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </section>
-
-      {/* 📬 STAGE 5: Cooperation Form */}
-      <section 
-        id="cooperation-section"
-        ref={inquirySectionRef}
-        className="py-24 w-full px-6 md:px-12 bg-white relative z-20"
-      >
-        <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-16 items-start">
-          
-          <div className="lg:col-span-5 text-left pr-4">
-            <span className="text-neutral-400 text-[9px] font-bold uppercase tracking-widest mb-2 block flex items-center gap-1.5">
-              <Award size={12} />
-              <span>OFFICIAL REQUEST</span>
-            </span>
-            <h2 className="text-2xl md:text-4xl font-extrabold text-black mb-6 tracking-tight leading-tight uppercase">
-              프로젝트 의뢰
-            </h2>
-            <p className="text-[11px] md:text-xs text-neutral-500 leading-relaxed font-semibold">
-              메타버스 빌딩 시공, 공간 브랜딩 제휴 등 BlockCanvas 와의 공식 협업을 희망하시는 경우 양식을 송신해 주십시오. 48시간 이내에 회신해 드립니다.
-            </p>
+          {/* Technical Telemetry Metadata */}
+          <div className="absolute top-2 left-6 text-[7px] text-neutral-400 font-mono font-bold tracking-widest uppercase z-10 pointer-events-none">
+            [ TRACK STATUS: ACTIVE // SPEED: 30S_LOOP // RESOLVING_GRID: ON ]
+          </div>
+          <div className="absolute top-2 right-6 text-[7px] text-neutral-400 font-mono font-bold tracking-widest uppercase z-10 pointer-events-none">
+            [ ACTIVE_BUILDERS: {mergedCreators.length} // LATENCY: 0.04MS ]
           </div>
 
-          <div 
-            ref={inquiryBoxRef}
-            className="lg:col-span-7 bg-[#FAF9F5] border border-neutral-200 p-8 md:p-12 shadow-sm text-left w-full rounded-2xl"
-          >
-            <form id="inquiry-form" onSubmit={handleInquirySubmit} className="flex flex-col gap-6 w-full">
-              
-              <div>
-                <label className="text-[8px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">
-                  의뢰인 이름 / 회사명
-                </label>
-                <input 
-                  type="text" 
-                  name="name"
-                  placeholder="예: 마이크로소프트 코리아 관계자"
-                  className="w-full text-xs p-3 border border-neutral-200 focus:border-black focus:outline-none bg-white text-black font-mono rounded-lg"
-                  required
-                />
-              </div>
+          <InfiniteMarquee speed={30}>
+            {mergedCreators.map((creator, index) => {
+              const snapshotImages = ['/example1.png', '/example2.png', '/example4.png']
+              const currentSnapshot = snapshotImages[index % snapshotImages.length]
+              const initials = creator.display_name ? creator.display_name.slice(0, 2).toUpperCase() : 'BC'
 
-              <div>
-                <label className="text-[8px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">
-                  이메일 주소
-                </label>
-                <input 
-                  type="email" 
-                  name="email"
-                  placeholder="contact@company.com"
-                  className="w-full text-xs p-3 border border-neutral-200 focus:border-black focus:outline-none bg-white text-black font-mono rounded-lg"
-                  required
-                />
-              </div>
+              return (
+                <div
+                  key={creator.id}
+                  className="group relative w-[310px] md:w-[350px] bg-white border border-neutral-200/70 flex flex-col rounded-[32px] transition-all duration-500 ease-out hover:border-black hover:-translate-y-2 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.08)] overflow-hidden pointer-events-auto z-10"
+                >
+                  {/* Banner Image Area - Acts as the Portfolio Cover Banner (Elegant: h-[170px]) */}
+                  <div className="relative w-full h-[170px] bg-neutral-100 overflow-hidden">
+                    <Image 
+                      src={currentSnapshot} 
+                      alt="User Banner" 
+                      fill 
+                      className="object-cover group-hover:scale-105 transition-transform duration-1000 brightness-95" 
+                    />
+                    
+                    {/* Dark gradient mask on top of banner for tech look */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-black/10 pointer-events-none" />
+                    
+                    {/* Member sequence number at the top right */}
+                    <div className="absolute top-4 right-4 text-white/50 text-[8px] font-mono font-bold">
+                      #{String(index + 1).padStart(2, '0')}
+                    </div>
+                  </div>
 
-              <div>
-                <label className="text-[8px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">
-                  의뢰 목적 및 세부 설명
-                </label>
-                <textarea 
-                  name="message"
-                  rows={4}
-                  placeholder="의뢰 목적 및 스케일을 기재해 주십시오."
-                  className="w-full text-xs p-3 border border-neutral-200 focus:border-black focus:outline-none bg-white text-black resize-none rounded-lg"
-                  required
-                />
-              </div>
+                  {/* Avatar overlapping banner bottom boundary - Scaled up profile (90px) for visibility */}
+                  <div className="absolute top-[130px] left-1/2 -translate-x-1/2 z-20">
+                    <div className="relative w-[90px] h-[90px] rounded-full flex items-center justify-center bg-neutral-900 text-white font-black text-xl border-4 border-white shadow-[0_6px_16px_rgba(0,0,0,0.12)] group-hover:scale-105 transition-transform duration-500 overflow-hidden">
+                      {creator.avatar_url ? (
+                        <Image src={creator.avatar_url} alt={creator.display_name} fill className="object-cover" />
+                      ) : (
+                        <span>{initials}</span>
+                      )}
+                      {/* Interactive ring overlay */}
+                      <div className="absolute inset-0 rounded-full border-2 border-white/20 opacity-0 group-hover:opacity-100 animate-spin duration-1000 pointer-events-none" style={{ animationDuration: '3s' }} />
+                    </div>
+                  </div>
 
-              {formStatus && (
-                <div className={`p-3 text-[10px] md:text-xs font-bold rounded-lg ${formStatus.success ? 'bg-neutral-900 text-white' : 'bg-red-50 text-red-600 border border-red-200'}`}>
-                  {formStatus.success ? '🎉 의뢰서가 송신되었습니다.' : formStatus.error}
+                  {/* Content Body */}
+                  <div className="pt-16 px-6 pb-6 flex flex-col justify-between flex-grow text-center">
+                    <div className="mb-4">
+                      <h3 className="text-lg font-black text-black tracking-tight group-hover:text-[#3b82f6] transition-colors">{creator.display_name}</h3>
+                    </div>
+
+                    {/* Premium action button at the bottom */}
+                    <div className="w-full">
+                      <Link 
+                        href={`/creator/${creator.creator_name}`}
+                        className="text-[9px] font-black text-black hover:bg-neutral-900 hover:text-[#FAF9F5] transition-all inline-flex items-center gap-1 justify-center py-2.5 px-4 border border-neutral-200 rounded-full w-full hover:border-black transition-all duration-300 magnetic-target"
+                      >
+                        <span>EXPLORE CANVAS</span>
+                        <ArrowRight size={9} className="group-hover:translate-x-0.5 transition-transform duration-300" />
+                      </Link>
+                    </div>
+                  </div>
                 </div>
-              )}
+              )
+            })}
+          </InfiniteMarquee>
+        </div>
 
+        {/* 🖤 Premium Dark Geometric Footer (통합 100vh 스냅 섹션 하단에 배치) */}
+        <footer className="w-full bg-[#1A1A1A] text-white pt-10 pb-8 px-6 md:px-12 lg:px-24 border-t border-[#222222] pointer-events-auto z-30">
+          <div className="max-w-[1200px] mx-auto">
+            
+            {/* Top Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-8 mb-8 text-left">
+              
+              {/* Column 1: Support / Inquiry */}
+              <div className="md:col-span-4 flex flex-col">
+                <h3 className="text-[#888888] font-bold text-xs mb-6 tracking-widest uppercase">Support Canvas</h3>
+                
+                <Link href="/login" className="bg-transparent hover:bg-[#222222] border border-transparent hover:border-[#333333] transition-all rounded-lg p-4 flex items-center justify-between group mb-2 cursor-pointer">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded bg-[#333333] flex items-center justify-center text-[#AAAAAA] group-hover:text-[#FF424D] transition-colors">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M15.386 0.524c-4.764 0-8.64 3.876-8.64 8.64 0 4.75 3.876 8.613 8.64 8.613 4.75 0 8.614-3.864 8.614-8.613C24 4.4 20.136.524 15.386.524zM0 24h3.618V.524H0V24z"/></svg>
+                    </div>
+                    <span className="font-semibold text-xs text-[#CCCCCC] group-hover:text-white transition-colors">Become a Patreon</span>
+                  </div>
+                  <span className="text-[#666666] group-hover:text-white transition-colors">↗</span>
+                </Link>
+                
+                <a href="mailto:support@blockcanvas.com" className="bg-transparent hover:bg-[#222222] border border-transparent hover:border-[#333333] transition-all rounded-lg p-4 flex items-center justify-between group cursor-pointer">
+                  <span className="font-semibold text-xs text-[#CCCCCC] group-hover:text-white transition-colors ml-11">Business Inquiry</span>
+                  <span className="text-[#666666] group-hover:text-white transition-colors">↗</span>
+                </a>
+              </div>
+
+              {/* Column 2: Site Map */}
+              <div className="md:col-span-3 md:col-start-6 flex flex-col">
+                <h3 className="text-[#888888] font-bold text-xs mb-6 tracking-widest uppercase">Site</h3>
+                <ul className="space-y-1">
+                  <li>
+                    <button 
+                      onClick={() => {
+                        if (typeof window !== 'undefined' && (window as any).scrollToLandingIdx) {
+                          (window as any).scrollToLandingIdx(0)
+                        }
+                      }}
+                      className="flex items-center justify-between w-full p-3 rounded-lg hover:bg-[#222222] group transition-all text-[#CCCCCC] hover:text-white text-xs cursor-pointer focus:outline-none"
+                    >
+                      <span className="font-semibold">Home</span>
+                      <span className="text-[#666666] group-hover:text-white transition-colors text-sm">→</span>
+                    </button>
+                  </li>
+                  <li>
+                    <button 
+                      onClick={() => {
+                        if (typeof window !== 'undefined' && (window as any).scrollToLandingIdx) {
+                          (window as any).scrollToLandingIdx(1)
+                        }
+                      }}
+                      className="flex items-center justify-between w-full p-3 rounded-lg hover:bg-[#222222] group transition-all text-[#CCCCCC] hover:text-white text-xs cursor-pointer focus:outline-none"
+                    >
+                      <span className="font-semibold">Brand Mission</span>
+                      <span className="text-[#666666] group-hover:text-white transition-colors text-sm">↓</span>
+                    </button>
+                  </li>
+                  <li>
+                    <button 
+                      onClick={() => {
+                        if (typeof window !== 'undefined' && (window as any).scrollToLandingIdx) {
+                          (window as any).scrollToLandingIdx(2)
+                        }
+                      }}
+                      className="flex items-center justify-between w-full p-3 rounded-lg hover:bg-[#222222] group transition-all text-[#CCCCCC] hover:text-white text-xs cursor-pointer focus:outline-none"
+                    >
+                      <span className="font-semibold">Builder Guild</span>
+                      <span className="text-[#666666] group-hover:text-white transition-colors text-sm">↓</span>
+                    </button>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Column 3: Socials */}
+              <div className="md:col-span-3 md:col-start-10 flex flex-col">
+                <h3 className="text-[#888888] font-bold text-xs mb-6 tracking-widest uppercase">Socials</h3>
+                <ul className="space-y-1">
+                  <li>
+                    <a href="https://youtube.com" target="_blank" rel="noopener noreferrer" className="flex items-center justify-between w-full p-3 rounded-lg hover:bg-[#222222] group transition-all text-[#CCCCCC] hover:text-white text-xs cursor-pointer">
+                      <span className="font-semibold">YouTube</span>
+                      <span className="text-[#666666] group-hover:text-white transition-colors text-xs">↗</span>
+                    </a>
+                  </li>
+                  <li>
+                    <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="flex items-center justify-between w-full p-3 rounded-lg hover:bg-[#222222] group transition-all text-[#CCCCCC] hover:text-white text-xs cursor-pointer">
+                      <span className="font-semibold">Instagram</span>
+                      <span className="text-[#666666] group-hover:text-white transition-colors text-xs">↗</span>
+                    </a>
+                  </li>
+                  <li>
+                    <div 
+                      className="flex items-center justify-between w-full p-3 rounded-lg hover:bg-[#222222] group transition-all text-[#CCCCCC] hover:text-white cursor-pointer text-xs" 
+                      onClick={() => {
+                        navigator.clipboard.writeText('BlockCanvas#0001')
+                        alert('Discord ID Copied!')
+                      }}
+                    >
+                      <span className="font-semibold">Discord</span>
+                      <span className="text-[#666666] group-hover:text-white transition-colors text-[9px] font-bold uppercase">Copy ID</span>
+                    </div>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Bottom Bar with Centered Circular Top Button */}
+            <div className="flex flex-col items-center justify-center pt-8 border-t border-[#222222] relative">
               <button 
-                type="submit"
-                disabled={isPending}
-                className="py-4 bg-black text-white hover:bg-neutral-800 font-bold text-[9px] uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 disabled:bg-neutral-400 magnetic-target rounded-xl"
+                onClick={() => {
+                  if (typeof window !== 'undefined' && (window as any).scrollToLandingIdx) {
+                    (window as any).scrollToLandingIdx(0)
+                  }
+                }}
+                className="absolute top-[-24px] left-1/2 -translate-x-1/2 w-12 h-12 rounded-full bg-white text-black flex items-center justify-center border border-[#333333] hover:bg-neutral-100 hover:scale-105 transition-all shadow-lg text-lg font-bold group z-30 cursor-pointer"
               >
-                <span>{isPending ? 'TRANSMITTING...' : 'SEND INQUIRY'}</span>
+                <ArrowUp size={16} className="text-black group-hover:-translate-y-0.5 transition-transform duration-300 pointer-events-none" />
               </button>
 
-            </form>
-          </div>
+              <div className="flex flex-col items-center text-center mt-6 w-full">
+                <div className="flex items-center gap-2 mb-2 justify-center">
+                  <div className="relative w-6 h-6 opacity-90">
+                    <Image src="/logo_icon_white.png" alt="BlockCanvas Logo" fill className="object-contain" />
+                  </div>
+                  <span className="font-black text-base tracking-tighter text-white">BLOCKCANVAS<span className="text-[#FF424D]">.</span></span>
+                </div>
+                <p className="text-[#666666] text-[10px] font-medium">© 2026 BlockCanvas Studio. All rights reserved.</p>
+                <p className="text-[#444444] text-[8px] mt-2 font-medium max-w-xl leading-relaxed text-center">
+                  Open Source Licenses: Next.js (MIT), React (MIT), Tailwind CSS (MIT), Framer Motion (MIT), GSAP (Standard), Prisma (Apache-2.0), Radix UI (MIT), Lucide (ISC), Lenis (MIT), Animate UI (MIT).
+                </p>
+              </div>
+            </div>
 
-        </div>
+          </div>
+        </footer>
       </section>
-
-      {/* 🖤 Geometric Black Footer (푸터만 블랙 톤 허용) */}
-      <footer className="w-full bg-black py-20 px-6 md:px-12 text-neutral-500 border-t border-black relative z-10">
-        <div className="w-full flex flex-col md:flex-row items-center justify-between">
-          <div className="flex flex-col gap-2 mb-10 md:mb-0 text-center md:text-left">
-            <span className="font-extrabold text-sm tracking-widest text-white uppercase">BLOCKCANVAS</span>
-            <p className="text-[#666666] text-[9px] font-bold">© 2026 BlockCanvas Studio. All rights reserved.</p>
-          </div>
-
-          <div className="flex gap-8 text-[9px] text-[#888888] font-bold">
-            <Link href="/login" className="hover:text-white transition-colors magnetic-target">로그인</Link>
-            <Link href="/creator/steve_builder" className="hover:text-white transition-colors magnetic-target">데모 사이트</Link>
-          </div>
-        </div>
-      </footer>
 
     </div>
   )

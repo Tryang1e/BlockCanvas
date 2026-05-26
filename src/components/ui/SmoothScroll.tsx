@@ -18,9 +18,10 @@ export default function SmoothScroll({ children, isRoot = true, className }: { c
   // 1. 관리자 대시보드(/adminpage) 라우트에서는 스무스 스크롤러를 완벽 배제하여
   // 내부 오버플로우 스크롤(overflow-auto)이 브라우저 순정 그대로 가장 자연스럽고 신속하게 동작 보장!
   const isAdminPage = pathname?.startsWith('/adminpage')
+  const isLandingPage = pathname === '/'
 
   useEffect(() => {
-    if (isAdminPage) return
+    if (isAdminPage || isLandingPage) return
     
     if (typeof window !== 'undefined') {
       window.history.scrollRestoration = 'manual'
@@ -91,7 +92,7 @@ export default function SmoothScroll({ children, isRoot = true, className }: { c
     }
   }, [])
 
-  if (isAdminPage) {
+  if (isAdminPage || isLandingPage) {
     return <div className={className}>{children}</div>
   }
 
