@@ -849,16 +849,15 @@ export default function MainLandingClient({ creators }: Props) {
                     </a>
                   </li>
                   <li>
-                    <div
-                      className="flex items-center justify-between w-full p-3 rounded-lg hover:bg-[#222222] group transition-all text-[#CCCCCC] hover:text-white cursor-pointer text-xs"
-                      onClick={() => {
-                        navigator.clipboard.writeText('BlockCanvas#0001')
-                        alert('Discord ID Copied!')
-                      }}
+                    <a 
+                      href="https://discord.gg/xbA5Y5QWf5" 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="flex items-center justify-between w-full p-3 rounded-lg hover:bg-[#222222] group transition-all text-[#CCCCCC] hover:text-white text-xs cursor-pointer"
                     >
                       <span className="font-semibold">Discord</span>
-                      <span className="text-[#666666] group-hover:text-white transition-colors text-[9px] font-bold uppercase">Copy ID</span>
-                    </div>
+                      <span className="text-[#666666] group-hover:text-white transition-colors text-xs">↗</span>
+                    </a>
                   </li>
                 </ul>
               </div>
