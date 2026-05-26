@@ -236,7 +236,7 @@ export default function MainLandingClient({ creators }: Props) {
     }
 
     // --- 8. Premium Slide Scrolling Controller (pixelnetwork.kr-style slide-by-slide transitions) ---
-    const sections = ['#hero-section', '#about-section', '#staff-section']
+    const sections = ['#hero-section', '#about-section', '#staff-section', '#footer-section']
     let isAnimating = false
     let startY = 0
 
@@ -592,9 +592,6 @@ export default function MainLandingClient({ creators }: Props) {
         ref={staffPanelRef}
         className="snap-section w-full bg-[#FAF9F5] flex flex-col justify-center relative overflow-hidden"
       >
-        {/* CAD Blueprint grid overlay matching drawing-board aesthetic */}
-        <div className="absolute inset-0 opacity-[0.015] pointer-events-none" style={{ backgroundImage: 'linear-gradient(to right, #000 1px, transparent 1px), linear-gradient(to bottom, #000 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
-
         <div className="w-full px-6 md:px-12 text-left mb-12 max-w-6xl mx-auto relative z-10">
           <span className="text-neutral-400 text-[9px] font-bold uppercase tracking-widest mb-2 block flex items-center gap-1.5 font-mono">
             <Users size={11} className="text-neutral-500" />
@@ -683,9 +680,8 @@ export default function MainLandingClient({ creators }: Props) {
         </div>
       </section>
 
-      {/* 🖤 Premium Dark Geometric Footer Section - Isolated into its own independent snap-section */}
-      <section className="snap-section w-full bg-[#1A1A1A] flex flex-col justify-center border-t border-[#222222] relative overflow-hidden z-30">
-        <footer className="w-full text-white py-12 px-6 md:px-12 lg:px-24 pointer-events-auto">
+      <section id="footer-section" className="snap-section w-full bg-[#1A1A1A] flex flex-col justify-center border-t border-[#222222] relative overflow-hidden z-30">
+        <footer className="w-full text-white pt-10 pb-8 px-6 md:px-12 lg:px-24 pointer-events-auto">
           <div className="max-w-[1200px] mx-auto">
             
             {/* Top Grid */}
