@@ -40,6 +40,14 @@ export default function MainLandingClient({ creators }: Props) {
   const [currentIdx, setCurrentIdx] = useState(0)
   const currentIdxRef = useRef(0)
 
+  // Drawer-style Overlay Pop/Push Footer States
+  const [showFooterPopup, setShowFooterPopup] = useState(false)
+  const showFooterPopupRef = useRef(false)
+  const toggleFooterPopup = (val: boolean) => {
+    setShowFooterPopup(val)
+    showFooterPopupRef.current = val
+  }
+
   // Top level DOM Refs
   const mainContainerRef = useRef<HTMLDivElement>(null)
 
@@ -266,22 +274,29 @@ export default function MainLandingClient({ creators }: Props) {
 
     // Wheel listener (non-passive to allow preventDefault)
     const handleWheelEvent = (e: WheelEvent) => {
-      // If we are at the last section (#staff-section) and scrolling down, release snapping to let compact footer slide up naturally
-      if (currentIdxRef.current === 2 && e.deltaY > 15) {
-        return
-      }
-
-      // If we are deep inside the footer area and scrolling up, let default scroll work until we hit staff-section's top boundary
-      const staffSection = document.getElementById('staff-section')
-      if (staffSection) {
-        const staffTop = staffSection.getBoundingClientRect().top + window.scrollY
-        if (window.scrollY > staffTop + 10 && e.deltaY < -15) {
-          return
-        }
-      }
-
       e.preventDefault()
       if (isAnimating) return
+
+      // Last section (#staff-section) Pop/Push Drawer logic
+      if (currentIdxRef.current === 2) {
+        if (e.deltaY > 15) {
+          // Downward wheel: Pop footer up if hidden
+          if (!showFooterPopupRef.current) {
+            toggleFooterPopup(true)
+            return
+          }
+        } else if (e.deltaY < -15) {
+          // Upward wheel: Push footer down first
+          if (showFooterPopupRef.current) {
+            toggleFooterPopup(false)
+            return
+          }
+          // If footer is hidden, snap back to Stage 2
+          scrollToIdx(1)
+          return
+        }
+        return // Trap wheel actions within staff section while transitioning
+      }
 
       if (e.deltaY > 15) {
         scrollToIdx(currentIdxRef.current + 1)
@@ -298,17 +313,27 @@ export default function MainLandingClient({ creators }: Props) {
     const handleTouchMove = (e: TouchEvent) => {
       const diffY = startY - e.touches[0].clientY
 
-      // Release touch snap when swiping down from the last section
-      if (currentIdxRef.current === 2 && diffY > 40) {
-        return
-      }
-
-      const staffSection = document.getElementById('staff-section')
-      if (staffSection) {
-        const staffTop = staffSection.getBoundingClientRect().top + window.scrollY
-        if (window.scrollY > staffTop + 10 && diffY < -40) {
-          return
+      if (currentIdxRef.current === 2) {
+        if (Math.abs(diffY) > 40) {
+          e.preventDefault()
+          if (isAnimating) return
+          if (diffY > 0) {
+            // Swipe up (scroll down) -> Pop footer
+            if (!showFooterPopupRef.current) {
+              toggleFooterPopup(true)
+              return
+            }
+          } else {
+            // Swipe down (scroll up) -> Push footer
+            if (showFooterPopupRef.current) {
+              toggleFooterPopup(false)
+              return
+            }
+            scrollToIdx(1)
+            return
+          }
         }
+        return
       }
 
       if (isAnimating) {
@@ -330,23 +355,25 @@ export default function MainLandingClient({ creators }: Props) {
     const handleKeyDown = (e: KeyboardEvent) => {
       const keys = ['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', ' ', 'Spacebar']
       if (keys.includes(e.key)) {
-        const isDown = e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ' || e.key === 'Spacebar'
-
-        // Release keyboard snap when navigating down past the last section
-        if (currentIdxRef.current === 2 && isDown) {
-          return
-        }
-
-        const staffSection = document.getElementById('staff-section')
-        if (staffSection) {
-          const staffTop = staffSection.getBoundingClientRect().top + window.scrollY
-          if (window.scrollY > staffTop + 10 && !isDown) {
-            return
-          }
-        }
-
         e.preventDefault()
         if (isAnimating) return
+
+        const isDown = e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ' || e.key === 'Spacebar'
+
+        if (currentIdxRef.current === 2) {
+          if (isDown) {
+            if (!showFooterPopupRef.current) {
+              toggleFooterPopup(true)
+            }
+          } else {
+            if (showFooterPopupRef.current) {
+              toggleFooterPopup(false)
+            } else {
+              scrollToIdx(1)
+            }
+          }
+          return
+        }
 
         if (isDown) {
           scrollToIdx(currentIdxRef.current + 1)
@@ -723,7 +750,13 @@ export default function MainLandingClient({ creators }: Props) {
         </div>
       </section>
 
-      <section id="footer-section" className="w-full bg-[#1A1A1A] border-t border-[#222222] relative overflow-hidden z-30">
+      <section 
+        id="footer-section" 
+        className={`fixed bottom-0 left-0 w-full bg-[#1A1A1A] border-t border-[#222222] z-40 transition-all duration-[800ms] transform ${
+          showFooterPopup ? 'translate-y-0 opacity-100 shadow-[0_-30px_60px_rgba(0,0,0,0.4)]' : 'translate-y-full opacity-0 pointer-events-none'
+        }`}
+        style={{ transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)' }}
+      >
         <footer className="w-full text-white pt-10 pb-8 px-6 md:px-12 lg:px-24 pointer-events-auto">
           <div className="max-w-[1200px] mx-auto">
             
@@ -757,6 +790,7 @@ export default function MainLandingClient({ creators }: Props) {
                   <li>
                     <button 
                       onClick={() => {
+                        toggleFooterPopup(false)
                         if (typeof window !== 'undefined' && (window as any).scrollToLandingIdx) {
                           (window as any).scrollToLandingIdx(0)
                         }
@@ -770,6 +804,7 @@ export default function MainLandingClient({ creators }: Props) {
                   <li>
                     <button 
                       onClick={() => {
+                        toggleFooterPopup(false)
                         if (typeof window !== 'undefined' && (window as any).scrollToLandingIdx) {
                           (window as any).scrollToLandingIdx(1)
                         }
@@ -783,6 +818,7 @@ export default function MainLandingClient({ creators }: Props) {
                   <li>
                     <button 
                       onClick={() => {
+                        toggleFooterPopup(false)
                         if (typeof window !== 'undefined' && (window as any).scrollToLandingIdx) {
                           (window as any).scrollToLandingIdx(2)
                         }
@@ -832,6 +868,7 @@ export default function MainLandingClient({ creators }: Props) {
             <div className="flex flex-col items-center justify-center pt-6 border-t border-[#222222] relative">
               <button 
                 onClick={() => {
+                  toggleFooterPopup(false)
                   if (typeof window !== 'undefined' && (window as any).scrollToLandingIdx) {
                     (window as any).scrollToLandingIdx(0)
                   }
