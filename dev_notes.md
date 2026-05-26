@@ -1,5 +1,18 @@
 ﻿# 개발 노트 (dev_notes)
 
+## 📅 2026-05-26: 🏛️ About Us(브랜드 미션) 섹션 BLOCKCANVAS 타이틀 Uni Sans Heavy 전용 명품 다크 서체(#FAF9F5 배경용) 바인딩 최종 완공
+
+### 054. About Us 섹션 헤드라인 BLOCKCANVAS에 Uni Sans Heavy 서체 및 은은한 다크 차콜 호흡 클래스 연동
+- **요구사항**:
+  - About Us 구역의 헤드라인 BLOCKCANVAS 텍스트에도 메인 히어로 구역과 일관된 명품 Uni Sans Heavy 정적 에셋 서체(Uni font)를 완벽하게 적용할 것.
+- **해결책**:
+  - **🏛️ 1. Uni Sans Heavy 전용 명품 다크 서체 바인딩 (Uni Font Integration)**:
+    - MainLandingClient.tsx 의 About Us 구역 BLOCKCANVAS 텍스트 스팬에 기존 시스템 폰트 두꺼움 설정(ont-black text-black) 대신, 우리가 완비한 Uni Sans Heavy 기반의 다크 차콜 전용 숨결 클래스인 **luxury-text-heavy-dark**를 정밀하게 부여했습니다.
+    - 이를 통해 약 1.5초 간격으로 칠흑 같은 딥 차콜과 다크 스틸 그레이 사이를 실크같이 우아하게Breathing(호흡)하며 은은히 요동치는 최고의 키네틱 타이포그래피 정체성을 성사했습니다.
+  - **🛠️ 2. 프로덕션 빌드 성공 및 원격 저장소 배포 완료 (Exit code: 0)**:
+    - Turbopack 빌드를 에러 없이 통과하고 깃허브 원격 리포지토리에 동기화 푸시했습니다.
+
+
 ## 📅 2026-05-26: 🏛️ Brand Mission(브랜드 미션) 섹션 BLOCKCANVAS 초대형 타이틀(5.4rem) 및 서브 타이틀(2.8rem) 및 본문 단락(1.125rem) 스케일 극대화 완공
 
 ### 053. 브랜드 미션 섹션 헤드라인과 디스크립션 폰트를 웅장하고 프리미엄급 비율로 스케일업

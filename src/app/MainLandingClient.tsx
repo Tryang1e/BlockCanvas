@@ -771,24 +771,24 @@ export default function MainLandingClient({ creators }: Props) {
         <div className="absolute inset-0 opacity-[0.015] pointer-events-none" style={{ backgroundImage: 'linear-gradient(to right, #000 1px, transparent 1px), linear-gradient(to bottom, #000 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
 
         <div className="about-content-box w-full max-w-5xl mx-auto text-left relative z-10 flex flex-col justify-center items-start">
-          <span className="text-neutral-400 text-[9px] font-bold uppercase tracking-widest mb-4 block flex items-center gap-1.5 font-mono">
+          <span className="text-neutral-400 text-[16px] font-bold uppercase tracking-widest mb-4 block flex items-center gap-1.5 font-mono">
             <Compass size={11} className="text-neutral-400 animate-spin" style={{ animationDuration: '6s' }} />
-            <span>BRAND MISSION</span>
+            <span>About Us</span>
           </span>
 
           {/* Heading - Dynamic contrast layout matching pixelnetwork */}
           <h2 className="text-5xl md:text-7xl lg:text-[5.4rem] text-neutral-900 leading-[1.1] tracking-tighter mb-12 w-full">
-            <span className="font-black text-black uppercase block">BLOCKCANVAS</span>
+            <span className="uppercase block luxury-text-heavy-dark select-none">BLOCKCANVAS</span>
             <span className="font-light text-neutral-400 block mt-4 text-3xl md:text-5xl lg:text-[2.8rem] tracking-tight">크리에이터들을 위한 공간</span>
           </h2>
 
           {/* Core description paragraphs split layout */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-24 w-full mt-6">
             <p className="text-base md:text-[1.125rem] text-[#333333] font-normal leading-relaxed">
-              BlockCanvas는 가상 공간 디자이너와 빌더들이 단순한 인게임 플레이어에 머무르지 않고, 하나의 완성된 공간 아티스트로서 온전한 가치를 인정받을 수 있는 혁신적인 포트폴리오 빌딩 엔진을 지향합니다. 크리에이터가 중심이 되어 높은 신뢰도와 상상력을 바탕으로 각 분야 최고의 마스터 빌더들이 하나로 뭉쳐있습니다.
+              BlockCanvas는 여러 크리에이터들이 좁은 공간에 머무르지 않고, 더 넓은 세상에서 아티스트로서 온전한 가치를 인정받을 수 있는 혁신적인 커뮤니티를 지향합니다. 크리에이터가 중심이 되어 높은 신뢰도와 상상력을 바탕으로 각 분야 최고의 디자이너들과 함께합니다.
             </p>
             <p className="text-base md:text-[1.125rem] text-[#333333] font-normal leading-relaxed">
-              인게임 빌딩의 디테일한 배치와 구조를 웹 브라우저 상에 그대로 재현하고 마우스 드래그를 통해 누구나 손쉽게 공간을 편집하고 상호작용하도록 함으로써, 크리에이터에게는 온전한 브랜딩 가치를, 파트너사에게는 한 차원 높은 메타버스 브랜딩 솔루션을 긴밀하게 전달합니다.
+              단순한 퀄리티를 넘어 여러 크리에이터가 한대 모여 수 많은 작품들을 남겨 여러 이용자들에게 온전히 다가갈 수 있도록 공간을 제공합니다. 누구나 손쉽게 교류하도록 여러 디자이너에게는 넓은 공간을 크리에이터에게는 다양한 영감을 주는 공간을 제공합니다.
             </p>
           </div>
 
@@ -796,7 +796,7 @@ export default function MainLandingClient({ creators }: Props) {
           <div className="flex flex-row gap-4 items-center mt-12 md:mt-16 w-full pointer-events-auto">
             <Link
               href="#staff-section"
-              className="rounded-full bg-neutral-900 text-[#FAF9F5] hover:bg-neutral-800 px-8 py-3.5 text-[9px] font-bold uppercase tracking-widest flex items-center gap-2 transition-all duration-300 shadow-sm hover:shadow-lg magnetic-target"
+              className="rounded-full bg-neutral-900 text-[#FAF9F5] hover:bg-neutral-800 px-8 py-3.5 text-[12px] font-bold uppercase tracking-widest flex items-center gap-2 transition-all duration-300 shadow-sm hover:shadow-lg magnetic-target"
             >
               <Users size={12} />
               <span>explore creators</span>
@@ -804,7 +804,7 @@ export default function MainLandingClient({ creators }: Props) {
 
             <Link
               href="/login"
-              className="rounded-full border border-neutral-900 bg-transparent text-neutral-900 hover:bg-neutral-900 hover:text-[#FAF9F5] px-8 py-3.5 text-[9px] font-bold uppercase tracking-widest transition-all duration-300 magnetic-target"
+              className="rounded-full border border-neutral-900 bg-transparent text-neutral-900 hover:bg-neutral-900 hover:text-[#FAF9F5] px-8 py-3.5 text-[12px] font-bold uppercase tracking-widest transition-all duration-300 magnetic-target"
             >
               <span>start building</span>
             </Link>

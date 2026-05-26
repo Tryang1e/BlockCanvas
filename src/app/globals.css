@@ -21,10 +21,12 @@
     color: #ffffff;
     text-shadow: 0 0 0px rgba(255, 255, 255, 0);
   }
+
   50% {
     color: #dddddd;
     text-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   }
+
   100% {
     color: #ffffff;
     text-shadow: 0 0 0px rgba(255, 255, 255, 0);
@@ -45,10 +47,12 @@
     color: #111111;
     text-shadow: 0 0 0px rgba(0, 0, 0, 0);
   }
+
   50% {
-    color: #555555;
+    color: #333333;
     text-shadow: 0 0 1px rgba(0, 0, 0, 0.05);
   }
+
   100% {
     color: #111111;
     text-shadow: 0 0 0px rgba(0, 0, 0, 0);
