@@ -590,11 +590,14 @@ export default function MainLandingClient({ creators }: Props) {
       <section 
         id="staff-section" 
         ref={staffPanelRef}
-        className="snap-section w-full bg-[#FAF9F5] flex flex-col justify-between"
+        className="snap-section w-full bg-[#FAF9F5] flex flex-col justify-center relative overflow-hidden"
       >
-        <div className="w-full px-6 md:px-12 text-left pt-16 max-w-6xl mx-auto">
-          <span className="text-neutral-400 text-[9px] font-bold uppercase tracking-widest mb-2 block flex items-center gap-1.5">
-            <Users size={11} />
+        {/* CAD Blueprint grid overlay matching drawing-board aesthetic */}
+        <div className="absolute inset-0 opacity-[0.015] pointer-events-none" style={{ backgroundImage: 'linear-gradient(to right, #000 1px, transparent 1px), linear-gradient(to bottom, #000 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+
+        <div className="w-full px-6 md:px-12 text-left mb-12 max-w-6xl mx-auto relative z-10">
+          <span className="text-neutral-400 text-[9px] font-bold uppercase tracking-widest mb-2 block flex items-center gap-1.5 font-mono">
+            <Users size={11} className="text-neutral-500" />
             <span>GUILD ARCHITECTS</span>
           </span>
           <h2 className="text-2xl md:text-4xl font-extrabold text-black tracking-tight uppercase">
@@ -605,10 +608,7 @@ export default function MainLandingClient({ creators }: Props) {
           </p>
         </div>
 
-        <div className="w-full py-6 border-y border-neutral-200/60 bg-[#FAF9F5]/40 backdrop-blur-sm relative overflow-hidden my-auto">
-          {/* CAD Blueprint grid overlay matching drawing-board aesthetic */}
-          <div className="absolute inset-0 opacity-[0.012] pointer-events-none z-0" style={{ backgroundImage: 'linear-gradient(to right, #000 1px, transparent 1px), linear-gradient(to bottom, #000 1px, transparent 1px)', backgroundSize: '30px 30px' }} />
-
+        <div className="w-full py-8 border-y border-neutral-200/60 bg-[#FAF9F5]/40 backdrop-blur-sm relative overflow-hidden z-10">
           {/* Technical Telemetry Metadata */}
           <div className="absolute top-2 left-6 text-[7px] text-neutral-400 font-mono font-bold tracking-widest uppercase z-10 pointer-events-none">
             [ TRACK STATUS: ACTIVE // SPEED: 30S_LOOP // RESOLVING_GRID: ON ]
@@ -681,9 +681,11 @@ export default function MainLandingClient({ creators }: Props) {
             })}
           </InfiniteMarquee>
         </div>
+      </section>
 
-        {/* 🖤 Premium Dark Geometric Footer (통합 100vh 스냅 섹션 하단에 배치) */}
-        <footer className="w-full bg-[#1A1A1A] text-white pt-10 pb-8 px-6 md:px-12 lg:px-24 border-t border-[#222222] pointer-events-auto z-30">
+      {/* 🖤 Premium Dark Geometric Footer Section - Isolated into its own independent snap-section */}
+      <section className="snap-section w-full bg-[#1A1A1A] flex flex-col justify-center border-t border-[#222222] relative overflow-hidden z-30">
+        <footer className="w-full text-white py-12 px-6 md:px-12 lg:px-24 pointer-events-auto">
           <div className="max-w-[1200px] mx-auto">
             
             {/* Top Grid */}
@@ -788,7 +790,7 @@ export default function MainLandingClient({ creators }: Props) {
             </div>
 
             {/* Bottom Bar with Centered Circular Top Button */}
-            <div className="flex flex-col items-center justify-center pt-8 border-t border-[#222222] relative">
+            <div className="flex flex-col items-center justify-center pt-6 border-t border-[#222222] relative">
               <button 
                 onClick={() => {
                   if (typeof window !== 'undefined' && (window as any).scrollToLandingIdx) {
@@ -797,10 +799,10 @@ export default function MainLandingClient({ creators }: Props) {
                 }}
                 className="absolute top-[-24px] left-1/2 -translate-x-1/2 w-12 h-12 rounded-full bg-white text-black flex items-center justify-center border border-[#333333] hover:bg-neutral-100 hover:scale-105 transition-all shadow-lg text-lg font-bold group z-30 cursor-pointer"
               >
-                <ArrowUp size={16} className="text-black group-hover:-translate-y-0.5 transition-transform duration-300 pointer-events-none" />
+                <span className="text-black group-hover:-translate-y-0.5 transition-transform duration-300 pointer-events-none">↑</span>
               </button>
 
-              <div className="flex flex-col items-center text-center mt-6 w-full">
+              <div className="flex flex-col items-center text-center mt-4 w-full">
                 <div className="flex items-center gap-2 mb-2 justify-center">
                   <div className="relative w-6 h-6 opacity-90">
                     <Image src="/logo_icon_white.png" alt="BlockCanvas Logo" fill className="object-contain" />
@@ -808,8 +810,8 @@ export default function MainLandingClient({ creators }: Props) {
                   <span className="font-black text-base tracking-tighter text-white">BLOCKCANVAS<span className="text-[#FF424D]">.</span></span>
                 </div>
                 <p className="text-[#666666] text-[10px] font-medium">© 2026 BlockCanvas Studio. All rights reserved.</p>
-                <p className="text-[#444444] text-[8px] mt-2 font-medium max-w-xl leading-relaxed text-center">
-                  Open Source Licenses: Next.js (MIT), React (MIT), Tailwind CSS (MIT), Framer Motion (MIT), GSAP (Standard), Prisma (Apache-2.0), Radix UI (MIT), Lucide (ISC), Lenis (MIT), Animate UI (MIT).
+                <p className="text-[#444444] text-[8px] mt-2 font-medium max-w-xl leading-relaxed text-center opacity-40">
+                  Open Source Licenses: Next.js, React, Tailwind CSS, Framer Motion, GSAP, Prisma, Radix UI, Lucide, Lenis, Animate UI.
                 </p>
               </div>
             </div>
