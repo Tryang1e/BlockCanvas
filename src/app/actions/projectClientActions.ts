@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { cookies } from 'next/headers'
+import { verifySession } from '@/lib/session'
 
 export async function fetchProjectDetails(projectId: string) {
   try {
@@ -56,7 +57,8 @@ export async function fetchProjectDetails(projectId: string) {
     }
 
     const cookieStore = await cookies()
-    const session = cookieStore.get('session')?.value
+    const sessionToken = cookieStore.get('session')?.value
+    const session = verifySession(sessionToken)
     const isOwner = session === project.creator.creator_name
 
     let otherProjects: any[] = []

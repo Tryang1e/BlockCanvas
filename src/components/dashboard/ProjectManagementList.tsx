@@ -22,9 +22,16 @@ import {
   useSortable
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ExternalLink, Trash2, GripVertical, CheckSquare, Square, Settings2 } from 'lucide-react'
+import { ExternalLink, Trash2, GripVertical, CheckSquare, Square, Settings2, Eye, EyeOff, Globe, Lock, Sparkles, Type } from 'lucide-react'
 import { updateProjectOrderAction } from '@/app/actions/projects'
-import { updateSectionOrderAction } from '@/app/actions/section'
+import { 
+  updateSectionOrderAction, 
+  updateSectionVisibilityAction, 
+  updateSectionTitleVisibilityAction, 
+  updateSectionAnimationAction, 
+  updateSectionNameAction, 
+  deleteSectionAction 
+} from '@/app/actions/section'
 import SectionReorderModal from '@/components/creator/SectionReorderModal'
 
 interface ProjectManagementListProps {
@@ -136,7 +143,7 @@ function SortableProjectRow({
       {/* Actions */}
       <div className="flex items-center justify-end gap-2 shrink-0">
         <a 
-          href={`/creator/${creatorName}/project/${project.id}`}
+          href={`/project/${project.id}`}
           className="p-2 text-neutral-400 hover:text-blue-600 transition-colors bg-white hover:bg-blue-50 rounded-md shadow-sm border border-neutral-100"
           title="게시글 사이트 보러 가기"
           target="_blank"
@@ -160,6 +167,9 @@ export default function ProjectManagementList({ initialProjects, sections: initi
   
   // Bulk Move Dropdown State
   const [targetSectionId, setTargetSectionId] = useState<string>('')
+  
+  // Section Animation Dropdown State
+  const [openAnimSectionId, setOpenAnimSectionId] = useState<string | null>(null)
 
   // To prevent Next.js hydration mismatch if dnd-kit renders early
   const [isMounted, setIsMounted] = useState(false)
@@ -359,6 +369,82 @@ export default function ProjectManagementList({ initialProjects, sections: initi
     }
   }
 
+  // --- Section Management Handlers ---
+  const handleToggleSectionVisibility = async (sectionId: string, currentVisibility: boolean) => {
+    const newVisibility = !currentVisibility
+    setSections(prev => prev.map(s => s.id === sectionId ? { ...s, is_visible: newVisibility } : s))
+    try {
+      await updateSectionVisibilityAction(sectionId, newVisibility, creatorName)
+    } catch (e) {
+      console.error(e)
+      alert('섹션 공개 상태 변경에 실패했습니다.')
+      setSections(prev => prev.map(s => s.id === sectionId ? { ...s, is_visible: currentVisibility } : s))
+    }
+  }
+
+  const handleToggleSectionTitleVisibility = async (sectionId: string, currentShowTitle: boolean) => {
+    const newShowTitle = !currentShowTitle
+    setSections(prev => prev.map(s => s.id === sectionId ? { ...s, show_title: newShowTitle } : s))
+    try {
+      await updateSectionTitleVisibilityAction(sectionId, newShowTitle, creatorName)
+    } catch (e) {
+      console.error(e)
+      alert('섹션 제목 표시 상태 변경에 실패했습니다.')
+      setSections(prev => prev.map(s => s.id === sectionId ? { ...s, show_title: currentShowTitle } : s))
+    }
+  }
+
+  const handleSectionAnimationChange = async (sectionId: string, animType: string) => {
+    setSections(prev => prev.map(s => s.id === sectionId ? { ...s, animation_type: animType } : s))
+    setOpenAnimSectionId(null)
+    try {
+      await updateSectionAnimationAction(sectionId, animType, creatorName)
+    } catch (e) {
+      console.error(e)
+      alert('애니메이션 변경에 실패했습니다.')
+    }
+  }
+
+  const handleRenameSection = async (sectionId: string, currentName: string) => {
+    const newName = prompt('섹션의 새로운 이름을 입력하세요:', currentName)
+    if (!newName || newName.trim() === '' || newName === currentName) return
+    
+    setSections(prev => prev.map(s => s.id === sectionId ? { ...s, name: newName } : s))
+    try {
+      await updateSectionNameAction(sectionId, newName, creatorName)
+    } catch (e) {
+      console.error(e)
+      alert('섹션 이름 변경에 실패했습니다.')
+      setSections(prev => prev.map(s => s.id === sectionId ? { ...s, name: currentName } : s))
+    }
+  }
+
+  const handleDeleteSection = async (sectionId: string, name: string) => {
+    if (!confirm(`정말 "${name}" 섹션을 삭제하시겠습니까?\n섹션 내의 게시물들은 '미배정 (Unassigned)' 섹션으로 이동합니다.`)) return
+    
+    setSections(prev => prev.filter(s => s.id !== sectionId))
+    setProjects(prev => prev.map(p => p.section_id === sectionId ? { ...p, section_id: null } : p))
+    try {
+      await deleteSectionAction(sectionId, creatorName)
+    } catch (e) {
+      console.error(e)
+      alert('섹션 삭제에 실패했습니다.')
+      window.location.reload()
+    }
+  }
+
+  const getAnimLabel = (type: string) => {
+    switch(type) {
+      case 'fade-up': return '위로 등장'
+      case 'fade-in': return '제자리 등장'
+      case 'zoom-in': return '팝업 확대'
+      case 'slide-right': return '왼쪽에서 밀기'
+      case 'slide-left': return '오른쪽에서 밀기'
+      case 'slide-up': return '아래에서 밀기'
+      default: return '위로 등장'
+    }
+  }
+
   const projectsBySection = useMemo(() => {
     const grouped = sections.map(section => ({
       section,
@@ -464,6 +550,92 @@ export default function ProjectManagementList({ initialProjects, sections: initi
                     <span className="text-neutral-400 font-normal text-sm ml-2">({sectionProjects.length}개)</span>
                   </h3>
                 </div>
+
+                {section.id !== 'unassigned' && (
+                  <div className="flex gap-1.5 bg-white border border-neutral-200/80 shadow-sm rounded-full p-1.5 items-center z-20 relative animate-in fade-in duration-300">
+                    <button
+                      onClick={() => handleToggleSectionVisibility(section.id, section.is_visible !== false)}
+                      className={`p-2 rounded-full transition-all flex items-center justify-center ${
+                        section.is_visible !== false 
+                          ? 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900' 
+                          : 'bg-amber-100 text-amber-700 shadow-sm'
+                      }`}
+                      title="섹션 공개/비공개 토글"
+                    >
+                      {section.is_visible !== false ? <Eye size={16} /> : <EyeOff size={16} />}
+                    </button>
+
+                    <button
+                      onClick={() => handleToggleSectionTitleVisibility(section.id, section.show_title !== false)}
+                      className={`p-2 rounded-full transition-all flex items-center justify-center ${
+                        section.show_title !== false 
+                          ? 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900' 
+                          : 'bg-neutral-800 text-white shadow-md'
+                      }`}
+                      title="제목 표시 여부 토글"
+                    >
+                      {section.show_title !== false ? <Globe size={16} /> : <Lock size={16} />}
+                    </button>
+
+                    <div className="w-px h-4 bg-neutral-200 mx-1" />
+
+                    <div className="relative" onMouseLeave={() => setOpenAnimSectionId(null)}>
+                      <button
+                        onClick={() => setOpenAnimSectionId(openAnimSectionId === section.id ? null : section.id)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full transition-all hover:bg-neutral-100 text-neutral-600 hover:text-neutral-900"
+                      >
+                        <Sparkles size={14} className="text-blue-500 animate-pulse" />
+                        <span>{getAnimLabel(section.animation_type || 'fade-up')}</span>
+                      </button>
+
+                      {openAnimSectionId === section.id && (
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 z-50">
+                          <div className="w-44 bg-white/95 backdrop-blur-xl border border-neutral-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.08)] rounded-xl p-1.5 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-200">
+                            {[
+                              { value: 'fade-up', label: '🚀 위로 등장' },
+                              { value: 'fade-in', label: '💨 제자리 등장' },
+                              { value: 'zoom-in', label: '🔍 팝업 확대' },
+                              { value: 'slide-right', label: '➡️ 왼쪽에서 밀기' },
+                              { value: 'slide-left', label: '⬅️ 오른쪽에서 밀기' },
+                              { value: 'slide-up', label: '⬆️ 아래에서 밀기' }
+                            ].map((option) => (
+                              <button
+                                key={option.value}
+                                onClick={() => handleSectionAnimationChange(section.id, option.value)}
+                                className={`px-3 py-2 text-xs font-medium text-left rounded-lg transition-all flex items-center justify-between ${
+                                  (section.animation_type || 'fade-up') === option.value 
+                                    ? 'bg-blue-50 text-blue-600 font-bold' 
+                                    : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
+                                }`}
+                              >
+                                {option.label}
+                                {(section.animation_type || 'fade-up') === option.value && <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="w-px h-4 bg-neutral-200 mx-1" />
+
+                    <button
+                      onClick={() => handleRenameSection(section.id, section.name)}
+                      className="p-2 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 rounded-full transition-all"
+                      title="이름 변경"
+                    >
+                      <Type size={16} />
+                    </button>
+
+                    <button
+                      onClick={() => handleDeleteSection(section.id, section.name)}
+                      className="p-2 text-neutral-500 hover:bg-red-50 hover:text-red-500 rounded-full transition-all"
+                      title="섹션 삭제"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                )}
               </div>
               
               <div className="flex flex-col w-full">
@@ -517,7 +689,7 @@ export default function ProjectManagementList({ initialProjects, sections: initi
         <div className="bg-white rounded-2xl border border-neutral-200 p-12 text-center shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
           <p className="text-neutral-500 font-medium mb-4">아직 생성된 섹션이나 게시물이 없습니다.</p>
           <a 
-            href={`/creator/${creatorName}`}
+            href={`/`}
             className="inline-block bg-black text-white px-6 py-2.5 rounded-lg text-sm font-bold shadow hover:bg-neutral-800 transition-colors"
           >
             포트폴리오 화면으로 이동

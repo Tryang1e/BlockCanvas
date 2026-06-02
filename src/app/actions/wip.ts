@@ -35,7 +35,7 @@ export async function createWipLogAction(
     }
   })
 
-  revalidatePath(`/creator/${creatorName}`)
+  revalidatePath(`/sites/${creatorName}`)
   return newLog
 }
 
@@ -62,7 +62,7 @@ export async function deleteWipLogAction(creatorName: string, logId: string) {
     where: { id: logId }
   })
 
-  revalidatePath(`/creator/${creatorName}`)
+  revalidatePath(`/sites/${creatorName}`)
   return { success: true }
 }
 
@@ -111,6 +111,6 @@ export async function updateWipLogAction(
     }
   })
 
-  revalidatePath(`/creator/${creatorName}`)
+  revalidatePath(`/sites/${creatorName}`)
   return updatedLog
 }

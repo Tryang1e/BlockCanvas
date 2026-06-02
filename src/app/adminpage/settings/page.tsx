@@ -12,6 +12,16 @@ export default async function AdminSettingsPage() {
     return acc
   }, {} as Record<string, string>)
 
+  // Fetch all available creators (active profiles)
+  const creators = await prisma.profile.findMany({
+    select: {
+      creator_name: true,
+      display_name: true,
+      avatar_url: true
+    },
+    orderBy: { creator_name: 'asc' }
+  })
+
   return (
     <div>
       <h2 className="text-2xl font-bold mb-6 tracking-tight">사이트 전체 설정</h2>
@@ -20,7 +30,7 @@ export default async function AdminSettingsPage() {
           <h3 className="text-sm font-bold text-neutral-800">글로벌 서비스 설정</h3>
         </div>
         <div className="p-6">
-          <AdminSettingsForm initialSettings={settingsObj} />
+          <AdminSettingsForm initialSettings={settingsObj} availableCreators={creators} />
         </div>
       </div>
     </div>

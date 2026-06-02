@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import { verifySession } from '@/lib/session'
 
 export default async function AdminLayout({
   children,
@@ -9,7 +10,8 @@ export default async function AdminLayout({
   children: React.ReactNode
 }) {
   const cookieStore = await cookies()
-  const session = cookieStore.get('session')?.value
+  const sessionToken = cookieStore.get('session')?.value
+  const session = verifySession(sessionToken)
   
   if (!session) redirect('/login')
   
@@ -19,7 +21,7 @@ export default async function AdminLayout({
     })
     
     if (!profile || profile.role !== 'admin') {
-      redirect(`/creator/${session}/dashboard`)
+      redirect(`http://${session}.craftopia.work/dashboard`)
     }
   }
 

@@ -131,22 +131,77 @@ html.lenis-scrolling iframe {
   @apply border-solid border-neutral-600 bg-white shadow-sm;
 }
 
-/* Constrain and apply dynamic corner radius to all rich text / editor images */
+/* Constrain and apply dynamic corner radius to all rich text / editor images and media */
 .prose img,
-.tiptap img {
-  height: 700px;
-  width: 100%;
-  object-fit: cover !important;
+.tiptap img,
+.prose video,
+.tiptap video,
+.prose [data-type="faq-block"],
+.tiptap [data-type="faq-block"] {
   border-radius: var(--editor-image-corner-radius, 0px) !important;
   transition: border-radius 0.5s ease, transform 0.5s ease !important;
 }
 
-/* Tiptap editor floating toolbars, bubble menus and interactive wrapper elements */
+/* Tiptap editor floating toolbars, bubble menus and interactive wrapper elements have their own premium roundings */
 [data-tippy-root]>div,
 .tiptap-bubble-menu,
-.tiptap-floating-menu,
-.border-dashed,
-.ring-dashed {
-  border-radius: var(--editor-image-corner-radius, 0px) !important;
-  transition: border-radius 0.5s ease, border-color 0.3s ease !important;
+.tiptap-floating-menu {
+  border-radius: 12px !important;
+}
+
+/* 은은한 다크 그레이/블루 대시 링 아웃라인 단락 편집 상태 표시 */
+.active-paragraph-focus {
+  position: relative !important;
+  z-index: auto !important;
+  outline: 2px dashed rgba(59, 130, 246, 0.45) !important;
+  outline-offset: 6px !important;
+  background-color: rgba(59, 130, 246, 0.015) !important;
+  border-radius: 6px !important;
+  transition: outline 0.2s ease-in-out, background-color 0.2s ease-in-out !important;
+}
+
+/* Columns Grid Layout - Common & Public Rendering Styles */
+[data-type="column-block"] {
+  display: block !important;
+  width: 100% !important;
+  margin-top: 2rem !important;
+  margin-bottom: 2rem !important;
+}
+
+[data-type="column-block"] .column-block-content-hole {
+  display: grid !important;
+  gap: 1.25rem !important;
+  width: 100% !important;
+}
+
+[data-type="column-block"][data-layout="50-50"] .column-block-content-hole {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+[data-type="column-block"][data-layout="33-33-33"] .column-block-content-hole {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+[data-type="column-block"][data-layout="40-60"] .column-block-content-hole {
+  grid-template-columns: 4fr 6fr !important;
+}
+[data-type="column-block"][data-layout="60-40"] .column-block-content-hole {
+  grid-template-columns: 6fr 4fr !important;
+}
+[data-type="column-block"][data-layout="30-70"] .column-block-content-hole {
+  grid-template-columns: 3fr 7fr !important;
+}
+[data-type="column-block"][data-layout="70-30"] .column-block-content-hole {
+  grid-template-columns: 7fr 3fr !important;
+}
+
+[data-type="column"] {
+  width: 100% !important;
+  min-height: 100px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.5rem !important;
+}
+
+/* 실제 배포/발행된 포트폴리오 사이트(HTMLRenderer 뷰어)에서는 드래그 핸들 탭을 흔적 없이 숨김 */
+.columns-drag-handle-tab {
+  display: none !important;
 }

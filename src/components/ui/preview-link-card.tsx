@@ -11,6 +11,20 @@ interface PreviewLinkCardProps {
   asChild?: boolean;
 }
 
+const getSafeHostname = (urlStr: string) => {
+  if (!urlStr || typeof urlStr !== 'string') return 'Link';
+  try {
+    if (urlStr.startsWith('http://') || urlStr.startsWith('https://')) {
+      return new URL(urlStr).hostname;
+    }
+  } catch (e) {}
+  try {
+    const match = urlStr.match(/^(?:https?:\/\/)?(?:www\.)?([^\/:]+)/i);
+    if (match && match[1]) return match[1];
+  } catch (err) {}
+  return urlStr || 'Link';
+};
+
 export function PreviewLinkCard({ href, children, className, asChild = false }: PreviewLinkCardProps) {
   const [metadata, setMetadata] = useState<{
     title?: string;
@@ -22,7 +36,7 @@ export function PreviewLinkCard({ href, children, className, asChild = false }: 
   const [loading, setLoading] = useState(false);
   
   // Basic validation to avoid breaking on relative links
-  const isExternal = href.startsWith('http');
+  const isExternal = typeof href === 'string' && href.startsWith('http');
 
   const fetchMetadata = async () => {
     if (!isExternal || metadata || loading) return;
@@ -48,6 +62,8 @@ export function PreviewLinkCard({ href, children, className, asChild = false }: 
       </a>
     );
   }
+
+  const safeHostname = getSafeHostname(href);
 
   return (
     <PreviewCard onOpenChange={(open) => { if (open) fetchMetadata(); }}>
@@ -78,11 +94,11 @@ export function PreviewLinkCard({ href, children, className, asChild = false }: 
               <div className="flex items-center gap-2">
                 {metadata.favicon && <img src={metadata.favicon} alt="" className="w-4 h-4 rounded-sm" />}
                 <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 truncate">
-                  {new URL(href).hostname}
+                  {safeHostname}
                 </span>
               </div>
               <h3 className="font-bold text-neutral-900 dark:text-neutral-100 line-clamp-1">
-                {metadata.title || new URL(href).hostname}
+                {metadata.title || safeHostname}
               </h3>
               {metadata.description && (
                 <p className="text-neutral-500 dark:text-neutral-400 line-clamp-2 text-xs">
@@ -94,7 +110,7 @@ export function PreviewLinkCard({ href, children, className, asChild = false }: 
         ) : (
           <div className="p-4 flex items-center justify-center gap-2 text-neutral-500 dark:text-neutral-400">
             <ExternalLink size={16} />
-            <span className="text-sm font-medium">{new URL(href).hostname}</span>
+            <span className="text-sm font-medium">{safeHostname}</span>
           </div>
         )}
       </PreviewCardPanel>

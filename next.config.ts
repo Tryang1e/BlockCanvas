@@ -9,11 +9,26 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  allowedDevOrigins: ['localhost:3000', 'test.localhost:3000', 'craftopia.work', '*.craftopia.work'],
   experimental: {
     serverActions: {
       bodySizeLimit: '1024mb', // 1GB limit for Video/Audio
+      allowedOrigins: [
+        'http://craftopia.work',
+        'https://craftopia.work',
+        'http://*.craftopia.work',
+        'https://*.craftopia.work',
+        'http://sian17.craftopia.work',
+        'https://sian17.craftopia.work',
+        'http://tryangle.craftopia.work',
+        'https://tryangle.craftopia.work',
+        'http://owlhouse.craftopia.work',
+        'https://owlhouse.craftopia.work',
+        'http://localhost:3000',
+        'http://*.localhost:3000'
+      ],
     },
-    middlewareClientMaxBodySize: '1024mb', // Prevent Middleware from truncating stream at 10MB
+    proxyClientMaxBodySize: '1024mb', // Prevent Proxy from truncating stream at 10MB
   },
   async headers() {
     return [

@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers'
 import { prisma } from './prisma'
+import { verifySession } from './session'
 
 /**
  * Checks if the current session matches the requested creatorName.
@@ -8,11 +9,14 @@ import { prisma } from './prisma'
  */
 export async function requireAuth(creatorName: string): Promise<string> {
   const cookieStore = await cookies()
-  const session = cookieStore.get('session')?.value
+  const sessionToken = cookieStore.get('session')?.value
+  const session = verifySession(sessionToken)
 
   let isAuthorized = false
 
-  if (session === creatorName || session === 'admin') {
+  const creatorNameLower = creatorName.toLowerCase()
+
+  if (session === creatorNameLower || session === 'admin') {
     isAuthorized = true
   } else if (session) {
     const sessionProfile = await prisma.profile.findUnique({
@@ -29,7 +33,7 @@ export async function requireAuth(creatorName: string): Promise<string> {
   }
 
   const profile = await prisma.profile.findUnique({
-    where: { creator_name: creatorName },
+    where: { creator_name: creatorNameLower },
     select: { id: true }
   })
 

@@ -5,12 +5,13 @@ import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 
 interface TooltipProps {
-  text: string
+  text?: string
   children: React.ReactNode
   position?: 'top' | 'bottom' | 'left' | 'right'
+  visualContent?: React.ReactNode
 }
 
-export default function Tooltip({ text, children, position = 'top' }: TooltipProps) {
+export default function Tooltip({ text, children, position = 'top', visualContent }: TooltipProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [coords, setCoords] = useState({ top: 0, left: 0 })
   const wrapperRef = useRef<HTMLDivElement>(null)
@@ -77,8 +78,8 @@ export default function Tooltip({ text, children, position = 'top' }: TooltipPro
       y: (position === 'top' ? '-100%' : (position === 'bottom' ? 0 : '-50%')) as string | number,
       transition: {
         type: 'spring' as const,
-        damping: 14,
-        stiffness: 240
+        damping: 15,
+        stiffness: 250
       }
     },
     exit: { 
@@ -138,9 +139,16 @@ export default function Tooltip({ text, children, position = 'top' }: TooltipPro
                 left: coords.left,
                 zIndex: 99999,
               }}
-              className="pointer-events-none whitespace-nowrap bg-neutral-950/90 backdrop-blur-md text-white text-[11px] font-bold tracking-wider px-2.5 py-1.5 rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.3)] border border-neutral-800/80 flex items-center justify-center"
+              className={`pointer-events-none bg-neutral-950/95 backdrop-blur-lg text-white rounded-xl shadow-[0_12px_32px_rgba(0,0,0,0.5)] border border-neutral-800/60 p-3.5 flex flex-col items-center justify-center text-center ${visualContent ? 'w-[245px]' : 'whitespace-nowrap text-[12.5px] font-bold px-3 py-1.8'}`}
             >
-              {text}
+              {visualContent ? (
+                <div className="flex flex-col gap-2.5 w-full items-start text-left">
+                  {text && <span className="text-[11.5px] font-extrabold uppercase tracking-widest text-neutral-300 border-b border-white/5 pb-1 block w-full">{text}</span>}
+                  {visualContent}
+                </div>
+              ) : (
+                text
+              )}
               <div className={`absolute border-[5px] ${arrowClass}`} />
             </motion.div>
           )}

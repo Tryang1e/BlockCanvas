@@ -17,6 +17,6 @@ export async function updateBannerAction(creatorName: string, bannerUrl: string 
     create: { creator_id: profile.id, banner_url: bannerUrl }
   })
 
-  revalidatePath(`/creator/${creatorName}`)
+  revalidatePath(`/sites/${creatorName}`)
   return { success: true }
 }

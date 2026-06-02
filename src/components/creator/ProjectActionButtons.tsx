@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { deleteProjectAction } from '@/app/actions/projects'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -8,10 +8,16 @@ import Tooltip from '@/components/ui/Tooltip'
 
 export default function ProjectActionButtons({ projectId, creatorName, isOwner }: { projectId: string, creatorName: string, isOwner?: boolean }) {
   const router = useRouter()
+  const [mounted, setMounted] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   if (!isOwner) return null
+  if (!mounted) return <div className="absolute top-3 right-3 opacity-0 flex gap-2 z-10 w-8 h-8" />
 
   const handleDelete = async (e: React.MouseEvent | React.PointerEvent) => {
     e.stopPropagation()
@@ -61,7 +67,7 @@ export default function ProjectActionButtons({ projectId, creatorName, isOwner }
     <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2 z-10 pointer-events-auto">
       <Tooltip text="수정하기" position="bottom">
         <Link 
-          href={`/creator/${creatorName}/editor?project_id=${projectId}`}
+          href={`/editor?project_id=${projectId}`}
           onPointerDown={(e) => e.stopPropagation()}
           className="bg-white/90 hover:bg-white text-neutral-800 p-2 rounded-full shadow-md text-xs font-bold w-8 h-8 flex items-center justify-center transition-all cursor-pointer hover:scale-110"
         >

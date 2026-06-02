@@ -2,10 +2,31 @@
 
 import { useState } from 'react'
 import { publishProjectAction } from '@/app/actions/publish'
-import { uploadFileAction } from '@/app/actions/upload'
 
-export default function PublishSettingsModal({ creatorName, widgets, sectionId, initialProject, categories = [], onPublishStart }: { creatorName: string, widgets: any[], sectionId?: string, initialProject?: any, categories?: any[], onPublishStart?: () => void }) {
-  const [isOpen, setIsOpen] = useState(false)
+
+export default function PublishSettingsModal({ 
+  creatorName, 
+  widgets, 
+  sectionId, 
+  initialProject, 
+  categories = [], 
+  isOpen: externalIsOpen, 
+  setIsOpen: externalSetIsOpen, 
+  onPublishStart 
+}: { 
+  creatorName: string, 
+  widgets: any[], 
+  sectionId?: string, 
+  initialProject?: any, 
+  categories?: any[], 
+  isOpen?: boolean, 
+  setIsOpen?: (open: boolean) => void, 
+  onPublishStart?: () => void 
+}) {
+  const [internalIsOpen, setInternalIsOpen] = useState(false)
+  const isOpen = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen
+  const setIsOpen = externalSetIsOpen !== undefined ? externalSetIsOpen : setInternalIsOpen
+  
   const [coverUrl, setCoverUrl] = useState<string | null>(initialProject?.thumbnail_url || null)
   const [uploading, setUploading] = useState(false)
 
@@ -52,8 +73,16 @@ export default function PublishSettingsModal({ creatorName, widgets, sectionId, 
     formData.append('file', file)
 
     try {
-      const url = await uploadFileAction(formData)
-      if (url) setCoverUrl(url)
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      })
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || '이미지 업로드에 실패했습니다.')
+      }
+      const data = await response.json()
+      if (data.url) setCoverUrl(data.url)
     } catch (err) {
       console.error(err)
     }
@@ -70,7 +99,7 @@ export default function PublishSettingsModal({ creatorName, widgets, sectionId, 
       </button>
 
       {isOpen && (
-        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-2 sm:p-4 backdrop-blur-[2px]">
+        <div className="fixed inset-0 bg-black/60 z-[999999] flex items-center justify-center p-2 sm:p-4 backdrop-blur-[2px]">
           <form 
             action={publishProjectAction} 
             onSubmit={() => {

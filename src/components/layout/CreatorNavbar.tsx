@@ -48,6 +48,17 @@ export default function CreatorNavbar({
   // nav py-5 (20px) + link p-2 (8px) = 28px offset from top
   const clipHeight = Math.max(0, bannerBottom - 28)
 
+  // Calculate login URL based on environment to ensure it's always on the root domain
+  const [loginUrl, setLoginUrl] = useState('/login')
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const isLocal = window.location.hostname.includes('localhost')
+      const protocol = window.location.protocol
+      const baseDomain = isLocal ? 'localhost:3000' : 'craftopia.work'
+      setLoginUrl(`${protocol}//${baseDomain}/login`)
+    }
+  }, [])
+
   return (
     <nav className="fixed top-0 left-0 w-full z-[9999] px-4 md:px-8 py-4 md:py-5 flex justify-between items-center pointer-events-none">
       <div className="flex items-center pointer-events-auto">
@@ -114,7 +125,7 @@ export default function CreatorNavbar({
         ) : (
           <div className="flex items-center gap-2">
             <Link
-              href="/login"
+              href={loginUrl}
               className="text-white font-bold text-sm px-4 py-2 hover:text-neutral-300 transition-colors"
             >
               로그인

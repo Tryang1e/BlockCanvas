@@ -1,13 +1,16 @@
 'use server'
 
 import { prisma } from '@/lib/prisma'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 import { hashPassword } from '@/lib/hash'
+import { deleteUserPhysicalFiles } from '@/lib/file-delete'
+import { signSession, verifySession } from '@/lib/session'
 
 async function requireAdmin() {
   const cookieStore = await cookies()
-  const session = cookieStore.get('session')?.value
+  const sessionToken = cookieStore.get('session')?.value
+  const session = verifySession(sessionToken)
   
   if (session === 'admin') return 'admin'
 
@@ -21,10 +24,33 @@ async function requireAdmin() {
   throw new Error('권한이 없습니다: 관리자만 접근 가능합니다.')
 }
 
+async function getDynamicConfig() {
+  const host = (await headers()).get('host') || 'craftopia.work'
+  const isLocal = host.includes('localhost') || host.includes('127.0.0.1')
+  const isDev = process.env.NODE_ENV !== 'production'
+  
+  const protoHeader = (await headers()).get('x-forwarded-proto')
+  const protocol = protoHeader === 'https' ? 'https' : 'http'
+  
+  return {
+    isLocal,
+    isDev,
+    protocol,
+    baseDomain: isLocal ? 'localhost:3000' : 'craftopia.work',
+    // 터널 개발 환경(craftopia.work)에서는 서브도메인 간 세션 공유를 위해 쿠키 도메인을 '.craftopia.work'로 설정하고, 순수 localhost인 경우에만 도메인을 생략합니다.
+    cookieDomain: isLocal ? undefined : '.craftopia.work'
+  }
+}
+
 export async function deleteUserAction(id: string) {
   try {
     const admin = await requireAdmin()
     const user = await prisma.profile.findUnique({ where: { id } })
+    
+    // 1. Delete physical files from local storage first (before DB records are gone)
+    await deleteUserPhysicalFiles(id)
+    
+    // 2. Cascade delete from DB
     await prisma.profile.delete({
       where: { id }
     })
@@ -181,7 +207,7 @@ export async function createUserAdminAction(formData: FormData) {
     
     const email = formData.get('email') as string
     const password = formData.get('password') as string
-    const creatorName = formData.get('creator_name') as string
+    const creatorName = (formData.get('creator_name') as string).toLowerCase()
     const displayName = formData.get('display_name') as string
     const role = (formData.get('role') as string) || 'creator'
 
@@ -212,6 +238,25 @@ export async function createUserAdminAction(formData: FormData) {
         creator_name: creatorName,
         display_name: displayName || creatorName,
         role
+      }
+    })
+
+    // Create default Portfolio
+    await prisma.portfolio.create({
+      data: {
+        creator_id: newUser.id,
+        headline: '나의 멋진 포트폴리오',
+        about_text: '포트폴리오 소개글을 입력해주세요.',
+      }
+    })
+
+    // Create default section
+    await prisma.portfolioSection.create({
+      data: {
+        creator_id: newUser.id,
+        name: 'Main Projects',
+        sort_order: 0,
+        is_visible: true
       }
     })
 
@@ -248,12 +293,15 @@ export async function impersonateUserAction(creatorName: string) {
     }
     
     // 쿠키를 해당 크리에이터로 변경하여 강제 세션 가로채기 대리 로그인 가동!
+    const { protocol, cookieDomain, isDev } = await getDynamicConfig()
     const cookieStore = await cookies()
-    cookieStore.set('session', creatorName, { 
+    const signedToken = signSession(creatorName)
+    cookieStore.set('session', signedToken, { 
       httpOnly: true, 
-      secure: process.env.NODE_ENV === 'production' && process.env.SECURE_COOKIE === 'true',
+      secure: isDev ? false : (protocol === 'https'),
       sameSite: 'lax',
       path: '/',
+      domain: cookieDomain,
       maxAge: 60 * 60 * 24 * 30 // 30 days
     })
 
@@ -274,3 +322,39 @@ export async function impersonateUserAction(creatorName: string) {
     return { error: err.message || '서버 처리 중 문제가 발생했습니다.' }
   }
 }
+
+export async function resetUser2FAAction(id: string) {
+  try {
+    const admin = await requireAdmin()
+    const user = await prisma.profile.findUnique({ where: { id } })
+    if (!user) {
+      return { error: '해당 사용자를 찾을 수 없습니다.' }
+    }
+    
+    await prisma.profile.update({
+      where: { id },
+      data: {
+        two_factor_secret: null,
+        two_factor_enabled: false
+      }
+    })
+    
+    if (admin) {
+      await prisma.auditLog.create({
+        data: { 
+          admin_name: admin, 
+          action: 'RESET_2FA', 
+          target_id: id, 
+          details: `Reset 2FA security for user: ${user.creator_name}` 
+        }
+      })
+    }
+    
+    revalidatePath('/adminpage')
+    return { success: true }
+  } catch (err: any) {
+    console.error('Admin Action Error:', err)
+    return { error: err.message || '서버 처리 중 문제가 발생했습니다.' }
+  }
+}
+

@@ -5,10 +5,13 @@ import Link from 'next/link'
 import { incrementProjectViewCount } from '@/app/actions/project'
 import { Tweet } from 'react-tweet'
 import ReactPlayer from 'react-player'
+
+
 import HTMLRenderer from '@/components/ui/HTMLRenderer'
 import { PreviewLinkCard } from '@/components/ui/preview-link-card'
 import CreatorFooter from '@/components/layout/CreatorFooter'
 import { ScrollProgressProvider, ScrollProgress } from '@/components/ui/ScrollProgress'
+import SmoothScroll from '@/components/ui/SmoothScroll'
 
 interface ProjectDetailsViewerProps {
   project: any
@@ -27,9 +30,11 @@ const cleanProjectTitle = (title: string) => {
 }
 
 export default function ProjectDetailsViewer({ project, widgets, creatorName, isModal = false, otherProjects = [], relatedType = 'creator', profileData }: ProjectDetailsViewerProps) {
+  const [isMounted, setIsMounted] = React.useState(false)
 
   // Track View Count invisibly
   useEffect(() => {
+    setIsMounted(true)
     if (project?.id) {
       incrementProjectViewCount(project.id)
     }
@@ -89,10 +94,8 @@ export default function ProjectDetailsViewer({ project, widgets, creatorName, is
     }
   }
 
-  return (
-    <ScrollProgressProvider global={!isModal}>
-      <ScrollProgress />
-      <div className={`w-full flex flex-col ${isModal ? 'bg-white min-h-full md:min-h-0' : 'min-h-screen bg-[#fcfcfc]'}`}>
+  const content = (
+    <div className={!isMounted ? "w-full flex flex-col min-h-screen bg-[#fcfcfc]" : `w-full flex flex-col ${isModal ? 'bg-white min-h-full md:min-h-0' : 'min-h-screen bg-[#fcfcfc]'}`}>
 
       {/* Top Header */}
       {!isModal && (
@@ -138,54 +141,90 @@ export default function ProjectDetailsViewer({ project, widgets, creatorName, is
             if (w.widget_type === 'image') {
               const urls = w.content?.urls || []
               if (urls.length === 0) return null;
-              return (
-                <div key={w.id} className={`flex flex-wrap w-full justify-center bg-neutral-50 animate-in fade-in duration-1000 fill-mode-both ${delayClass}`}>
-                  {urls.map((url: string, idx: number) => (
-                    <div key={idx} className="relative flex-grow flex justify-center bg-neutral-50 group" style={{ flexBasis: urls.length >= 3 ? '30%' : urls.length === 2 ? '48%' : '100%' }}>
-                      <img src={url} alt={`media-${idx}`} className="w-full h-auto object-cover block transition-transform duration-700 ease-out group-hover:scale-[1.01]" />
-                    </div>
-                  ))}
-                </div>
-              )
+               return (
+                 <div key={w.id} className={`flex flex-wrap w-full gap-1.5 justify-center animate-in fade-in duration-1000 fill-mode-both ${delayClass}`}>
+                   {urls.map((url: string, idx: number) => {
+                      const getFlexBasis = (i: number, total: number) => {
+                        if (total === 1) return '100%';
+                        const remainder = total % 3;
+                        if (remainder === 0) {
+                          return '31.5%';
+                        } else if (remainder === 2) {
+                          return i >= total - 2 ? '48%' : '31.5%';
+                        } else { // remainder === 1
+                          return i >= total - 4 ? '48%' : '31.5%';
+                        }
+                      };
+
+                     return (
+                       <div 
+                         key={idx} 
+                         className="relative overflow-hidden group flex-grow"
+                         style={{ flexBasis: getFlexBasis(idx, urls.length) }}
+                       >
+                         {urls.length === 1 ? (
+                           <img src={url} alt={`media-${idx}`} className="w-full h-auto block mx-auto" />
+                         ) : (
+                           <img src={url} alt={`media-${idx}`} className="w-full h-full aspect-video object-cover block mx-auto transition-transform duration-700 ease-out group-hover:scale-[1.03]" />
+                         )}
+                       </div>
+                     );
+                   })}
+                 </div>
+               )
             }
             if (w.widget_type === 'video') {
-              const url = w.content?.url
+              const rawContent = w.content
+              const url = typeof rawContent === 'string'
+                ? rawContent
+                : (rawContent && typeof rawContent === 'object' && ((rawContent as any).url || (rawContent as any).html))
+                  ? ((rawContent as any).url || (rawContent as any).html)
+                  : ''
+
               if (!url) return null
               const isAudio = url.match(/\.(mp3|wav|ogg)$/i)
+              const isExternalVideo = !isAudio && (url.includes('youtube.com') || url.includes('youtu.be') || url.includes('vimeo.com') || url.includes('twitch.tv'))
               return (
-                <div key={w.id} className={`w-full flex justify-center my-4 bg-black animate-in fade-in duration-1000 fill-mode-both ${delayClass}`}>
-                  {isAudio ? (
-                    <audio src={url} controls className="w-full max-w-md my-12 px-4" />
-                  ) : (
-                    <video src={url} controls className="w-full h-auto max-h-[90vh] bg-black" />
-                  )}
-                </div>
+                <VideoWidgetBlock key={w.id} url={url} isAudio={isAudio} isExternalVideo={isExternalVideo} delayClass={delayClass} />
               )
             }
             if (w.widget_type === 'embed') {
-              const code = w.content?.html
+              const rawCode = w.content?.html
+              if (!rawCode) return null
+
+              const code = typeof rawCode === 'string'
+                ? rawCode
+                : (rawCode && typeof rawCode === 'object' && (rawCode as any).html)
+                  ? (rawCode as any).html
+                  : ''
+
               if (!code) return null
 
               const tweetMatch = code.match(/twitter\.com\/.*\/status\/(\d+)|x\.com\/.*\/status\/(\d+)/)
               const tweetId = tweetMatch ? (tweetMatch[1] || tweetMatch[2]) : null
-              const isVideoUrl = !code.includes('<iframe') && !tweetId && (code.includes('youtube.com') || code.includes('youtu.be') || code.includes('vimeo.com') || code.includes('twitch.tv'))
+              const isVideoUrl = !tweetId && (code.includes('youtube.com') || code.includes('youtu.be') || code.includes('vimeo.com') || code.includes('twitch.tv'))
 
               return (
-                <div key={w.id} className={`w-full flex justify-center my-8 ${delayClass}`}>
-                  <div className={`w-full ${tweetId ? 'max-w-lg' : isVideoUrl ? 'max-w-4xl aspect-video bg-black shadow-2xl' : 'max-w-4xl'}`}>
+                <div key={w.id} className={`w-full flex justify-center ${(!isMounted || isVideoUrl) ? '' : 'my-8'} ${delayClass}`}>
+                  <div className={`w-full ${tweetId ? 'max-w-lg' : (!isMounted || isVideoUrl) ? 'aspect-video bg-black' : 'max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-12'}`}>
                     {tweetId ? (
                       <div className="light w-full flex justify-center">
                         <Tweet id={tweetId} />
                       </div>
-                    ) : isVideoUrl ? (
-                      <div className="w-full max-w-3xl aspect-video mx-auto relative shadow-lg rounded-xl overflow-hidden bg-black animate-in fade-in duration-1000">
+                    ) : code.includes('<iframe') ? (
+                      <div
+                        className="w-full relative aspect-video bg-black [&>iframe]:w-full [&>iframe]:h-full [&>iframe]:absolute [&>iframe]:inset-0 [&>iframe]:border-none"
+                        dangerouslySetInnerHTML={{ __html: isMounted ? (typeof window !== 'undefined' ? require('isomorphic-dompurify').sanitize(code, { ADD_TAGS: ['iframe'] }) : code) : '' }}
+                      />
+                    ) : (isMounted && isVideoUrl) ? (
+                      <div className="w-full aspect-video relative bg-black animate-in fade-in duration-1000">
                         {/* @ts-ignore */}
-                        <ReactPlayer url={code} width="100%" height="100%" controls />
+                        <ReactPlayer src={code} width="100%" height="100%" controls />
                       </div>
                     ) : (
                       <div
-                        className="w-full relative aspect-video bg-black shadow-2xl [&>iframe]:w-full [&>iframe]:h-full [&>iframe]:absolute [&>iframe]:inset-0 [&>iframe]:border-none"
-                        dangerouslySetInnerHTML={{ __html: typeof window !== 'undefined' ? require('isomorphic-dompurify').sanitize(code, { ADD_TAGS: ['iframe'] }) : code }}
+                        className="w-full relative aspect-video bg-black [&>iframe]:w-full [&>iframe]:h-full [&>iframe]:absolute [&>iframe]:inset-0 [&>iframe]:border-none"
+                        dangerouslySetInnerHTML={{ __html: isMounted ? (typeof window !== 'undefined' ? require('isomorphic-dompurify').sanitize(code, { ADD_TAGS: ['iframe'] }) : code) : '' }}
                       />
                     )}
                   </div>
@@ -296,6 +335,55 @@ export default function ProjectDetailsViewer({ project, widgets, creatorName, is
         <CreatorFooter profileData={profileData} creatorName={creatorName} />
       )}
       </div>
+  )
+
+  return (
+    <ScrollProgressProvider global={!isModal}>
+      {!isModal ? (
+        <SmoothScroll isRoot={true}>
+          <ScrollProgress />
+          {content}
+        </SmoothScroll>
+      ) : (
+        content
+      )}
     </ScrollProgressProvider>
   )
 }
+
+// 🛡️ Premium Video Widget Block with Scroll-Interception Layer & Click-To-Activate Haptics
+function VideoWidgetBlock({ url, isAudio, isExternalVideo, delayClass }: { url: string; isAudio: string[] | null; isExternalVideo: boolean; delayClass: string }) {
+  const [isMounted, setIsMounted] = React.useState(false)
+  const [isActive, setIsActive] = React.useState(false)
+
+  React.useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
+  return (
+    <div 
+      className={`w-full flex justify-center bg-black animate-in fade-in duration-1000 fill-mode-both ${delayClass} relative group`}
+      onMouseLeave={() => setIsActive(false)}
+    >
+      {isAudio ? (
+        <audio src={url} controls className="w-full max-w-md my-12 px-4" />
+      ) : (isMounted && isExternalVideo) ? (
+        <div className="w-full aspect-video relative bg-black max-w-[1400px] mx-auto w-full">
+          {/* @ts-ignore */}
+          <ReactPlayer src={url} width="100%" height="100%" controls />
+          
+          {/* 🛡️ Scroll Interceptor Transparent Layer (Click to Activate Play) */}
+          {!isActive && (
+            <div 
+              onClick={() => setIsActive(true)}
+              className="absolute inset-0 z-10 bg-transparent cursor-pointer"
+            />
+          )}
+        </div>
+      ) : (
+        <video src={url} controls className="w-full h-auto max-h-[90vh] bg-black max-w-[1400px] mx-auto" />
+      )}
+    </div>
+  )
+}
+

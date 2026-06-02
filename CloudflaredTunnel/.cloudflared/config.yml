@@ -1,0 +1,12 @@
+tunnel: aa0a6dc8-623f-4170-a3da-b253f189f470
+credentials-file: C:\Github\BlockCanvas\CloudflaredTunnel\.cloudflared\aa0a6dc8-623f-4170-a3da-b253f189f470.json
+protocol: http2
+
+ingress:
+  - hostname: "remote.craftopia.work"
+    service: rdp://127.0.0.1:47231
+  - hostname: "*.craftopia.work"
+    service: http://127.0.0.1:3000
+  - hostname: "craftopia.work"
+    service: http://127.0.0.1:3000
+  - service: http_status:404

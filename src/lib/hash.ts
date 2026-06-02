@@ -28,9 +28,24 @@ export async function verifyPassword(password: string, storedHash: string): Prom
     return false;
   }
   
-  // Step 1: PBKDF2 the input
-  const pbkdf2Hash = crypto.pbkdf2Sync(password, 'static-app-salt-blockcanvas', 100000, 64, 'sha512').toString('base64');
+  try {
+    // Step 1: PBKDF2 the input (New double-hash scheme)
+    const pbkdf2Hash = crypto.pbkdf2Sync(password, 'static-app-salt-blockcanvas', 100000, 64, 'sha512').toString('base64');
+    
+    // Step 2: Bcrypt compare using double-hash
+    const matchDouble = await bcrypt.compare(pbkdf2Hash, storedHash);
+    if (matchDouble) return true;
+  } catch (e) {
+    console.error('PBKDF2 Bcrypt check failed:', e);
+  }
+
+  try {
+    // Step 3: Fallback check for legacy pure Bcrypt passwords (without PBKDF2)
+    const matchLegacy = await bcrypt.compare(password, storedHash);
+    if (matchLegacy) return true;
+  } catch (e) {
+    console.error('Legacy Bcrypt check failed:', e);
+  }
   
-  // Step 2: Bcrypt compare
-  return await bcrypt.compare(pbkdf2Hash, storedHash);
+  return false;
 }

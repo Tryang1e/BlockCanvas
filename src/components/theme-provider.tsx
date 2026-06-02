@@ -1,5 +1,6 @@
 'use client'
 import React, { createContext, useContext, useEffect, useState } from 'react'
+import { safeStorage } from '@/lib/storage'
 
 type Theme = 'dark' | 'light' | 'system'
 const ThemeContext = createContext<{theme: Theme, resolvedTheme: 'dark'|'light', setTheme: (t:Theme)=>void}>({theme:'system', resolvedTheme:'light', setTheme:()=>{}})
@@ -11,7 +12,7 @@ export function ThemeProvider({children}: {children: React.ReactNode}) {
 
   useEffect(() => {
     setMounted(true)
-    const saved = localStorage.getItem('theme') as Theme
+    const saved = safeStorage.getItem('theme') as Theme
     if (saved) setThemeState(saved)
   }, [])
 

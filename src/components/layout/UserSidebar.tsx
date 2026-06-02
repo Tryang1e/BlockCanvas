@@ -70,13 +70,9 @@ export default function UserSidebar({
       <button 
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-10 h-10 rounded-full overflow-hidden bg-teal-700 flex items-center justify-center text-white border border-neutral-700 hover:border-neutral-500 transition-colors shadow-lg relative"
+        className="w-10 h-10 rounded-full overflow-hidden bg-neutral-200 flex items-center justify-center text-white border border-neutral-700 hover:border-neutral-500 transition-colors shadow-lg relative"
       >
-        {avatarUrl ? (
-          <Image src={avatarUrl} alt="Avatar" fill className="object-cover" unoptimized />
-        ) : (
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-        )}
+        <Image src={avatarUrl || '/default_avatar.png'} alt="Avatar" fill className="object-cover" unoptimized />
       </button>
 
       {/* Dropdown Panel */}
@@ -85,12 +81,8 @@ export default function UserSidebar({
           
           {/* Profile Section */}
           <div className="flex items-start gap-4 px-4 py-3">
-            <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 bg-teal-700 flex items-center justify-center text-white mt-1 relative">
-              {avatarUrl ? (
-                <Image src={avatarUrl} alt="Avatar" fill className="object-cover" unoptimized />
-              ) : (
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-              )}
+            <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 bg-neutral-200 flex items-center justify-center text-white mt-1 relative">
+              <Image src={avatarUrl || '/default_avatar.png'} alt="Avatar" fill className="object-cover" unoptimized />
             </div>
             <div className="flex flex-col text-left">
               <span className="font-bold text-base tracking-wide">{userName}</span>
@@ -100,37 +92,48 @@ export default function UserSidebar({
 
           <Separator />
 
-          <Link href={`/creator/${userHandle}`}>
-            <MenuItem 
-              type="div"
-              icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>} 
-              text="내 포트폴리오로 가기" 
-            />
-          </Link>
-          <Link href={`/creator/${userHandle}/dashboard`}>
-            <MenuItem 
-              type="div"
-              icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>} 
-              text="크리에이터 대시보드로 가기" 
-            />
-          </Link>
-          <MenuItem 
-            type="button"
-            onClick={async () => {
-              await logout()
-            }}
-            icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>} 
-            text="로그아웃" 
-          />
+          {(() => {
+            const isLocal = typeof window !== 'undefined' && (window.location.hostname.includes('localhost') || window.location.hostname.includes('127.0.0.1'))
+            const baseDomain = isLocal ? 'localhost:3000' : 'craftopia.work'
+            const protocol = typeof window !== 'undefined' ? window.location.protocol : 'https:'
+            const rootUrl = `${protocol}//${userHandle}.${baseDomain}`
 
-          <Separator />
-          <Link href={`/creator/${userHandle}/dashboard/settings`}>
-            <MenuItem 
-              type="div"
-              icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>} 
-              text="설정" 
-            />
-          </Link>
+            return (
+              <>
+                <Link href={rootUrl}>
+                  <MenuItem 
+                    type="div"
+                    icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>} 
+                    text="내 포트폴리오로 가기" 
+                  />
+                </Link>
+                <Link href={`${rootUrl}/dashboard`}>
+                  <MenuItem 
+                    type="div"
+                    icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>} 
+                    text="크리에이터 대시보드로 가기" 
+                  />
+                </Link>
+                <MenuItem 
+                  type="button"
+                  onClick={async () => {
+                    await logout()
+                  }}
+                  icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>} 
+                  text="로그아웃" 
+                />
+
+                <Separator />
+                <Link href={`${rootUrl}/dashboard/settings`}>
+                  <MenuItem 
+                    type="div"
+                    icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>} 
+                    text="설정" 
+                  />
+                </Link>
+              </>
+            )
+          })()}
 
           <Separator />
 

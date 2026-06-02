@@ -1,9 +1,16 @@
 import { prisma } from './src/lib/prisma'
 async function main() {
-  const profile = await prisma.profile.findUnique({
-    where: { creator_name: 'yunaron1004414' },
-    include: { portfolios: true }
+  const profiles = await prisma.profile.findMany({
+    select: {
+      id: true,
+      creator_name: true,
+      display_name: true,
+      email: true,
+      role: true,
+      two_factor_enabled: true
+    }
   });
-  console.log(JSON.stringify(profile, null, 2));
+  console.log(JSON.stringify(profiles, null, 2));
 }
 main().finally(() => prisma.$disconnect());
+

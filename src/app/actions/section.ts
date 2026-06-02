@@ -26,7 +26,7 @@ export async function createSectionAction(creatorId: string, name: string, secti
     }
   })
 
-  revalidatePath(`/creator/${creatorName}`)
+  revalidatePath(`/sites/${creatorName}`)
   return { success: true, section: newSection }
 }
 
@@ -42,7 +42,7 @@ export async function updateSectionOrderAction(sectionIds: string[], creatorName
 
   await Promise.all(promises)
 
-  revalidatePath(`/creator/${creatorName}`)
+  revalidatePath(`/sites/${creatorName}`)
   return { success: true }
 }
 
@@ -58,7 +58,7 @@ export async function updateSectionTitleVisibilityAction(sectionId: string, show
     return { success: false }
   }
 
-  revalidatePath(`/creator/${creatorName}`)
+  revalidatePath(`/sites/${creatorName}`)
   return { success: true }
 }
 
@@ -74,7 +74,7 @@ export async function updateSectionVisibilityAction(sectionId: string, is_visibl
     return { success: false }
   }
 
-  revalidatePath(`/creator/${creatorName}`)
+  revalidatePath(`/sites/${creatorName}`)
   return { success: true }
 }
 
@@ -85,7 +85,7 @@ export async function deleteSectionAction(sectionId: string, creatorName: string
     where: { id: sectionId, creator_id: authCreatorId }
   })
 
-  revalidatePath(`/creator/${creatorName}`)
+  revalidatePath(`/sites/${creatorName}`)
   return { success: true }
 }
 
@@ -96,7 +96,7 @@ export async function updateSectionNameAction(sectionId: string, name: string, c
     data: { name }
   })
 
-  revalidatePath(`/creator/${creatorName}`)
+  revalidatePath(`/sites/${creatorName}`)
   return { success: true }
 }
 
@@ -107,7 +107,7 @@ export async function updateSectionContentAction(sectionId: string, content: str
     data: { content }
   })
 
-  revalidatePath(`/creator/${creatorName}`)
+  revalidatePath(`/sites/${creatorName}`)
   return { success: true }
 }
 
@@ -118,6 +118,6 @@ export async function updateSectionAnimationAction(sectionId: string, animation_
     data: { animation_type }
   })
 
-  revalidatePath(`/creator/${creatorName}`)
+  revalidatePath(`/sites/${creatorName}`)
   return { success: true }
 }

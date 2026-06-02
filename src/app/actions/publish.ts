@@ -2,7 +2,9 @@
 
 import { prisma } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
+import { revalidatePath } from 'next/cache'
 import { requireAuth } from '@/lib/server-auth'
+import { headers } from 'next/headers'
 
 export async function publishProjectAction(formData: FormData) {
   const creatorName = formData.get('creator_name') as string
@@ -119,6 +121,25 @@ export async function publishProjectAction(formData: FormData) {
     })
   }
 
-  // 4. Return to Portfolio main view
-  return redirect(`/creator/${creatorName}`)
+  // 4. Return to Creator's Portfolio Subdomain instead of main landing
+  revalidatePath(`/sites/${normalizedName}`)
+
+  const headersList = await headers()
+  const host = headersList.get('host') || 'craftopia.work'
+  
+  // Extract hostname and port separately for robust URL construction
+  const hostname = host.includes(':') ? host.split(':')[0] : host
+  const port = host.includes(':') ? `:${host.split(':')[1]}` : ''
+  
+  const isLocal = hostname.endsWith('localhost') || hostname.includes('127.0.0.1')
+  const protocol = isLocal ? 'http' : 'https'
+  const rootDomain = 'craftopia.work'
+
+  // Construct the target portfolio root URL definitively
+  const finalUrl = isLocal 
+    ? `${protocol}://${normalizedName}.localhost${port}`
+    : `${protocol}://${normalizedName}.${rootDomain}`
+  
+  console.log(`[Publish] Redirecting to Portfolio: ${finalUrl}`)
+  return redirect(finalUrl)
 }

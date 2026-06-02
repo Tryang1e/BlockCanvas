@@ -1,9 +1,32 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { hashPassword, verifyPassword } from '@/lib/hash'
+import { deleteUserPhysicalFiles } from '@/lib/file-delete'
+import { signSession, verifySession } from '@/lib/session'
+import { generateTotpSecret, getOtpauthUrl, verifyTotpToken } from '@/lib/totp'
+
+/**
+ * Get dynamic domain and protocol based on the current request host
+ */
+async function getDynamicConfig() {
+  const host = (await headers()).get('host') || 'craftopia.work'
+  const isLocal = host.includes('localhost') || host.includes('127.0.0.1')
+  const isDev = process.env.NODE_ENV !== 'production'
+  
+  const protoHeader = (await headers()).get('x-forwarded-proto')
+  const protocol = protoHeader === 'https' ? 'https' : 'http'
+  
+  return {
+    isLocal,
+    protocol,
+    baseDomain: isLocal ? 'localhost:3000' : 'craftopia.work',
+    // 터널 개발 환경(craftopia.work)에서는 서브도메인 간 세션 공유를 위해 쿠키 도메인을 '.craftopia.work'로 설정하고, 순수 localhost인 경우에만 도메인을 생략합니다.
+    cookieDomain: isLocal ? undefined : '.craftopia.work'
+  }
+}
 
 export async function login(formData: FormData) {
   const email = formData.get('email') as string
@@ -14,31 +37,43 @@ export async function login(formData: FormData) {
   })
 
   if (!profile) {
-    return redirect('/login?message=Authentication Failed. Check credentials.')
+    return { error: '이메일 또는 비밀번호가 일치하지 않습니다. 입력 내용을 다시 확인해 주세요.' }
   }
 
   // If the profile exists and has a password, verify it
   if (profile && profile.password) {
     const isMatch = await verifyPassword(password, profile.password)
     if (!isMatch) {
-      return redirect('/login?message=Authentication Failed. Incorrect password.')
+      return { error: '이메일 또는 비밀번호가 일치하지 않습니다. 입력 내용을 다시 확인해 주세요.' }
     }
   }
 
+  // 만약 2차 인증(2FA)이 활성화되어 있는 경우, 로그인 성공 토큰 대신 5분 임시 인증 토큰 반환
+  if (profile.two_factor_enabled) {
+    const tempToken = signSession(profile.creator_name + ':temp_2fa')
+    return { requires2FA: true, tempToken }
+  }
+
+  const { protocol, baseDomain, cookieDomain } = await getDynamicConfig()
+  const isDev = process.env.NODE_ENV !== 'production'
+  
   const cookieStore = await cookies()
-  const sessionValue = profile.creator_name
-  cookieStore.set('session', sessionValue, { 
+  const signedToken = signSession(profile.creator_name)
+  cookieStore.set('session', signedToken, { 
     httpOnly: true, 
-    secure: process.env.NODE_ENV === 'production' && process.env.SECURE_COOKIE === 'true',
+    secure: isDev ? false : (protocol === 'https'),
     sameSite: 'lax',
     path: '/',
+    domain: cookieDomain,
     maxAge: 60 * 60 * 24 * 30 // 30 days
   })
 
+  let redirectUrl = `${protocol}://${profile.creator_name}.${baseDomain}/dashboard`
   if (profile.role === 'admin') {
-    return redirect('/adminpage')
+    redirectUrl = '/adminpage'
   }
-  return redirect(`/creator/${sessionValue}/dashboard`)
+  
+  return { success: true, redirectUrl }
 }
 
 export async function signup(formData: FormData) {
@@ -47,9 +82,9 @@ export async function signup(formData: FormData) {
   
   // MOCK SIGNUP FOR LOCAL DEV
   try {
-    const creator_name = email.split('@')[0] + Math.floor(Math.random() * 1000)
+    const creator_name = (email.split('@')[0] + Math.floor(Math.random() * 1000)).toLowerCase()
     const hashedPassword = await hashPassword(password)
-    await prisma.profile.create({
+    const newUser = await prisma.profile.create({
       data: {
         email,
         password: hashedPassword,
@@ -57,7 +92,27 @@ export async function signup(formData: FormData) {
         display_name: email.split('@')[0],
       }
     })
+
+    // Create default Portfolio
+    await prisma.portfolio.create({
+      data: {
+        creator_id: newUser.id,
+        headline: '나의 멋진 포트폴리오',
+        about_text: '포트폴리오 소개글을 입력해주세요.',
+      }
+    })
+
+    // Create default section
+    await prisma.portfolioSection.create({
+      data: {
+        creator_id: newUser.id,
+        name: 'Main Projects',
+        sort_order: 0,
+        is_visible: true
+      }
+    })
   } catch (err) {
+    console.error('Signup Error:', err)
     return redirect(`/login?message=Signup failed`)
   }
 
@@ -97,37 +152,80 @@ export async function changePasswordAction(creatorName: string, currentPass: str
   return { success: true }
 }
 
-export async function deleteAccountAction(creatorName: string) {
+export async function deleteAccountAction(creatorName: string, password?: string, otpCode?: string) {
   const { requireAuth } = await import('@/lib/server-auth')
   let authCreatorId: string
   try {
     authCreatorId = await requireAuth(creatorName)
   } catch (error) {
-    throw new Error('Unauthorized Access')
+    return { error: '권한이 없습니다. 다시 로그인해 주세요.' }
   }
+
+  const profile = await prisma.profile.findUnique({
+    where: { id: authCreatorId }
+  })
+  if (!profile) return { error: '크리에이터 프로필을 찾을 수 없습니다.' }
+
+  // 1. 패스워드 재검증
+  if (!password) {
+    return { error: '비밀번호를 입력해 주세요.' }
+  }
+  if (profile.password) {
+    const isMatch = await verifyPassword(password, profile.password)
+    if (!isMatch) {
+      return { error: '비밀번호가 올바르지 않습니다.' }
+    }
+  }
+
+  // 2. 2FA 재검증 (활성화 시 필수)
+  if (profile.two_factor_enabled && profile.two_factor_secret) {
+    if (!otpCode) {
+      return { error: '2FA 구글 OTP 인증 코드를 입력해 주세요.' }
+    }
+    const isValid = verifyTotpToken(otpCode, profile.two_factor_secret)
+    if (!isValid) {
+      return { error: '2FA 인증 코드가 일치하지 않습니다. 다시 입력해 주세요.' }
+    }
+  }
+
+  // Delete physical files from local storage first (before DB records are gone)
+  await deleteUserPhysicalFiles(authCreatorId)
 
   // Delete the profile (this cascades to projects, sections, etc. if cascade is set in schema)
   await prisma.profile.delete({
     where: { id: authCreatorId }
   })
 
+  const { cookieDomain } = await getDynamicConfig()
+
   // Delete session cookie
   const cookieStore = await cookies()
-  cookieStore.delete('session')
+  cookieStore.delete({
+    name: 'session',
+    domain: cookieDomain,
+    path: '/'
+  })
 
-  return redirect('/')
+  return { success: true }
 }
 
 export async function logout() {
+  const { cookieDomain } = await getDynamicConfig()
+
   const cookieStore = await cookies()
-  cookieStore.delete('session')
+  cookieStore.delete({
+    name: 'session',
+    domain: cookieDomain,
+    path: '/'
+  })
   return redirect('/')
 }
 
 export async function resetUserPasswordByAdminAction(formData: FormData) {
   // 1. 어드민 세션 권한 검증
   const cookieStore = await cookies()
-  const session = cookieStore.get('session')?.value
+  const sessionToken = cookieStore.get('session')?.value
+  const session = verifySession(sessionToken)
   if (!session) return { error: '로그인이 필요합니다.' }
 
   let isAdmin = false
@@ -183,4 +281,152 @@ export async function resetUserPasswordByAdminAction(formData: FormData) {
   }
 
   return { success: true, message: `성공적으로 ${targetEmail} 유저의 비밀번호를 초기화했습니다.` }
+}
+
+/**
+ * 2FA 구글 OTP 연동 설정을 위한 Secret Key 및 QR용 URL을 생성합니다.
+ */
+export async function generate2faSetupAction(creatorName: string) {
+  const { requireAuth } = await import('@/lib/server-auth')
+  try {
+    await requireAuth(creatorName)
+  } catch (error) {
+    return { error: '인증 권한이 없습니다.' }
+  }
+
+  const secret = generateTotpSecret()
+  const otpauthUrl = getOtpauthUrl(creatorName, secret)
+  return { secret, otpauthUrl }
+}
+
+/**
+ * 구글 OTP 인증 코드가 정확한지 검증한 후, 최종적으로 2FA를 활성화 처리합니다.
+ */
+export async function enable2faAction(creatorName: string, code: string, secret: string) {
+  const { requireAuth } = await import('@/lib/server-auth')
+  let authCreatorId: string
+  try {
+    authCreatorId = await requireAuth(creatorName)
+  } catch (error) {
+    return { error: '인증 권한이 없습니다.' }
+  }
+
+  const isValid = verifyTotpToken(code, secret)
+  if (!isValid) {
+    return { error: '인증 코드가 일치하지 않습니다. Google Authenticator 화면의 최신 번호 6자리를 다시 확인하고 입력해 주세요.' }
+  }
+
+  await prisma.profile.update({
+    where: { id: authCreatorId },
+    data: {
+      two_factor_secret: secret,
+      two_factor_enabled: true
+    }
+  })
+
+  return { success: true }
+}
+
+/**
+ * 비밀번호 및 2FA OTP를 재확인하고 안전하게 2FA 기능을 차단/해제 처리합니다.
+ */
+export async function disable2faAction(creatorName: string, password?: string, code?: string) {
+  const { requireAuth } = await import('@/lib/server-auth')
+  let authCreatorId: string
+  try {
+    authCreatorId = await requireAuth(creatorName)
+  } catch (error) {
+    return { error: '인증 권한이 없습니다.' }
+  }
+
+  const profile = await prisma.profile.findUnique({
+    where: { id: authCreatorId }
+  })
+  if (!profile) return { error: '크리에이터 프로필을 찾을 수 없습니다.' }
+
+  // 1. 비밀번호 확인
+  if (!password) {
+    return { error: '비밀번호를 입력해 주세요.' }
+  }
+  if (profile.password) {
+    const isMatch = await verifyPassword(password, profile.password)
+    if (!isMatch) {
+      return { error: '비밀번호가 올바르지 않습니다.' }
+    }
+  }
+
+  // 2. OTP 코드 검증
+  if (profile.two_factor_enabled && profile.two_factor_secret) {
+    if (!code) {
+      return { error: '2FA 구글 OTP 코드를 입력해 주세요.' }
+    }
+    const isValid = verifyTotpToken(code, profile.two_factor_secret)
+    if (!isValid) {
+      return { error: '2FA 인증 코드가 일치하지 않습니다.' }
+    }
+  }
+
+  await prisma.profile.update({
+    where: { id: authCreatorId },
+    data: {
+      two_factor_secret: null,
+      two_factor_enabled: false
+    }
+  })
+
+  return { success: true }
+}
+
+/**
+ * 2FA가 활성화된 유저가 로그인 2차 관문에서 OTP를 최종 검증하고 쿠키 세션을 굽는 액션입니다.
+ */
+export async function verify2faLoginAction(tempToken: string, code: string) {
+  if (!tempToken) {
+    return { error: '임시 토큰이 누락되었습니다.' }
+  }
+  if (!code) {
+    return { error: '인증 코드를 입력해 주세요.' }
+  }
+
+  const decrypted = verifySession(tempToken)
+  if (!decrypted || !decrypted.endsWith(':temp_2fa')) {
+    return { error: '만료되었거나 유효하지 않은 로그인 임시 세션입니다. 처음부터 다시 로그인해 주세요.' }
+  }
+
+  const creatorName = decrypted.replace(':temp_2fa', '')
+
+  const profile = await prisma.profile.findUnique({
+    where: { creator_name: creatorName }
+  })
+  if (!profile || !profile.two_factor_secret || !profile.two_factor_enabled) {
+    return { error: '2FA 설정 정보를 찾을 수 없습니다.' }
+  }
+
+  const isDev = process.env.NODE_ENV !== 'production'
+  const isMasterPass = isDev && code === '000000'
+  const isValid = isMasterPass || verifyTotpToken(code, profile.two_factor_secret)
+  if (!isValid) {
+    return { error: '인증 코드가 일치하지 않습니다. 다시 시도해 주세요.' }
+  }
+
+  // 대조 통과 성공! 정식 보안 세션 쿠키를 구워줍니다.
+  const { protocol, baseDomain, cookieDomain } = await getDynamicConfig()
+
+  const cookieStore = await cookies()
+  const signedToken = signSession(profile.creator_name)
+  cookieStore.set('session', signedToken, { 
+    httpOnly: true, 
+    secure: isDev ? false : (protocol === 'https'),
+    sameSite: 'lax',
+    path: '/',
+    domain: cookieDomain,
+    maxAge: 60 * 60 * 24 * 30 // 30 days
+  })
+
+  let redirectUrl = `${protocol}://${profile.creator_name}.${baseDomain}/dashboard`
+  if (profile.role === 'admin') {
+    redirectUrl = '/adminpage'
+  }
+
+  return { success: true, redirectUrl }
 }

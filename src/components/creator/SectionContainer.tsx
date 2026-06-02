@@ -16,6 +16,145 @@ import Tooltip from '@/components/ui/Tooltip'
 import { useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
+// --- Premium Section Visual Tooltip Guides ---
+const TitleVisibilityGuide = () => (
+  <div className="w-full flex flex-col gap-1 select-none pointer-events-none text-neutral-300">
+    <p className="text-[11.5px] text-neutral-350 font-medium leading-relaxed">
+      방문객에게 섹션의 대제목 노출을 켜거나 끕니다. 포트폴리오의 극단적인 미니멀리즘을 위해 제목 숨김이 가능합니다.
+    </p>
+    <div className="w-full h-11 flex items-center justify-center bg-neutral-900/60 border border-white/5 rounded-lg overflow-hidden relative mt-1">
+      <div className="flex flex-col gap-1 items-center relative">
+        <span className="text-[8px] font-mono text-neutral-300 font-black tracking-widest uppercase animate-[toggleTitleText_3s_infinite_ease-in-out]">✦ SECTION TITLE</span>
+        <div className="w-16 h-0.5 bg-blue-500/50 rounded animate-[toggleTitleLine_3s_infinite_ease-in-out]" />
+      </div>
+      <style>{`
+        @keyframes toggleTitleText {
+          0%, 100% { opacity: 1; transform: scale(1); filter: blur(0px); }
+          50% { opacity: 0.15; transform: scale(0.95); filter: blur(1.5px); }
+        }
+        @keyframes toggleTitleLine {
+          0%, 100% { width: 64px; background-color: rgba(59, 130, 246, 0.5); }
+          50% { width: 12px; background-color: rgba(239, 68, 68, 0.2); }
+        }
+      `}</style>
+    </div>
+  </div>
+)
+
+const SectionVisibilityGuide = () => (
+  <div className="w-full flex flex-col gap-1 select-none pointer-events-none text-neutral-350">
+    <p className="text-[11.5px] text-neutral-350 font-medium leading-relaxed">
+      섹션을 외부 전체에 공개(Globe)할지, 나만 관리하는 비공개(Lock) 상태로 잠글지 결정합니다.
+    </p>
+    <div className="w-full h-11 flex items-center justify-center bg-neutral-900/60 border border-white/5 rounded-lg overflow-hidden relative mt-1">
+      <div className="flex items-center gap-2 text-[8px] font-bold font-mono">
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-neutral-950 border border-white/5 animate-[toggleVisibility_3s_infinite_ease-in-out]">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping inline-block" />
+          <span className="text-emerald-400">PUBLIC STATE</span>
+        </div>
+      </div>
+      <style>{`
+        @keyframes toggleVisibility {
+          0%, 100% { 
+            border-color: rgba(16, 185, 129, 0.4); 
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.2);
+            filter: hue-rotate(0deg);
+          }
+          50% { 
+            border-color: rgba(245, 158, 11, 0.4);
+            box-shadow: 0 0 10px rgba(245, 158, 11, 0.2);
+            filter: hue-rotate(180deg) brightness(1.2);
+          }
+        }
+      `}</style>
+    </div>
+  </div>
+)
+
+const SectionAnimationGuide = () => (
+  <div className="w-full flex flex-col gap-1 select-none pointer-events-none text-neutral-350">
+    <p className="text-[11.5px] text-neutral-350 font-medium leading-relaxed">
+      방문자가 스크롤을 내릴 때, 섹션 전체가 스무스하게 솟아오르는 특수 물리 애니메이션 효과를 부여합니다.
+    </p>
+    <div className="w-full h-12 flex items-center justify-center bg-neutral-900/60 border border-white/5 rounded-lg overflow-hidden relative mt-1">
+      <div className="w-16 h-7 border border-neutral-700 bg-neutral-950 flex flex-col gap-1 p-1 rounded animate-[slideUpFade_2.2s_infinite_cubic-bezier(0.16,1,0.3,1)]">
+        <div className="w-full h-2 bg-blue-500/20 rounded-sm" />
+        <div className="flex gap-1">
+          <div className="w-3 h-2 bg-white/10 rounded-sm" />
+          <div className="w-3 h-2 bg-white/10 rounded-sm" />
+          <div className="w-3 h-2 bg-white/10 rounded-sm" />
+        </div>
+      </div>
+      <style>{`
+        @keyframes slideUpFade {
+          0% { transform: translateY(12px) scale(0.9); opacity: 0; filter: blur(1px); }
+          30%, 80% { transform: translateY(0px) scale(1); opacity: 1; filter: blur(0px); }
+          100% { transform: translateY(-8px) scale(0.95); opacity: 0; filter: blur(1px); }
+        }
+      `}</style>
+    </div>
+  </div>
+)
+
+const SectionRenameGuide = () => (
+  <div className="w-full flex flex-col gap-1 select-none pointer-events-none text-neutral-350">
+    <p className="text-[11.5px] text-neutral-350 font-medium leading-relaxed">
+      섹션의 명칭을 실시간 변경합니다. 메뉴 바 및 앵커 네비게이션에도 자동으로 동기화됩니다.
+    </p>
+    <div className="w-full h-11 flex items-center justify-center bg-neutral-900/60 border border-white/5 rounded-lg overflow-hidden relative mt-1">
+      <div className="flex items-center gap-1 bg-neutral-950 px-3 py-1 rounded border border-white/5 text-[8px] font-mono text-blue-400 relative">
+        <span className="typing-simulated-text"></span>
+      </div>
+      <style>{`
+        .typing-simulated-text::before {
+          content: 'Gallery';
+          animation: typingText 6s infinite ease-in-out;
+        }
+        .typing-simulated-text::after {
+          content: '|';
+          color: #60a5fa;
+          animation: typingCursor 0.8s infinite;
+        }
+        @keyframes typingCursor {
+          0%, 100% { opacity: 0; }
+          50% { opacity: 1; }
+        }
+        @keyframes typingText {
+          0%, 100% { content: 'G'; }
+          10% { content: 'Ga'; }
+          20% { content: 'Gal'; }
+          30% { content: 'Gall'; }
+          40%, 70% { content: 'Gallery Section'; }
+          80% { content: 'Gall'; }
+          90% { content: 'G'; }
+        }
+      `}</style>
+    </div>
+  </div>
+)
+
+const SectionDeleteGuide = () => (
+  <div className="w-full flex flex-col gap-1 select-none pointer-events-none text-neutral-350">
+    <p className="text-[11.5px] text-red-400 font-bold leading-relaxed">
+      ⚠️ 경고: 이 섹션과 내부에 속한 모든 프로젝트가 영구 소멸하며 복구할 수 없습니다!
+    </p>
+    <div className="w-full h-12 flex items-center justify-center bg-neutral-900/60 border border-white/5 rounded-lg overflow-hidden relative mt-1">
+      <div className="w-14 h-7 border border-red-500/30 bg-red-950/20 rounded flex items-center justify-center text-[8px] font-mono text-red-400 font-black tracking-widest animate-[shakeAndDisintegrate_2.5s_infinite_ease-in-out]">
+        DELETE
+      </div>
+      <style>{`
+        @keyframes shakeAndDisintegrate {
+          0%, 100% { transform: translate(0, 0) scale(1); opacity: 1; filter: grayscale(0); }
+          10%, 30% { transform: translate(-1px, 1px) rotate(-1deg); }
+          20%, 40% { transform: translate(1.5px, -1px) rotate(1.5deg); }
+          50% { transform: translate(0px, 0px) scale(0.85); opacity: 0.15; filter: grayscale(1) blur(1.5px); }
+          75% { transform: translate(0, 0) scale(0.9); opacity: 0.2; }
+        }
+      `}</style>
+    </div>
+  </div>
+)
+
 // 1. 텍스트 섹션 내부용 고품격 커스터마이징 FAQ 아코디언 토글 컴포넌트
 function FaqAccordion({ 
   question, 
@@ -368,12 +507,14 @@ function SectionContainer({
     }
   }
 
-
   const style = {
     transform: CSS.Transform.toString(transform) || 'translate3d(0,0,0)',
     transition,
-    opacity: isDragging && !isOverlay ? 0 : 1,
-    willChange: 'transform',
+    opacity: isDragging && !isOverlay ? 0.35 : 1,
+    border: isDragging && !isOverlay ? '3px dashed rgba(59,130,246,0.6)' : undefined,
+    backgroundColor: isDragging && !isOverlay ? 'rgba(59,130,246,0.03)' : undefined,
+    padding: isDragging && !isOverlay ? '1.5rem' : undefined,
+    willChange: 'transform' as const,
   }
 
   const sectionType = section.section_type || 'image_grid'
@@ -441,7 +582,7 @@ function SectionContainer({
               {isOwner && (
                 <div className="flex gap-1 opacity-0 group-hover/header:opacity-100 transition-all duration-300 translate-y-1 group-hover/header:translate-y-0 ml-4 z-20 relative bg-white/80 border border-neutral-200/60 shadow-sm backdrop-blur-xl rounded-full p-1 items-center">
                   
-                  <Tooltip text="제목 표시 여부 토글" position="bottom">
+                  <Tooltip text="제목 표시 여부 토글" visualContent={<TitleVisibilityGuide />} position="bottom">
                     <button
                       onPointerDown={handleToggleTitle}
                       className={`p-2 rounded-full transition-all flex items-center justify-center ${showTitle ? 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900' : 'bg-neutral-800 text-white shadow-md'}`}
@@ -450,7 +591,7 @@ function SectionContainer({
                     </button>
                   </Tooltip>
 
-                  <Tooltip text="섹션 공개/비공개 토글" position="bottom">
+                  <Tooltip text="섹션 공개/비공개 토글" visualContent={<SectionVisibilityGuide />} position="bottom">
                     <button
                       onPointerDown={handleToggleVisibility}
                       className={`p-2 rounded-full transition-all flex items-center justify-center ${isPublic ? 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900' : 'bg-amber-100 text-amber-700 shadow-sm'}`}
@@ -462,7 +603,7 @@ function SectionContainer({
                   <div className="w-px h-4 bg-neutral-200 mx-1" />
 
                   <div className="relative" onPointerLeave={() => setIsAnimDropdownOpen(false)}>
-                    <Tooltip text="등장 애니메이션 설정" position="bottom">
+                    <Tooltip text="등장 애니메이션 설정" visualContent={<SectionAnimationGuide />} position="bottom">
                       <button
                         onPointerDown={(e) => { e.stopPropagation(); setIsAnimDropdownOpen(!isAnimDropdownOpen); }}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full transition-all hover:bg-neutral-100 text-neutral-600 hover:text-neutral-900"
@@ -503,7 +644,7 @@ function SectionContainer({
 
                   <div className="w-px h-4 bg-neutral-200 mx-1" />
 
-                  <Tooltip text="이름 변경" position="bottom">
+                  <Tooltip text="이름 변경" visualContent={<SectionRenameGuide />} position="bottom">
                     <button
                       onPointerDown={(e) => { e.stopPropagation(); onRename(); }}
                       className="p-2 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 rounded-full transition-all"
@@ -512,7 +653,7 @@ function SectionContainer({
                     </button>
                   </Tooltip>
 
-                  <Tooltip text="섹션 삭제" position="bottom">
+                  <Tooltip text="섹션 삭제" visualContent={<SectionDeleteGuide />} position="bottom">
                     <button
                       onPointerDown={(e) => { e.stopPropagation(); onDelete(); }}
                       className="p-2 text-neutral-500 hover:bg-red-50 hover:text-red-500 rounded-full transition-all"
@@ -646,7 +787,7 @@ function SectionContainer({
                   {/* Create Project Button Card for Image Grid (100% 16:9 높이 보장) */}
                   {isOwner && (
                     <Link 
-                      href={`/creator/${creatorName}/editor?section_id=${section.id}`} 
+                      href={`/editor?section_id=${section.id}`} 
                       className="block group break-inside-avoid w-full"
                       style={{ height: 'calc(var(--col-width, 100cqw) * 9 / 16)' }}
                     >

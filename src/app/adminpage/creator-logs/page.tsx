@@ -38,12 +38,13 @@ export default async function AdminCreatorLogsPage() {
                       {new Date(log.created_at).toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
                     </td>
                     <td className="px-6 py-4">
-                      <Link 
-                        href={`/creator/${log.creator_name}`} 
+                      <a 
+                        href={`http://${log.creator_name}.craftopia.work`} 
+                        target="_blank"
                         className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:underline rounded-md text-xs font-bold ring-1 ring-blue-500/20 transition-colors"
                       >
                         {log.creator_name}
-                      </Link>
+                      </a>
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-xs font-black tracking-wide uppercase text-neutral-700">

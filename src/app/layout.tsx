@@ -37,6 +37,7 @@ export const metadata: Metadata = {
 
 import { prisma } from '@/lib/prisma'
 import { cookies } from 'next/headers'
+import { verifySession } from '@/lib/session'
 
 export default async function RootLayout({
   children,
@@ -62,7 +63,8 @@ export default async function RootLayout({
   // Check if admin
   let isAdmin = false
   const cookieStore = await cookies()
-  const session = cookieStore.get('session')?.value
+  const sessionToken = cookieStore.get('session')?.value
+  const session = verifySession(sessionToken)
   
   if (session === 'admin') {
     isAdmin = true
@@ -102,6 +104,43 @@ export default async function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var test = window.localStorage;
+                  if (!test) throw new Error("localStorage is null");
+                } catch (e) {
+                  console.warn("[BlockCanvas] 스토리지 접근이 차단되어 메모리 기반 Mock 스토리지를 활성화합니다.");
+                  var storageMock = {
+                    _data: {},
+                    getItem: function(k) { return this._data[k] || null; },
+                    setItem: function(k, v) { this._data[k] = String(v); },
+                    removeItem: function(k) { delete this._data[k]; },
+                    clear: function() { this._data = {}; },
+                    key: function(i) { return Object.keys(this._data)[i] || null; },
+                    length: 0
+                  };
+                  Object.defineProperty(storageMock, 'length', {
+                    get: function() { return Object.keys(this._data).length; }
+                  });
+                  try {
+                    Object.defineProperty(window, 'localStorage', {
+                      value: storageMock,
+                      writable: true,
+                      configurable: true
+                    });
+                  } catch (err) {
+                    try {
+                      window.localStorage = storageMock;
+                    } catch (e2) {}
+                  }
+                }
+              })();
+            `
+          }}
+        />
       </head>
       <body className="min-h-full flex flex-col pt-0">
         {isBannerActive && bannerText && (
@@ -110,9 +149,7 @@ export default async function RootLayout({
           </div>
         )}
         <ThemeProvider>
-          <SmoothScroll>
-            {children}
-          </SmoothScroll>
+          {children}
         </ThemeProvider>
       </body>
     </html>

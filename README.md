@@ -10,6 +10,7 @@
 - Supabase
 - Vercel
 
+./cloudflared.exe --config ./.cloudflared/config.yml tunnel run --protocol quic
 
 ### 구조
 

@@ -26,10 +26,8 @@ import SectionContainer from './SectionContainer'
 import ProjectCard from './ProjectCard'
 import RichTextEditor from '@/components/editor/RichTextEditor'
 import ScrollSpyNav from './ScrollSpyNav'
-import ProjectModal from './ProjectModal'
-import ProjectDetailsViewer from './ProjectDetailsViewer'
-import { fetchProjectDetails } from '@/app/actions/projectClientActions'
 import SectionReorderModal from './SectionReorderModal'
+import { useRouter } from 'next/navigation'
 import { useState, useEffect, useMemo, useRef } from 'react'
 
 interface Section {
@@ -105,6 +103,7 @@ export default function DraggablePortfolio({
   const [selectedProjectRelatedType, setSelectedProjectRelatedType] = useState<string>('creator')
   const [isLoadingProject, setIsLoadingProject] = useState(false)
 
+  const router = useRouter()
   const [mounted, setMounted] = useState(false)
   useEffect(() => {
     setMounted(true)
@@ -265,21 +264,13 @@ export default function DraggablePortfolio({
     }
   }
 
-  const handleOpenProject = async (projectId: string) => {
+  const handleOpenProject = (projectId: string) => {
     // 1. 모달이 열리기 직전의 진짜 부모 스크롤 높이를 정밀 백업!
     parentScrollYRef.current = window.scrollY
-    setSelectedProjectId(projectId)
-    setIsLoadingProject(true)
-    window.history.pushState(null, '', `/creator/${creatorName}/project/${projectId}`)
     
-    const res = await fetchProjectDetails(projectId)
-    if (res.success) {
-      setSelectedProjectData(res.project)
-      setSelectedProjectWidgets(res.widgets || [])
-      setSelectedProjectOtherProjects(res.otherProjects || [])
-      setSelectedProjectRelatedType(res.relatedType || 'creator')
-    }
-    setIsLoadingProject(false)
+    // 2. Next.js의 Parallel/Intercepting Routes 기능을 100% 활용하도록 네이티브 라우팅 수행!
+    // 이는 @modal/(.)project/[project_id] 경로를 트리거하며, 중복 렌더링 방지 및 URL 동기화를 완벽히 해결합니다.
+    router.push(`/project/${projectId}`, { scroll: false })
   }
 
   const handleCloseProject = () => {
@@ -288,7 +279,7 @@ export default function DraggablePortfolio({
     setSelectedProjectWidgets([])
     setSelectedProjectOtherProjects([])
     setSelectedProjectRelatedType('creator')
-    window.history.pushState(null, '', `/creator/${creatorName}`)
+    window.history.pushState(null, '', `/`)
 
     // 2. 모달이 닫히는 즉시 백업해 두었던 스크롤 좌표로 기적의 수동 복원!
     const targetScroll = parentScrollYRef.current
@@ -318,6 +309,18 @@ export default function DraggablePortfolio({
     window.addEventListener('popstate', handlePopState)
     return () => window.removeEventListener('popstate', handlePopState)
   }, [selectedProjectId])
+
+  // Escape key to close section modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isSectionModalOpen) {
+        setIsSectionModalOpen(false)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isSectionModalOpen])
+
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event
@@ -548,6 +551,22 @@ export default function DraggablePortfolio({
           acceleration: 2.0,           // 스크롤 가속 최적화
         }}
       >
+        {/* 💡 섹션 위치 및 순서 변경 관리 가이드라인 */}
+        {isOwner && (
+          <div className="mb-8 bg-blue-50/45 dark:bg-blue-950/15 border border-blue-200/50 dark:border-blue-800/40 rounded-xl p-4 flex gap-3.5 text-left items-start animate-in fade-in duration-300">
+            <span className="text-xl shrink-0 mt-0.5">💡</span>
+            <div>
+              <h4 className="text-xs font-bold text-neutral-800 dark:text-neutral-200 uppercase tracking-wide">
+                섹션 드래그앤드롭 순서 재조정 및 가이드라인
+              </h4>
+              <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-1.5 leading-relaxed font-medium">
+                각 섹션 헤더 좌측에 있는 **⠿ 손잡이 핸들**에 마우스 커서를 대고 원하는 위치로 위아래로 드래그하면, 메인 홈페이지에 노출되는 작품 목록의 순서가 실시간으로 재정렬되어 저장됩니다.
+                보다 편리하고 빠르게 일괄적으로 변경하려면 우측 상단의 **&quot;섹션 순서 관리&quot;** 버튼을 눌러 계층 리스트 모드로 조절할 수도 있습니다.
+              </p>
+            </div>
+          </div>
+        )}
+
         <div className="space-y-16">
           <SortableContext items={visibleSectionIds} strategy={verticalListSortingStrategy}>
             {visibleSections.map((section) => (
@@ -604,91 +623,344 @@ export default function DraggablePortfolio({
 
       {/* Section Creation Modal */}
       {isSectionModalOpen && (
-        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white dark:bg-neutral-900 dark:border-neutral-800 dark:text-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="p-6 border-b border-neutral-100 dark:border-neutral-800 shrink-0">
-              <h2 className="text-xl font-bold text-neutral-800">새로운 섹션 추가</h2>
-              <p className="text-sm text-neutral-500 mt-1">섹션의 종류와 이름을 설정하세요.</p>
-            </div>
+        <div onClick={(e) => { if (e.target === e.currentTarget) setIsSectionModalOpen(false) }} className="fixed inset-0 bg-neutral-950/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-300 section-modal-scope">
+          {/* Scoped CSS Keyframe Animations for Section Previews */}
+          <style>{`
+            .section-modal-scope .grid-card-1-anim {
+              animation: grid-card-pop 4s infinite ease-in-out;
+            }
+            .section-modal-scope .grid-card-2-anim {
+              animation: grid-card-pop 4s infinite ease-in-out 0.4s;
+            }
+            .section-modal-scope .grid-card-3-anim {
+              animation: grid-card-pop 4s infinite ease-in-out 0.8s;
+            }
+            .section-modal-scope .slider-track-anim {
+              animation: slider-track-roll 10s infinite linear;
+            }
+            .section-modal-scope .text-line-1-anim {
+              animation: line-grow-kf 4s infinite ease-in-out;
+            }
+            .section-modal-scope .text-line-2-anim {
+              animation: line-grow-kf 4s infinite ease-in-out 0.5s;
+            }
+            .section-modal-scope .text-line-3-anim {
+              animation: line-grow-kf 4s infinite ease-in-out 1s;
+            }
+            .section-modal-scope .timeline-track-grow {
+              animation: timeline-path-grow 4s infinite ease-in-out;
+            }
+            .section-modal-scope .timeline-node-anim {
+              animation: timeline-node-pulse 2s infinite ease-in-out;
+            }
+            .section-modal-scope .timeline-card-1-anim {
+              animation: timeline-card-pop 4s infinite ease-in-out 0.3s;
+            }
+            .section-modal-scope .timeline-card-2-anim {
+              animation: timeline-card-pop 4s infinite ease-in-out 1s;
+            }
 
-            <div className="p-6 overflow-y-auto grow flex flex-col gap-5" data-lenis-prevent="true">
-              <div>
-                <label className="block text-xs font-bold text-neutral-600 uppercase mb-2">섹션 종류</label>
-                <div className="grid grid-cols-4 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setNewSectionType('image_grid')}
-                    className={`flex flex-col items-center justify-center py-4 px-2 rounded-lg border-2 transition-colors ${newSectionType === 'image_grid' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-neutral-200 hover:border-neutral-300 text-neutral-500'}`}
-                  >
-                    <span className="text-2xl mb-2">🖼️</span>
-                    <span className="text-[10px] md:text-xs font-bold">이미지 그리드</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setNewSectionType('video_slider')}
-                    className={`flex flex-col items-center justify-center py-4 px-2 rounded-lg border-2 transition-colors ${newSectionType === 'video_slider' ? 'border-red-500 bg-red-50 text-red-700' : 'border-neutral-200 hover:border-neutral-300 text-neutral-500'}`}
-                  >
-                    <span className="text-2xl mb-2">▶️</span>
-                    <span className="text-[10px] md:text-xs font-bold">영상 슬라이더</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setNewSectionType('text')}
-                    className={`flex flex-col items-center justify-center py-4 px-2 rounded-lg border-2 transition-colors ${newSectionType === 'text' ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-neutral-200 hover:border-neutral-300 text-neutral-500'}`}
-                  >
-                    <span className="text-2xl mb-2">📝</span>
-                    <span className="text-[10px] md:text-xs font-bold">텍스트 단락</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setNewSectionType('wip_timeline')}
-                    className={`flex flex-col items-center justify-center py-4 px-2 rounded-lg border-2 transition-colors ${newSectionType === 'wip_timeline' ? 'border-neutral-900 bg-neutral-50 text-neutral-900' : 'border-neutral-200 hover:border-neutral-300 text-neutral-500'}`}
-                  >
-                    <span className="text-2xl mb-2">⏱️</span>
-                    <span className="text-[10px] md:text-xs font-bold">WIP 타임라인</span>
-                  </button>
+            @keyframes grid-card-pop {
+              0%, 100% { opacity: 0.4; transform: scale(0.95); border-color: #e5e5e5; }
+              50% { opacity: 1; transform: scale(1); border-color: #3b82f6; box-shadow: 0 0 10px rgba(59,130,246,0.15); }
+            }
+            @keyframes slider-track-roll {
+              0% { transform: translateX(0); }
+              100% { transform: translateX(-33.33%); }
+            }
+            @keyframes line-grow-kf {
+              0%, 100% { width: 0%; opacity: 0.3; }
+              50% { width: 100%; opacity: 1; }
+            }
+            @keyframes timeline-path-grow {
+              0%, 10% { height: 0%; }
+              90%, 100% { height: 100%; }
+            }
+            @keyframes timeline-node-pulse {
+              0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.3); }
+              50% { transform: scale(1.15); box-shadow: 0 0 0 6px rgba(245, 158, 11, 0); }
+            }
+            @keyframes timeline-card-pop {
+              0%, 10% { opacity: 0; transform: translateX(8px); }
+              35%, 85% { opacity: 1; transform: translateX(0); }
+              95%, 100% { opacity: 0; }
+            }
+          `}</style>
+
+          <div className="bg-white/95 border border-neutral-200 text-neutral-800 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.12)] w-full max-w-[850px] md:h-[580px] flex flex-col md:flex-row overflow-hidden animate-in zoom-in-95 duration-300 backdrop-blur-xl">
+            
+            {/* Left Column: Form & Configuration */}
+            <div data-lenis-prevent="true" className="w-full md:w-[380px] border-b md:border-b-0 md:border-r border-neutral-200/80 p-6 flex flex-col justify-between overflow-y-auto custom-scrollbar bg-neutral-50/40 shrink-0">
+              <div className="space-y-6">
+                {/* Header */}
+                <div className="text-left">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">💡</span>
+                    <h3 className="font-extrabold text-xs text-neutral-800 tracking-wider uppercase">
+                      BLOCKCANVAS CREATOR SECTION
+                    </h3>
+                  </div>
+                  <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider mt-1">
+                    새로운 포트폴리오 섹션 레이아웃 추가
+                  </p>
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-xs font-bold text-neutral-600 uppercase mb-2">섹션 이름</label>
-                <input
-                  type="text"
-                  value={newSectionName}
-                  onChange={(e) => setNewSectionName(e.target.value)}
-                  placeholder="예: 3D 모델링 작업물"
-                  className="w-full px-4 py-2 border border-neutral-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-                />
-              </div>
-
-              {newSectionType === 'text' && (
+                {/* Section Type Choices */}
                 <div>
-                  <label className="block text-xs font-bold text-neutral-600 uppercase mb-2">본문 내용</label>
-                  <RichTextEditor
-                    content={newSectionContent}
-                    onChange={setNewSectionContent}
+                  <label className="block text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-2.5">섹션 레이아웃 선택</label>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {/* Image Grid */}
+                    <button
+                       type="button"
+                       onClick={() => setNewSectionType('image_grid')}
+                       className={`flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all active:scale-[0.98] ${
+                         newSectionType === 'image_grid'
+                           ? 'border-blue-500 bg-blue-50/70 text-blue-700 shadow-[0_4px_14px_rgba(59,130,246,0.08)] font-bold'
+                           : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 hover:bg-neutral-50 hover:text-neutral-800 shadow-sm'
+                       }`}
+                    >
+                      <span className="text-xl shrink-0">🖼️</span>
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold">이미지 그리드</div>
+                        <p className={`text-[9px] font-semibold mt-0.5 truncate ${newSectionType === 'image_grid' ? 'text-blue-500/80' : 'text-neutral-400'}`}>갤러리 격자</p>
+                      </div>
+                    </button>
+
+                    {/* Video Slider */}
+                    <button
+                       type="button"
+                       onClick={() => setNewSectionType('video_slider')}
+                       className={`flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all active:scale-[0.98] ${
+                         newSectionType === 'video_slider'
+                           ? 'border-red-500 bg-red-50/70 text-red-700 shadow-[0_4px_14px_rgba(244,63,94,0.08)] font-bold'
+                           : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 hover:bg-neutral-50 hover:text-neutral-800 shadow-sm'
+                       }`}
+                    >
+                      <span className="text-xl shrink-0">▶️</span>
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold">영상 슬라이더</div>
+                        <p className={`text-[9px] font-semibold mt-0.5 truncate ${newSectionType === 'video_slider' ? 'text-red-500/80' : 'text-neutral-400'}`}>가로 롤링</p>
+                      </div>
+                    </button>
+
+                    {/* Text block */}
+                    <button
+                       type="button"
+                       onClick={() => setNewSectionType('text')}
+                       className={`flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all active:scale-[0.98] ${
+                         newSectionType === 'text'
+                           ? 'border-purple-500 bg-purple-50/70 text-purple-700 shadow-[0_4px_14px_rgba(139,92,246,0.08)] font-bold'
+                           : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 hover:bg-neutral-50 hover:text-neutral-800 shadow-sm'
+                       }`}
+                    >
+                      <span className="text-xl shrink-0">📝</span>
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold">텍스트 단락</div>
+                        <p className={`text-[9px] font-semibold mt-0.5 truncate ${newSectionType === 'text' ? 'text-purple-500/80' : 'text-neutral-400'}`}>자유 캔버스</p>
+                      </div>
+                    </button>
+
+                    {/* WIP Timeline */}
+                    <button
+                       type="button"
+                       onClick={() => setNewSectionType('wip_timeline')}
+                       className={`flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all active:scale-[0.98] ${
+                         newSectionType === 'wip_timeline'
+                           ? 'border-amber-500 bg-amber-50/70 text-amber-700 shadow-[0_4px_14px_rgba(245,158,11,0.08)] font-bold'
+                           : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 hover:bg-neutral-50 hover:text-neutral-800 shadow-sm'
+                       }`}
+                    >
+                      <span className="text-xl shrink-0">⏱️</span>
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold">WIP 타임라인</div>
+                        <p className={`text-[9px] font-semibold mt-0.5 truncate ${newSectionType === 'wip_timeline' ? 'text-amber-600/85' : 'text-neutral-400'}`}>히스토리 피드</p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Section Name Input */}
+                <div className="text-left">
+                  <label className="block text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-2.5">섹션 이름</label>
+                  <input
+                    type="text"
+                    value={newSectionName}
+                    onChange={(e) => setNewSectionName(e.target.value)}
+                    placeholder="예: 3D 모델링 작업물"
+                    className="w-full bg-neutral-50 border border-neutral-200 text-neutral-800 rounded-xl focus:bg-white focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600/20 transition-all font-medium py-3 px-4 shadow-sm text-xs outline-none font-semibold"
+                    autoFocus
                   />
                 </div>
-              )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 pt-5 border-t border-neutral-200/60 mt-8 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsSectionModalOpen(false)}
+                  className="px-5 py-2.5 text-xs font-bold text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100 rounded-xl transition-all cursor-pointer"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAddSection}
+                  disabled={isCreatingSection || !newSectionName.trim()}
+                  className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-full shadow-md shadow-indigo-600/10 hover:shadow-indigo-600/20 active:scale-95 transition-all disabled:opacity-40 cursor-pointer"
+                >
+                  {isCreatingSection ? '추가 중...' : '섹션 추가'}
+                </button>
+              </div>
             </div>
 
-            <div className="p-4 bg-white border-t border-neutral-100 dark:border-neutral-800 flex justify-end gap-3 shrink-0">
-              <button
-                type="button"
-                onClick={() => setIsSectionModalOpen(false)}
-                className="px-5 py-2 text-sm font-bold text-neutral-600 hover:text-neutral-800 transition-colors"
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                onClick={handleAddSection}
-                disabled={isCreatingSection || !newSectionName.trim()}
-                className="px-6 py-2 bg-black text-white text-sm font-bold rounded-full shadow hover:bg-neutral-800 transition-colors disabled:opacity-50"
-              >
-                {isCreatingSection ? '추가 중...' : '섹션 추가'}
-              </button>
+            {/* Right Column: Visual Simulation & Onboarding Description */}
+            <div data-lenis-prevent="true" className="flex-1 bg-neutral-50/20 p-6 flex flex-col justify-between overflow-y-auto">
+              <div className="space-y-4">
+                {/* Title */}
+                <div className="text-left">
+                  <h4 className="text-xs font-extrabold text-neutral-800 tracking-wide">포트폴리오 비주얼 시뮬레이션</h4>
+                  <p className="text-[9px] text-neutral-400 font-semibold uppercase tracking-wider mt-0.5">선택한 섹션의 실제 동작 모션 미리보기</p>
+                </div>
+
+                {/* Animation Simulation Frame */}
+                <div className="h-[250px] bg-neutral-50 border border-neutral-200/80 rounded-xl relative overflow-hidden flex items-center justify-center shadow-inner">
+                  {/* Image Grid Simulation */}
+                  {newSectionType === 'image_grid' && (
+                    <div className="w-full h-full flex flex-col justify-center items-center p-4 gap-3 animate-in fade-in duration-300">
+                      <div className="grid grid-cols-3 gap-2.5 w-full max-w-[280px]">
+                        <div className="h-16 rounded-lg bg-white border border-neutral-200 flex items-center justify-center text-xl shadow-sm grid-card-1-anim">🖼️</div>
+                        <div className="h-16 rounded-lg bg-white border border-neutral-200 flex items-center justify-center text-xl shadow-sm grid-card-2-anim">🖼️</div>
+                        <div className="h-16 rounded-lg bg-white border border-neutral-200 flex items-center justify-center text-xl shadow-sm grid-card-3-anim">🖼️</div>
+                      </div>
+                      <div className="text-[9px] text-blue-500/80 font-bold uppercase tracking-widest animate-pulse mt-2.5">
+                        Responsive Grid System Active
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Video Slider Simulation */}
+                  {newSectionType === 'video_slider' && (
+                    <div className="w-full h-full flex flex-col justify-center items-center p-4 overflow-hidden relative animate-in fade-in duration-300">
+                      <div className="flex gap-3.5 w-[650px] slider-track-anim">
+                        <div className="w-24 h-16 bg-white border border-neutral-200 rounded-lg flex flex-col items-center justify-center text-xs shrink-0 shadow-sm">
+                          <span className="text-red-500 font-bold text-base">▶</span>
+                          <span className="text-[8px] text-neutral-400 font-bold mt-1">Video 01</span>
+                        </div>
+                        <div className="w-24 h-16 bg-white border border-neutral-200 rounded-lg flex flex-col items-center justify-center text-xs shrink-0 shadow-sm">
+                          <span className="text-red-500 font-bold text-base">▶</span>
+                          <span className="text-[8px] text-neutral-400 font-bold mt-1">Video 02</span>
+                        </div>
+                        <div className="w-24 h-16 bg-white border border-neutral-200 rounded-lg flex flex-col items-center justify-center text-xs shrink-0 shadow-sm">
+                          <span className="text-red-500 font-bold text-base">▶</span>
+                          <span className="text-[8px] text-neutral-400 font-bold mt-1">Video 03</span>
+                        </div>
+                        <div className="w-24 h-16 bg-white border border-neutral-200 rounded-lg flex flex-col items-center justify-center text-xs shrink-0 shadow-sm">
+                          <span className="text-red-500 font-bold text-base">▶</span>
+                          <span className="text-[8px] text-neutral-400 font-bold mt-1">Video 01</span>
+                        </div>
+                        <div className="w-24 h-16 bg-white border border-neutral-200 rounded-lg flex flex-col items-center justify-center text-xs shrink-0 shadow-sm">
+                          <span className="text-red-500 font-bold text-base">▶</span>
+                          <span className="text-[8px] text-neutral-400 font-bold mt-1">Video 02</span>
+                        </div>
+                        <div className="w-24 h-16 bg-white border border-neutral-200 rounded-lg flex flex-col items-center justify-center text-xs shrink-0 shadow-sm">
+                          <span className="text-red-500 font-bold text-base">▶</span>
+                          <span className="text-[8px] text-neutral-400 font-bold mt-1">Video 03</span>
+                        </div>
+                      </div>
+                      <div className="text-[9px] text-red-500/80 font-bold uppercase tracking-widest animate-pulse mt-4">
+                        Horizontal Scroll Carousel
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Text block Simulation */}
+                  {newSectionType === 'text' && (
+                    <div className="w-full h-full flex flex-col justify-center items-center p-4 gap-3 animate-in fade-in duration-300">
+                      <div className="w-full max-w-[280px] bg-white border border-neutral-200 rounded-xl p-4 text-left shadow-sm">
+                        <div className="flex items-center gap-1.5 mb-3">
+                          <span className="w-1.5 h-1.5 rounded-full bg-neutral-200" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-neutral-200" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-neutral-200" />
+                        </div>
+                        <div className="h-2 bg-neutral-200 rounded-full w-full mb-2 text-line-1-anim" />
+                        <div className="h-2 bg-neutral-200 rounded-full w-[90%] mb-2 text-line-2-anim" />
+                        <div className="h-2 bg-neutral-200 rounded-full w-[65%] text-line-3-anim" />
+                      </div>
+                      <div className="text-[9px] text-purple-500/80 font-bold uppercase tracking-widest animate-pulse mt-2.5">
+                        Rich Paragraph Document
+                      </div>
+                    </div>
+                  )}
+
+                  {/* WIP Timeline Simulation */}
+                  {newSectionType === 'wip_timeline' && (
+                    <div className="w-full h-full flex items-center justify-center p-4 relative animate-in fade-in duration-300">
+                      <div className="w-full max-w-[280px] flex items-stretch gap-4 relative">
+                        {/* Left dotted line */}
+                        <div className="w-[1.5px] bg-neutral-200 relative shrink-0">
+                          <div className="absolute top-0 bottom-0 left-0 right-0 border-l border-dashed border-neutral-300" />
+                          <div className="absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-b from-amber-400/80 to-transparent timeline-track-grow" />
+                          <div className="absolute top-2.5 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-amber-400 timeline-node-anim" />
+                          <div className="absolute top-12 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-amber-400 timeline-node-anim" />
+                        </div>
+                        
+                        {/* Right timeline cards */}
+                        <div className="flex-1 flex flex-col gap-3.5 py-1.5 text-left">
+                          <div className="bg-white border border-neutral-200 rounded-lg p-2 shadow-sm timeline-card-1-anim">
+                            <span className="text-[6px] text-neutral-400 block font-mono font-bold">2026-05-28</span>
+                            <span className="text-[8px] text-neutral-700 font-extrabold leading-none block mt-0.5">3D 렌더링 착수</span>
+                          </div>
+                          <div className="bg-white border border-neutral-200 rounded-lg p-2 shadow-sm timeline-card-2-anim">
+                            <span className="text-[6px] text-neutral-400 block font-mono font-bold">2026-05-29</span>
+                            <span className="text-[8px] text-neutral-700 font-extrabold leading-none block mt-0.5">디테일 맵핑 작업 완료</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Guidelines Description Card */}
+              <div className="bg-neutral-50 p-4 border border-neutral-200 rounded-xl flex items-start gap-3 text-left">
+                <span className="text-base shrink-0 mt-0.5">💡</span>
+                <div className="animate-in fade-in duration-200">
+                  {newSectionType === 'image_grid' && (
+                    <>
+                      <h5 className="text-[11px] font-extrabold text-blue-600 uppercase tracking-wider">이미지 그리드 (Image Grid)</h5>
+                      <p className="text-[10px] text-neutral-500 mt-1 leading-relaxed font-semibold">
+                        여러 이미지 파일을 한 번에 선택·업로드하여 그리드 격자 형태로 정렬 배치하는 작품 갤러리입니다. 대표작 사진, 3D 모델링 스크린샷, 그래픽 디자인 포트폴리오를 보여주기에 가장 완벽한 기본 레이아웃입니다.
+                      </p>
+                    </>
+                  )}
+                  {newSectionType === 'video_slider' && (
+                    <>
+                      <h5 className="text-[11px] font-extrabold text-red-600 uppercase tracking-wider">영상 슬라이더 (Video Slider)</h5>
+                      <p className="text-[10px] text-neutral-500 mt-1 leading-relaxed font-semibold">
+                        유튜브 비디오 링크 주소를 연동하여 옆으로 부드럽게 넘겨볼 수 있는 가로 카드 슬라이더 형태로 노출합니다. 모션 그래픽 릴, 영상 편집 포트폴리오, 3D 카메라 워킹 작업 쇼케이스 등에 탁월한 선택입니다.
+                      </p>
+                    </>
+                  )}
+                  {newSectionType === 'text' && (
+                    <>
+                      <h5 className="text-[11px] font-extrabold text-purple-600 uppercase tracking-wider">텍스트 단락 (Text Block Canvas)</h5>
+                      <p className="text-[10px] text-neutral-500 mt-1 leading-relaxed font-semibold">
+                        고급 리치 텍스트 에디터를 사용하여 자유롭게 서식 있는 설명글을 작성할 수 있습니다. 텍스트 효과, 다단 분할 레이아웃, 아코디언 FAQ 위젯 등을 삽입하여 작품 설명이나 자기소개 페이지를 입체적으로 구성할 수 있습니다.
+                      </p>
+                    </>
+                  )}
+                  {newSectionType === 'wip_timeline' && (
+                    <>
+                      <h5 className="text-[11px] font-extrabold text-amber-600 uppercase tracking-wider">WIP 타임라인 (Work In Progress)</h5>
+                      <p className="text-[10px] text-neutral-500 mt-1 leading-relaxed font-semibold">
+                        현재 활발히 진행 중인 제작 단계와 진척 과정을 시간 순으로 기록하는 피드 섹션입니다. 작업 과정을 투명하게 기록하여 내 팬들과 구매 고객들에게 높은 신뢰와 생생한 비하인드 스토리를 전달해 보세요.
+                      </p>
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
+
           </div>
         </div>
       )}
@@ -867,34 +1139,7 @@ export default function DraggablePortfolio({
         </div>
       )}
 
-      {/* Client-Side Project Modal */}
-      {selectedProjectId && (
-        <ProjectModal 
-          onClose={handleCloseProject}
-          title={selectedProjectData?.title}
-          description={selectedProjectData?.description}
-          createdAt={selectedProjectData?.created_at}
-        >
-          {isLoadingProject ? (
-            <div className="w-full min-h-[50vh] flex items-center justify-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-neutral-900"></div>
-            </div>
-          ) : selectedProjectData ? (
-            <ProjectDetailsViewer 
-              project={selectedProjectData} 
-              widgets={selectedProjectWidgets} 
-              creatorName={creatorName} 
-              isModal={true} 
-              otherProjects={selectedProjectOtherProjects}
-              relatedType={selectedProjectRelatedType}
-            />
-          ) : (
-            <div className="w-full min-h-[50vh] flex items-center justify-center">
-              <p className="text-neutral-500">Failed to load project details.</p>
-            </div>
-          )}
-        </ProjectModal>
-      )}
+      {/* Client-Side Project Modal is now handled by Next.js Parallel Routes (@modal) */}
 
     </div>
   )

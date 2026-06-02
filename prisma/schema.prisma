@@ -23,6 +23,8 @@ model Profile {
   projects        Project[]
   messages        ContactMessage[]
   wip_logs        WipLog[]
+  two_factor_secret   String?
+  two_factor_enabled  Boolean            @default(false)
 }
 
 model Portfolio {

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { cookies } from 'next/headers'
+import { verifySession, signSession } from '@/lib/session'
 
 export async function POST(request: Request) {
   try {
@@ -11,7 +12,8 @@ export async function POST(request: Request) {
 
     // 1. 어드민 권한 체크
     const cookieStore = await cookies()
-    const session = cookieStore.get('session')?.value
+    const sessionToken = cookieStore.get('session')?.value
+    const session = verifySession(sessionToken)
 
     let isAdmin = false
     if (session === 'admin') {
@@ -38,10 +40,11 @@ export async function POST(request: Request) {
     }
 
     // 3. 쿠키 갱신 수행 (NextResponse 응답 상에서 direct set)
+    const signedToken = signSession(creatorName)
     const response = NextResponse.json({ success: true })
-    response.cookies.set('session', creatorName, {
+    response.cookies.set('session', signedToken, {
       httpOnly: true,
-      secure: false, // Localhost http 대응
+      secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
       maxAge: 60 * 60 * 24 * 30 // 30 days

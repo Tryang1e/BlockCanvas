@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { validateUploadedFile } from '@/lib/upload-validator';
 
 export async function POST(request: Request) {
   try {
@@ -11,13 +12,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No file received." }, { status: 400 });
     }
 
-    if (file.size > 1024 * 1024 * 1024) {
-      return NextResponse.json({ error: "File exceeds 1GB limit." }, { status: 413 });
+    // Call the cryptographic & size validation helper
+    const validation = await validateUploadedFile(file);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
     
     // Generate safe distinct filename
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+    let safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+    
+    // If the file extension was normalized/corrected (e.g., clipboard pasted files with 'blob' or no extensions),
+    // we safely append the corrected extension so it retains proper headers and loads correctly!
+    if (validation.correctedExtension) {
+      const hasValidExtension = /\.(png|jpg|jpeg|gif|webp|mp4)$/i.test(safeName);
+      if (!hasValidExtension) {
+        safeName = `${safeName}.${validation.correctedExtension}`;
+      }
+    }
     const filename = `${uniqueSuffix}-${safeName}`;
     
     // Path maps to Next.js 'public' directory

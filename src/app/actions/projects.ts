@@ -27,7 +27,7 @@ export async function deleteProjectAction(projectId: string, creatorName: string
     throw new Error('프로젝트 삭제에 실패했습니다.')
   }
 
-  revalidatePath(`/creator/${creatorName}`)
+  revalidatePath(`/sites/${creatorName}`)
   return { success: true }
 }
 
@@ -54,7 +54,7 @@ export async function updateProjectOrderAction(
     throw new Error('프로젝트 순서 업데이트에 실패했습니다.')
   }
 
-  revalidatePath(`/creator/${creatorName}`)
+  revalidatePath(`/sites/${creatorName}`)
   return { success: true }
 }
 
@@ -99,7 +99,7 @@ export async function createSimpleVideoProjectAction(
       }
     })
 
-    revalidatePath(`/creator/${creatorName}`)
+    revalidatePath(`/sites/${creatorName}`)
     return { success: true, project: newProject }
   } catch (error) {
     console.error('Create Video Project Error:', error)

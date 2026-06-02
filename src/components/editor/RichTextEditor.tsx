@@ -1,6 +1,6 @@
 'use client'
 
-import { useEditor, EditorContent, NodeViewWrapper, ReactNodeViewRenderer, NodeViewProps } from '@tiptap/react'
+import { useEditor, EditorContent, NodeViewWrapper, NodeViewContent, ReactNodeViewRenderer, NodeViewProps } from '@tiptap/react'
 import { BubbleMenu, FloatingMenu } from '@tiptap/react/menus'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -10,7 +10,8 @@ import { Link } from '@tiptap/extension-link'
 import { FontFamily } from '@tiptap/extension-font-family'
 import { TextStyle } from '@tiptap/extension-text-style'
 import { Extension, Editor } from '@tiptap/core'
-import { Plugin, PluginKey } from '@tiptap/pm/state'
+import { Plugin, PluginKey, TextSelection, NodeSelection } from '@tiptap/pm/state'
+import { Decoration, DecorationSet } from '@tiptap/pm/view'
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -21,6 +22,7 @@ declare module '@tiptap/core' {
     columnBlock: {
       insertTwoColumns: () => ReturnType,
       insertColumns: (ratio: '50-50' | '30-70' | '70-30' | '40-60' | '60-40' | '33-33-33') => ReturnType,
+      setColumnsLayout: (ratio: '50-50' | '30-70' | '70-30' | '40-60' | '60-40' | '33-33-33') => ReturnType,
     }
   }
 }
@@ -48,7 +50,6 @@ import { useEffect, useCallback, useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import Image from '@tiptap/extension-image'
 import { Node, mergeAttributes } from '@tiptap/core'
-import { uploadFileAction } from '@/app/actions/upload'
 import { motion, AnimatePresence } from 'framer-motion'
 import { TextRotate, TextMorph, TypingText, SplittingText, SlidingText, ShimmeringText, RollingText, HighlightText, GradientText } from '@/components/ui/animate-ui'
 import { DefaultButton, FlipButton, RippleButton, LiquidButton } from '@/components/ui/animate-ui'
@@ -109,7 +110,7 @@ const ImageSizeInputs = ({ editor }: { editor: Editor }) => {
           type="number"
           value={attrs.height || ''}
           onChange={e => editor.chain().updateImageAttrs({ height: e.target.value }).run()}
-          placeholder={naturalHeight || "자동"}
+          placeholder="560"
           className="w-12 px-1 py-1 text-[11px] font-bold border border-neutral-700/60 bg-[#1e1e1e] text-neutral-300 rounded outline-none placeholder:text-neutral-600"
         />
       </div>
@@ -232,8 +233,8 @@ export const CustomImage = Image.extend({
         parseHTML: element => element.getAttribute('width') || element.style.width?.replace('px', ''),
       },
       height: {
-        default: null,
-        parseHTML: element => element.getAttribute('height') || element.style.height?.replace('px', ''),
+        default: '560',
+        parseHTML: element => element.getAttribute('height') || element.style.height?.replace('px', '') || '560',
       },
       align: {
         default: 'center',
@@ -264,24 +265,31 @@ export const CustomImage = Image.extend({
   renderHTML({ HTMLAttributes }) {
     const { href, align, width, height, ...rest } = HTMLAttributes;
 
-    let alignClass = '!block !mx-auto !my-6 rounded-xl max-w-full max-h-[800px] shadow-sm border border-neutral-100 object-cover';
+    let alignClass = '!block !mx-auto !my-6 rounded-xl max-w-full h-auto shadow-sm border border-neutral-100';
     if (align === 'left') {
-      alignClass = 'float-left mr-6 mb-4 max-w-[90%] sm:max-w-[40%] lg:max-w-[400px] rounded-xl shadow-sm border border-neutral-100 object-cover';
+      alignClass = 'float-left mr-6 mb-4 max-w-[90%] sm:max-w-[40%] lg:max-w-[400px] rounded-xl shadow-sm border border-neutral-100';
     } else if (align === 'right') {
-      alignClass = 'float-right ml-6 mb-4 max-w-[90%] sm:max-w-[40%] lg:max-w-[400px] rounded-xl shadow-sm border border-neutral-100 object-cover';
+      alignClass = 'float-right ml-6 mb-4 max-w-[90%] sm:max-w-[40%] lg:max-w-[400px] rounded-xl shadow-sm border border-neutral-100';
     }
 
     let style = '';
-    if (width) style += `width: ${width}px;`;
-    if (height) style += `height: ${height}px;`;
+    if (width) {
+      style += `width: ${width}px;`;
+    } else {
+      style += 'width: auto;';
+    }
+
+    const finalHeight = height || '560';
+    style += `height: ${finalHeight}px;`;
+    style += 'object-fit: cover; object-position: center;';
 
     const imgAttributes = mergeAttributes(this.options.HTMLAttributes, rest, {
       class: alignClass,
       'data-align': align || 'center',
       'data-href': href, // save it for parsing
-      width,
-      height,
-      style: style || null
+      width: width || null,
+      height: finalHeight,
+      style: style
     });
 
     const imgHTML = ['img', imgAttributes];
@@ -310,14 +318,44 @@ export const ColumnBlock = Node.create({
   group: 'block',
   content: 'column+',
   isolating: true,
+  selectable: true,
+  draggable: true,
+  addAttributes() {
+    return {
+      layout: {
+        default: '50-50',
+        parseHTML: element => element.getAttribute('data-layout') || '50-50',
+        renderHTML: attributes => {
+          return {
+            'data-layout': attributes.layout,
+          }
+        }
+      }
+    }
+  },
   parseHTML() {
-    return [{ tag: 'div[data-type="column-block"]' }]
+    return [
+      {
+        tag: 'div[data-type="column-block"]',
+      },
+      {
+        tag: 'div.columns-drag-handle-tab',
+        ignore: true,
+      }
+    ]
   },
   renderHTML({ HTMLAttributes }) {
     return ['div', mergeAttributes(HTMLAttributes, {
       'data-type': 'column-block',
-      class: 'flex flex-col md:flex-row gap-6 my-6 w-full items-start'
-    }), 0]
+      class: 'w-full my-6 relative'
+    }), 
+      ['div', {
+        class: 'columns-drag-handle-tab absolute -top-[19px] left-3 bg-blue-600 text-white text-[9px] font-black px-2.5 py-1 rounded-t-md cursor-grab select-none z-30 uppercase tracking-widest hover:bg-blue-750 active:cursor-grabbing',
+        contenteditable: 'false',
+        'data-drag-handle': ''
+      }, '⠿ Columns Block'],
+      ['div', { class: 'column-block-content-hole' }, 0]
+    ]
   },
   addCommands() {
     return {
@@ -328,33 +366,40 @@ export const ColumnBlock = Node.create({
         if (dispatch) {
           const schema = this.editor.schema;
           let columns: any[] = [];
-
+          
+          let layoutPreset = '50-50';
           if (ratio === '50-50') {
+            layoutPreset = '50-50';
             columns = [
               schema.nodes.column.create({ width: 'flex-1' }, schema.nodes.paragraph.create()),
               schema.nodes.column.create({ width: 'flex-1' }, schema.nodes.paragraph.create()),
             ];
           } else if (ratio === '30-70') {
+            layoutPreset = '30-70';
             columns = [
-              schema.nodes.column.create({ width: 'w-full md:w-[30%]' }, schema.nodes.paragraph.create()),
-              schema.nodes.column.create({ width: 'w-full md:w-[70%]' }, schema.nodes.paragraph.create()),
+              schema.nodes.column.create({ width: 'flex-1' }, schema.nodes.paragraph.create()),
+              schema.nodes.column.create({ width: 'flex-1' }, schema.nodes.paragraph.create()),
             ];
           } else if (ratio === '70-30') {
+            layoutPreset = '70-30';
             columns = [
-              schema.nodes.column.create({ width: 'w-full md:w-[70%]' }, schema.nodes.paragraph.create()),
-              schema.nodes.column.create({ width: 'w-full md:w-[30%]' }, schema.nodes.paragraph.create()),
+              schema.nodes.column.create({ width: 'flex-1' }, schema.nodes.paragraph.create()),
+              schema.nodes.column.create({ width: 'flex-1' }, schema.nodes.paragraph.create()),
             ];
           } else if (ratio === '40-60') {
+            layoutPreset = '40-60';
             columns = [
-              schema.nodes.column.create({ width: 'w-full md:w-[40%]' }, schema.nodes.paragraph.create()),
-              schema.nodes.column.create({ width: 'w-full md:w-[60%]' }, schema.nodes.paragraph.create()),
+              schema.nodes.column.create({ width: 'flex-1' }, schema.nodes.paragraph.create()),
+              schema.nodes.column.create({ width: 'flex-1' }, schema.nodes.paragraph.create()),
             ];
           } else if (ratio === '60-40') {
+            layoutPreset = '60-40';
             columns = [
-              schema.nodes.column.create({ width: 'w-full md:w-[60%]' }, schema.nodes.paragraph.create()),
-              schema.nodes.column.create({ width: 'w-full md:w-[40%]' }, schema.nodes.paragraph.create()),
+              schema.nodes.column.create({ width: 'flex-1' }, schema.nodes.paragraph.create()),
+              schema.nodes.column.create({ width: 'flex-1' }, schema.nodes.paragraph.create()),
             ];
           } else if (ratio === '33-33-33') {
+            layoutPreset = '33-33-33';
             columns = [
               schema.nodes.column.create({ width: 'flex-1' }, schema.nodes.paragraph.create()),
               schema.nodes.column.create({ width: 'flex-1' }, schema.nodes.paragraph.create()),
@@ -362,10 +407,13 @@ export const ColumnBlock = Node.create({
             ];
           }
 
-          const node = this.type.create(null, columns);
+          const node = this.type.create({ layout: layoutPreset }, columns);
           tr.replaceSelectionWith(node);
         }
         return true
+      },
+      setColumnsLayout: (ratio) => ({ commands }) => {
+        return commands.updateAttributes('columnBlock', { layout: ratio })
       }
     }
   }
@@ -394,14 +442,14 @@ export const Column = Node.create({
   renderHTML({ HTMLAttributes }) {
     return ['div', mergeAttributes(HTMLAttributes, {
       'data-type': 'column',
-      class: `${HTMLAttributes['data-width'] || 'flex-1'} min-w-0 transition-all relative group`
+      class: 'min-w-0 transition-all relative group'
     }), 0]
   },
 })
 
 // --- Custom ButtonLink Extension ---
 export const ButtonLinkNodeView = (props: NodeViewProps) => {
-  const { node, updateAttributes, selected, getPos, editor } = props;
+  const { node, updateAttributes, selected, getPos, editor, deleteNode, selectNode } = props as any;
   const { href, text, bgColor, textColor, buttonWidth, buttonHeight, textSize, fontFamily, isBold, isItalic, buttonStyle, align } = node.attrs;
 
   const [isEditing, setIsEditing] = useState(false);
@@ -437,7 +485,7 @@ export const ButtonLinkNodeView = (props: NodeViewProps) => {
     };
   }, [isEditing]);
 
-  // 바깥 클릭(Click Outside) 및 에디터 타이핑/상호작용 시 자동 닫기 콤보 훅
+  // 바깥 클릭(Click Outside) 시 자동 닫기 훅
   useEffect(() => {
     if (!isEditing || !editor) return;
 
@@ -454,17 +502,9 @@ export const ButtonLinkNodeView = (props: NodeViewProps) => {
       setIsEditing(false);
     };
 
-    const handleEditorInteraction = () => {
-      setIsEditing(false);
-    };
-
-    editor.on('update', handleEditorInteraction);
-    editor.on('selectionUpdate', handleEditorInteraction);
     document.addEventListener('mousedown', handleClickOutside, { capture: true });
 
     return () => {
-      editor.off('update', handleEditorInteraction);
-      editor.off('selectionUpdate', handleEditorInteraction);
       document.removeEventListener('mousedown', handleClickOutside, { capture: true });
     };
   }, [isEditing, editor]);
@@ -549,26 +589,64 @@ export const ButtonLinkNodeView = (props: NodeViewProps) => {
 
   return (
     <NodeViewWrapper 
-      className={`my-4 py-8 px-4 border rounded-xl shadow-sm block relative group/btnwrapper transition-colors ${
-        editAlign === 'left' ? 'text-left' : editAlign === 'right' ? 'text-right' : 'text-center'
-      } ${
-        isEditing 
-          ? 'border-blue-500 bg-blue-50/20 z-30 shadow-md' 
-          : selected 
-            ? 'border-blue-400 bg-blue-50/10 z-20' 
-            : 'border-neutral-200 bg-neutral-50 z-10'
-      }`} 
-      data-button-link 
+      onClick={(e: any) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault()
+          if (typeof selectNode === 'function') {
+            selectNode()
+          } else if (editor && typeof getPos === 'function') {
+            const pos = getPos()
+            if (typeof pos === 'number') {
+              editor.commands.setNodeSelection(pos)
+            }
+          }
+        }
+      }}
+      className={`mt-10 mb-4 py-8 px-4 border rounded-xl shadow-sm block relative group/btnwrapper transition-colors ${editAlign === 'left' ? 'text-left' : editAlign === 'right' ? 'text-right' : 'text-center'
+        } ${isEditing
+          ? 'border-blue-500 bg-blue-50/20 z-30 shadow-md'
+          : selected
+            ? 'border-blue-400 bg-blue-50/10 z-20'
+            : 'border-neutral-200 bg-neutral-50 z-auto'
+        }`}
+      data-button-link
       data-style={buttonStyle}
     >
       <div ref={buttonRef} className="inline-block">
         {renderButton()}
       </div>
 
-      {/* 텍스트 수정 버튼 */}
-      <button data-action="edit-button-link" onClick={handleEdit} className="absolute top-2 right-2 bg-white border border-neutral-300 hover:bg-neutral-100 text-neutral-600 text-xs px-2 py-1 rounded shadow-sm opacity-0 group-hover/btnwrapper:opacity-100 transition-opacity z-10 whitespace-nowrap">
-        버튼 수정
-      </button>
+      {/* Premium Floating Block Toolbar */}
+      <div 
+        className="absolute -top-10 left-2 flex items-center gap-1.5 bg-[#252525] border border-neutral-700/60 rounded-lg p-1.5 shadow-xl opacity-0 group-hover/btnwrapper:opacity-100 transition-all z-40 select-none scale-95 group-hover/btnwrapper:scale-100 w-max whitespace-nowrap" 
+        contentEditable={false}
+      >
+        <div 
+          className="w-5 h-5 flex items-center justify-center cursor-grab text-neutral-400 hover:text-white relative" 
+          data-drag-handle
+        >
+          <GripVertical size={14} />
+          <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+        </div>
+        <span className="text-[10px] text-neutral-200 font-bold px-1 select-none">버튼 링크 (Button Link)</span>
+        <button
+          onClick={handleEdit}
+          type="button"
+          className="text-[10px] text-blue-400 hover:text-blue-300 bg-blue-950/40 hover:bg-blue-900/60 border border-blue-900/30 px-2.5 py-1 rounded cursor-pointer transition-colors"
+        >
+          수정
+        </button>
+        <button
+          onClick={deleteNode}
+          type="button"
+          className="text-[10px] text-red-400 hover:text-red-300 bg-red-950/40 hover:bg-red-900/60 border border-red-900/30 px-2.5 py-1 rounded cursor-pointer transition-colors"
+        >
+          삭제
+        </button>
+      </div>
 
       {/* 수정 모달 */}
       {isEditing && mounted && typeof document !== 'undefined' && coords && createPortal(
@@ -632,7 +710,7 @@ export const ButtonLinkNodeView = (props: NodeViewProps) => {
 
               <button type="button" onClick={() => { setEditIsBold(!editIsBold); updateAttributes({ isBold: !editIsBold }); }} className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-serif font-bold ${editIsBold ? 'bg-blue-600 text-white' : 'bg-[#1e1e1e] text-neutral-400 border border-neutral-700/60'} transition-colors`}>B</button>
               <button type="button" onClick={() => { setEditIsItalic(!editIsItalic); updateAttributes({ isItalic: !editIsItalic }); }} className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-serif italic ${editIsItalic ? 'bg-blue-600 text-white' : 'bg-[#1e1e1e] text-neutral-400 border border-neutral-700/60'} transition-colors`}>I</button>
-              
+
               <div className="flex items-center gap-0.5">
                 <span className="text-[9px] text-neutral-500 scale-90">크기</span>
                 <input type="number" value={editTextSize} onChange={e => { setEditTextSize(e.target.value); updateAttributes({ textSize: e.target.value }); }} className="w-8 px-0.5 py-0.5 text-[10px] font-bold border border-neutral-700/60 bg-[#1e1e1e] text-neutral-300 rounded outline-none" min="8" max="72" />
@@ -732,7 +810,7 @@ export const ButtonLink = Node.create({
 
 
 // --- Custom AnimatedTextGroup Extension ---
-const AnimatedTextGroupNodeView = ({ node, updateAttributes, selected, deleteNode, editor, getPos }: any) => {
+const AnimatedTextGroupNodeView = ({ node, updateAttributes, selected, deleteNode, editor, getPos, selectNode }: any) => {
   const { texts, animationType, textSize, isBold, isItalic, fontFamily, align } = node.attrs;
   const parsedTexts = Array.isArray(texts) ? texts : (typeof texts === 'string' ? JSON.parse(texts || '[""]') : [""]);
 
@@ -764,7 +842,7 @@ const AnimatedTextGroupNodeView = ({ node, updateAttributes, selected, deleteNod
     };
   }, [isEditing]);
 
-  // 바깥 클릭(Click Outside) 및 에디터 타이핑/상호작용 시 자동 닫기 콤보 훅
+  // 바깥 클릭(Click Outside) 시 자동 닫기 훅
   useEffect(() => {
     if (!isEditing || !editor) return;
 
@@ -781,17 +859,9 @@ const AnimatedTextGroupNodeView = ({ node, updateAttributes, selected, deleteNod
       setIsEditing(false);
     };
 
-    const handleEditorInteraction = () => {
-      setIsEditing(false);
-    };
-
-    editor.on('update', handleEditorInteraction);
-    editor.on('selectionUpdate', handleEditorInteraction);
     document.addEventListener('mousedown', handleClickOutside, { capture: true });
 
     return () => {
-      editor.off('update', handleEditorInteraction);
-      editor.off('selectionUpdate', handleEditorInteraction);
       document.removeEventListener('mousedown', handleClickOutside, { capture: true });
     };
   }, [isEditing, editor]);
@@ -825,14 +895,14 @@ const AnimatedTextGroupNodeView = ({ node, updateAttributes, selected, deleteNod
   const handleSave = () => {
     const newTexts = editTexts.map(s => s.trim()).filter(s => s);
     if (newTexts.length > 0) {
-      updateAttributes({ 
-        texts: JSON.stringify(newTexts), 
+      updateAttributes({
+        texts: JSON.stringify(newTexts),
         animationType: editAnimationType,
-        textSize: editSize, 
-        isBold: editBold, 
-        isItalic: editItalic, 
-        fontFamily: editFont, 
-        align: editAlign 
+        textSize: editSize,
+        isBold: editBold,
+        isItalic: editItalic,
+        fontFamily: editFont,
+        align: editAlign
       });
     }
     setIsEditing(false);
@@ -857,28 +927,60 @@ const AnimatedTextGroupNodeView = ({ node, updateAttributes, selected, deleteNod
 
   return (
     <NodeViewWrapper 
-      className={`my-4 py-8 px-4 border rounded-xl shadow-sm block relative group transition-colors ${
-        align === 'left' ? 'text-left' : align === 'right' ? 'text-right' : 'text-center'
-      } ${
-        isEditing 
-          ? 'border-blue-500 bg-blue-50/20 z-30 shadow-md' 
-          : selected 
-            ? 'border-blue-400 bg-blue-50/10 z-20' 
-            : 'border-neutral-200 bg-neutral-50 z-10'
-      }`} 
-      data-animated-group={animationType} 
+      onClick={(e: any) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault()
+          if (typeof selectNode === 'function') {
+            selectNode()
+          } else if (editor && typeof getPos === 'function') {
+            const pos = getPos()
+            if (typeof pos === 'number') {
+              editor.commands.setNodeSelection(pos)
+            }
+          }
+        }
+      }}
+      className={`mt-10 mb-4 py-8 px-4 border rounded-xl shadow-sm block relative group transition-colors ${align === 'left' ? 'text-left' : align === 'right' ? 'text-right' : 'text-center'
+        } ${isEditing
+          ? 'border-blue-500 bg-blue-50/20 z-30 shadow-md'
+          : selected
+            ? 'border-blue-400 bg-blue-50/10 z-20'
+            : 'border-neutral-200 bg-neutral-50 z-auto'
+        }`}
+      data-animated-group={animationType}
       style={appliedStyle}
     >
-      {/* Drag Handle */}
-      <Tooltip text="드래그해서 위아래로 이동" position="left">
-        <div
-          className="absolute left-2 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing text-neutral-400 hover:text-neutral-800"
+      {/* Premium Floating Block Toolbar */}
+      <div 
+        className="absolute -top-10 left-2 flex items-center gap-1.5 bg-[#252525] border border-neutral-700/60 rounded-lg p-1.5 shadow-xl opacity-0 group-hover:opacity-100 transition-all z-40 select-none scale-95 group-hover:scale-100 w-max whitespace-nowrap" 
+        contentEditable={false}
+      >
+        <div 
+          className="w-5 h-5 flex items-center justify-center cursor-grab text-neutral-400 hover:text-white relative" 
           data-drag-handle
-          contentEditable={false}
         >
-          <GripVertical size={18} />
+          <GripVertical size={14} />
+          <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
         </div>
-      </Tooltip>
+        <span className="text-[10px] text-neutral-200 font-bold px-1 select-none">텍스트 애니메이션 (Animate UI)</span>
+        <button
+          onClick={handleEdit}
+          type="button"
+          className="text-[10px] text-blue-400 hover:text-blue-350 bg-blue-950/40 hover:bg-blue-900/60 border border-blue-900/30 px-2.5 py-1 rounded cursor-pointer transition-colors"
+        >
+          수정
+        </button>
+        <button
+          onClick={deleteNode}
+          type="button"
+          className="text-[10px] text-red-400 hover:text-red-300 bg-red-950/40 hover:bg-red-900/60 border border-red-900/30 px-2.5 py-1 rounded cursor-pointer transition-colors"
+        >
+          삭제
+        </button>
+      </div>
 
       {isEditing && mounted && typeof document !== 'undefined' && coords && createPortal(
         <div
@@ -903,9 +1005,9 @@ const AnimatedTextGroupNodeView = ({ node, updateAttributes, selected, deleteNod
               <span className="text-[9px] text-neutral-500 font-bold scale-90">효과:</span>
               <select
                 value={editAnimationType}
-                onChange={e => { 
-                  setEditAnimationType(e.target.value); 
-                  updateAttributes({ animationType: e.target.value }); 
+                onChange={e => {
+                  setEditAnimationType(e.target.value);
+                  updateAttributes({ animationType: e.target.value });
                 }}
                 className="px-1 py-0.5 text-[10px] font-bold border border-neutral-700/60 bg-[#1e1e1e] text-neutral-300 rounded outline-none cursor-pointer"
               >
@@ -984,9 +1086,7 @@ const AnimatedTextGroupNodeView = ({ node, updateAttributes, selected, deleteNod
         document.body
       )}
 
-      <button data-action="edit-animated-text" onClick={handleEdit} className="absolute top-2 right-2 bg-white border border-neutral-300 hover:bg-neutral-100 text-neutral-600 text-xs px-2 py-1 rounded shadow-sm opacity-0 group-hover:opacity-100 transition-opacity z-10">
-        텍스트 수정
-      </button>
+
 
       {animationType === 'rotating' && (
         <span className={`${appliedClass} inline-flex align-bottom relative bg-white px-4 py-1 rounded shadow-sm`}>
@@ -1135,18 +1235,18 @@ declare module '@tiptap/core' {
 
 const FaqBlockNodeView = (props: NodeViewProps) => {
   const { node, updateAttributes, selected, deleteNode } = props
-  const { 
-    question, 
-    answer, 
-    qFont, 
-    qSize, 
-    qColor, 
-    qBold, 
-    qItalic, 
-    aFont, 
-    aSize, 
-    aColor, 
-    aBold, 
+  const {
+    question,
+    answer,
+    qFont,
+    qSize,
+    qColor,
+    qBold,
+    qItalic,
+    aFont,
+    aSize,
+    aColor,
+    aBold,
     aItalic,
     borderStyle,
     hoverBg
@@ -1156,7 +1256,7 @@ const FaqBlockNodeView = (props: NodeViewProps) => {
 
   const [isEditing, setIsEditing] = useState(false)
   const [mounted, setMounted] = useState(false)
-  
+
   useEffect(() => {
     setMounted(true)
   }, [])
@@ -1223,8 +1323,8 @@ const FaqBlockNodeView = (props: NodeViewProps) => {
 
   const handleSave = () => {
     const finalizedQuestion = localQuestion.replace(/^Q\s*\.\s*/i, '').replace(/^Q\s+/i, '');
-    updateAttributes({ 
-      question: finalizedQuestion, 
+    updateAttributes({
+      question: finalizedQuestion,
       answer: localAnswer,
       qFont: localQFont,
       qSize: localQSize,
@@ -1243,7 +1343,7 @@ const FaqBlockNodeView = (props: NodeViewProps) => {
   }
 
   // 테마별/보더 스타일별 래퍼 클래스 및 장식적 요소 빌드
-  let wrapperClass = "my-3 transition-all duration-300 relative group/faqwrapper select-none overflow-hidden "
+  let wrapperClass = "mt-10 mb-3 transition-all duration-300 relative group/faqwrapper select-none overflow-hidden "
   if (selected) {
     wrapperClass += "border border-blue-500/60 bg-blue-50/5 dark:bg-blue-950/5 rounded-2xl "
   }
@@ -1289,8 +1389,18 @@ const FaqBlockNodeView = (props: NodeViewProps) => {
     fontStyle: localAItalic ? 'italic' : 'normal',
   }
 
+  const { selectNode } = props as any
+
   return (
-    <NodeViewWrapper className={wrapperClass}>
+    <NodeViewWrapper 
+      onClick={(e: any) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault()
+          selectNode()
+        }
+      }}
+      className={wrapperClass}
+    >
       <div className={accordionBoxClass}>
         {decorationLeftBar}
         {/* 아코디언 미리보기 헤더 */}
@@ -1304,12 +1414,11 @@ const FaqBlockNodeView = (props: NodeViewProps) => {
               {cleanQuestion || '질문을 입력하세요'}
             </span>
           </div>
-          <ChevronDown 
-            size={16} 
+          <ChevronDown
+            size={16}
             strokeWidth={2.5}
-            className={`text-neutral-450 dark:text-neutral-550 transition-all duration-300 shrink-0 ${
-              isOpen ? 'rotate-180 text-blue-600 dark:text-blue-400 scale-105' : ''
-            }`}
+            className={`text-neutral-450 dark:text-neutral-550 transition-all duration-300 shrink-0 ${isOpen ? 'rotate-180 text-blue-600 dark:text-blue-400 scale-105' : ''
+              }`}
           />
         </div>
 
@@ -1336,12 +1445,34 @@ const FaqBlockNodeView = (props: NodeViewProps) => {
         </AnimatePresence>
       </div>
 
-      {/* 에디팅 / 삭제 툴바 버튼 */}
-      <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover/faqwrapper:opacity-100 transition-all duration-300 z-10 scale-95 group-hover/faqwrapper:scale-100">
-        <button onClick={handleEdit} className="bg-white/90 backdrop-blur border border-neutral-300/80 hover:bg-neutral-100 text-neutral-700 text-[11px] font-bold px-2.5 py-1 rounded-lg shadow-sm whitespace-nowrap transition-colors">
+      {/* Premium Floating Block Toolbar */}
+      <div
+        className="absolute -top-10 left-2 flex items-center gap-1.5 bg-[#252525] border border-neutral-700/60 rounded-lg p-1.5 shadow-xl opacity-0 group-hover/faqwrapper:opacity-100 transition-all z-40 select-none scale-95 group-hover/faqwrapper:scale-100 w-max whitespace-nowrap"
+        contentEditable={false}
+      >
+        <div 
+          className="w-5 h-5 flex items-center justify-center cursor-grab text-neutral-400 hover:text-white relative" 
+          data-drag-handle
+        >
+          <GripVertical size={14} />
+          <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+        </div>
+        <span className="text-[10px] text-neutral-350 font-bold px-1 select-none">아코디언 블록 (FAQ)</span>
+        <button
+          onClick={handleEdit}
+          type="button"
+          className="text-[10px] text-blue-400 hover:text-blue-350 bg-blue-950/40 hover:bg-blue-900/60 border border-blue-900/30 px-2.5 py-1 rounded cursor-pointer transition-colors"
+        >
           수정
         </button>
-        <button onClick={deleteNode} className="bg-red-50/90 backdrop-blur border border-red-200/80 hover:bg-red-100 text-red-600 text-[11px] font-bold px-2.5 py-1 rounded-lg shadow-sm whitespace-nowrap transition-colors">
+        <button
+          onClick={deleteNode}
+          type="button"
+          className="text-[10px] text-red-400 hover:text-red-300 bg-red-950/40 hover:bg-red-900/60 border border-red-900/30 px-2.5 py-1 rounded cursor-pointer transition-colors"
+        >
           삭제
         </button>
       </div>
@@ -1392,7 +1523,7 @@ const FaqBlockNodeView = (props: NodeViewProps) => {
               {/* 질문 스타일 툴바 */}
               <div className="bg-[#181818] border border-neutral-800 p-2.5 rounded-lg flex flex-wrap gap-2 items-center">
                 <span className="text-[10px] text-neutral-300 font-mono font-black uppercase mr-1">Q Style:</span>
-                
+
                 {/* 폰트 셀렉트 */}
                 <select
                   value={localQFont}
@@ -1409,7 +1540,7 @@ const FaqBlockNodeView = (props: NodeViewProps) => {
                 {/* 사이즈 셀렉트 & 자유형 기입 인풋 */}
                 <div className="flex items-center gap-1 bg-[#222] border border-neutral-800 rounded-md px-1.5 py-0.5 h-7">
                   <select
-                    value={['10px','12px','13px','14px','15px','16px','18px','20px','24px','28px','32px','36px','40px','48px','56px','64px','72px'].includes(localQSize) ? localQSize : ''}
+                    value={['10px', '12px', '13px', '14px', '15px', '16px', '18px', '20px', '24px', '28px', '32px', '36px', '40px', '48px', '56px', '64px', '72px'].includes(localQSize) ? localQSize : ''}
                     onChange={e => setLocalQSize(e.target.value || localQSize)}
                     className="text-[10px] font-bold bg-transparent text-neutral-300 outline-none cursor-pointer"
                   >
@@ -1432,31 +1563,29 @@ const FaqBlockNodeView = (props: NodeViewProps) => {
                     <option value="64px">64px</option>
                     <option value="72px">72px</option>
                   </select>
-                  <input 
-                    type="text" 
-                    value={localQSize} 
-                    onChange={e => setLocalQSize(e.target.value)} 
+                  <input
+                    type="text"
+                    value={localQSize}
+                    onChange={e => setLocalQSize(e.target.value)}
                     placeholder="Size"
                     className="w-10 text-[10px] text-center font-bold bg-[#181818] text-neutral-200 border border-neutral-800 rounded outline-none py-px focus:border-neutral-600"
                   />
                 </div>
 
                 {/* 볼드/이탤릭 토글 */}
-                <button 
-                  type="button" 
-                  onClick={() => setLocalQBold(!localQBold)} 
-                  className={`w-7 h-7 rounded-md flex items-center justify-center font-bold text-[10px] transition-colors cursor-pointer border ${
-                    localQBold ? 'bg-neutral-200 text-neutral-900 border-neutral-100 font-extrabold' : 'bg-[#222] text-neutral-400 border-neutral-800 hover:text-neutral-200'
-                  }`}
+                <button
+                  type="button"
+                  onClick={() => setLocalQBold(!localQBold)}
+                  className={`w-7 h-7 rounded-md flex items-center justify-center font-bold text-[10px] transition-colors cursor-pointer border ${localQBold ? 'bg-neutral-200 text-neutral-900 border-neutral-100 font-extrabold' : 'bg-[#222] text-neutral-400 border-neutral-800 hover:text-neutral-200'
+                    }`}
                 >
                   B
                 </button>
-                <button 
-                  type="button" 
-                  onClick={() => setLocalQItalic(!localQItalic)} 
-                  className={`w-7 h-7 rounded-md flex items-center justify-center italic text-[10px] transition-colors cursor-pointer border ${
-                    localQItalic ? 'bg-neutral-200 text-neutral-900 border-neutral-100 font-extrabold' : 'bg-[#222] text-neutral-400 border-neutral-800 hover:text-neutral-200'
-                  }`}
+                <button
+                  type="button"
+                  onClick={() => setLocalQItalic(!localQItalic)}
+                  className={`w-7 h-7 rounded-md flex items-center justify-center italic text-[10px] transition-colors cursor-pointer border ${localQItalic ? 'bg-neutral-200 text-neutral-900 border-neutral-100 font-extrabold' : 'bg-[#222] text-neutral-400 border-neutral-800 hover:text-neutral-200'
+                    }`}
                 >
                   I
                 </button>
@@ -1464,11 +1593,11 @@ const FaqBlockNodeView = (props: NodeViewProps) => {
                 {/* 색상 피커 */}
                 <div className="flex items-center gap-1.5 border border-neutral-800 bg-[#222] rounded-md px-1.5 shrink-0 h-7">
                   <span className="text-[8px] text-neutral-400 font-black uppercase">Color</span>
-                  <input 
-                    type="color" 
-                    value={localQColor || '#ffffff'} 
-                    onChange={e => setLocalQColor(e.target.value)} 
-                    className="w-4 h-4 rounded cursor-pointer bg-transparent border-0 p-0" 
+                  <input
+                    type="color"
+                    value={localQColor || '#ffffff'}
+                    onChange={e => setLocalQColor(e.target.value)}
+                    className="w-4 h-4 rounded cursor-pointer bg-transparent border-0 p-0"
                   />
                 </div>
               </div>
@@ -1488,7 +1617,7 @@ const FaqBlockNodeView = (props: NodeViewProps) => {
               {/* 답변 스타일 툴바 */}
               <div className="bg-[#181818] border border-neutral-800 p-2.5 rounded-lg flex flex-wrap gap-2 items-center">
                 <span className="text-[10px] text-neutral-300 font-mono font-black uppercase mr-1">A Style:</span>
-                
+
                 {/* 폰트 셀렉트 */}
                 <select
                   value={localAFont}
@@ -1505,7 +1634,7 @@ const FaqBlockNodeView = (props: NodeViewProps) => {
                 {/* 사이즈 셀렉트 & 자유형 기입 인풋 */}
                 <div className="flex items-center gap-1 bg-[#222] border border-neutral-800 rounded-md px-1.5 py-0.5 h-7">
                   <select
-                    value={['10px','12px','13px','14px','15px','16px','18px','20px','24px','28px','32px','36px','40px','48px','56px','64px','72px'].includes(localASize) ? localASize : ''}
+                    value={['10px', '12px', '13px', '14px', '15px', '16px', '18px', '20px', '24px', '28px', '32px', '36px', '40px', '48px', '56px', '64px', '72px'].includes(localASize) ? localASize : ''}
                     onChange={e => setLocalASize(e.target.value || localASize)}
                     className="text-[10px] font-bold bg-transparent text-neutral-300 outline-none cursor-pointer"
                   >
@@ -1528,31 +1657,29 @@ const FaqBlockNodeView = (props: NodeViewProps) => {
                     <option value="64px">64px</option>
                     <option value="72px">72px</option>
                   </select>
-                  <input 
-                    type="text" 
-                    value={localASize} 
-                    onChange={e => setLocalASize(e.target.value)} 
+                  <input
+                    type="text"
+                    value={localASize}
+                    onChange={e => setLocalASize(e.target.value)}
                     placeholder="Size"
                     className="w-10 text-[10px] text-center font-bold bg-[#181818] text-neutral-200 border border-neutral-800 rounded outline-none py-px focus:border-neutral-600"
                   />
                 </div>
 
                 {/* 볼드/이탤릭 토글 */}
-                <button 
-                  type="button" 
-                  onClick={() => setLocalABold(!localABold)} 
-                  className={`w-7 h-7 rounded-md flex items-center justify-center font-bold text-[10px] transition-colors cursor-pointer border ${
-                    localABold ? 'bg-neutral-200 text-neutral-900 border-neutral-100 font-extrabold' : 'bg-[#222] text-neutral-400 border-neutral-800 hover:text-neutral-200'
-                  }`}
+                <button
+                  type="button"
+                  onClick={() => setLocalABold(!localABold)}
+                  className={`w-7 h-7 rounded-md flex items-center justify-center font-bold text-[10px] transition-colors cursor-pointer border ${localABold ? 'bg-neutral-200 text-neutral-900 border-neutral-100 font-extrabold' : 'bg-[#222] text-neutral-400 border-neutral-800 hover:text-neutral-200'
+                    }`}
                 >
                   B
                 </button>
-                <button 
-                  type="button" 
-                  onClick={() => setLocalAItalic(!localAItalic)} 
-                  className={`w-7 h-7 rounded-md flex items-center justify-center italic text-[10px] transition-colors cursor-pointer border ${
-                    localAItalic ? 'bg-neutral-200 text-neutral-900 border-neutral-100 font-extrabold' : 'bg-[#222] text-neutral-400 border-neutral-800 hover:text-neutral-200'
-                  }`}
+                <button
+                  type="button"
+                  onClick={() => setLocalAItalic(!localAItalic)}
+                  className={`w-7 h-7 rounded-md flex items-center justify-center italic text-[10px] transition-colors cursor-pointer border ${localAItalic ? 'bg-neutral-200 text-neutral-900 border-neutral-100 font-extrabold' : 'bg-[#222] text-neutral-400 border-neutral-800 hover:text-neutral-200'
+                    }`}
                 >
                   I
                 </button>
@@ -1560,11 +1687,11 @@ const FaqBlockNodeView = (props: NodeViewProps) => {
                 {/* 색상 피커 */}
                 <div className="flex items-center gap-1.5 border border-neutral-800 bg-[#222] rounded-md px-1.5 shrink-0 h-7">
                   <span className="text-[8px] text-neutral-400 font-black uppercase">Color</span>
-                  <input 
-                    type="color" 
-                    value={localAColor || '#a3a3a3'} 
-                    onChange={e => setLocalAColor(e.target.value)} 
-                    className="w-4 h-4 rounded cursor-pointer bg-transparent border-0 p-0" 
+                  <input
+                    type="color"
+                    value={localAColor || '#a3a3a3'}
+                    onChange={e => setLocalAColor(e.target.value)}
+                    className="w-4 h-4 rounded cursor-pointer bg-transparent border-0 p-0"
                   />
                 </div>
               </div>
@@ -1684,8 +1811,8 @@ export const FaqBlock = Node.create({
   },
 
   renderHTML({ node }) {
-    const { 
-      question, 
+    const {
+      question,
       answer,
       qFont,
       qSize,
@@ -1701,7 +1828,7 @@ export const FaqBlock = Node.create({
       hoverBg
     } = node.attrs
     const cleanQuestion = (question || '').replace(/^Q\s*\.\s*/i, '').replace(/^Q\s+/i, '');
-    
+
     // 검은 점(●) 방지 대격변: nested div를 제거하고 오직 attributes 형태로 완벽하게 단일 self-closing style 태그로 보존!
     return ['div', {
       'data-type': 'faq-block',
@@ -1735,11 +1862,115 @@ export const FaqBlock = Node.create({
   }
 })
 
+const FocusOutlineExtension = Extension.create({
+  name: 'focusOutline',
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        key: new PluginKey('focus-outline'),
+        state: {
+          init() {
+            return DecorationSet.empty
+          },
+          apply(tr, set, oldState, newState) {
+            const { selection } = newState
+            const { $from } = selection
+
+            let depth = $from.depth
+            while (depth > 0) {
+              const node = $from.node(depth)
+              if (node && node.type.isTextblock) {
+                const activeNodePos = $from.before(depth)
+                const deco = Decoration.node(activeNodePos, activeNodePos + node.nodeSize, {
+                  class: 'active-paragraph-focus'
+                })
+                return DecorationSet.create(newState.doc, [deco])
+              }
+              depth--
+            }
+            return DecorationSet.empty
+          }
+        },
+        props: {
+          decorations(state) {
+            return this.getState(state)
+          }
+        }
+      })
+    ]
+  }
+})
+
+const CtrlAOverride = Extension.create({
+  name: 'ctrlAOverride',
+  priority: 1000,
+  addKeyboardShortcuts() {
+    return {
+      'Mod-a': ({ editor }) => {
+        const { state, dispatch } = editor.view
+        const { selection } = state
+        const { $from } = selection
+
+        let depth = $from.depth
+        let textBlockNode = null
+        let startPos = 0
+        let endPos = 0
+        while (depth > 0) {
+          const node = $from.node(depth)
+          if (node && node.type.isTextblock) {
+            textBlockNode = node
+            startPos = $from.start(depth)
+            endPos = $from.end(depth)
+            break
+          }
+          depth--
+        }
+
+        if (textBlockNode) {
+          const isFullySelected = (selection.from === startPos && selection.to === endPos)
+          if (!isFullySelected) {
+            const tr = state.tr.setSelection(TextSelection.create(state.doc, startPos, endPos))
+            dispatch(tr)
+            return true // prevents default SelectAll
+          }
+        }
+        return false // let default SelectAll handle it
+      }
+    }
+  }
+})
+
 // --- Component ---
+
+function getSelectionCoords(editor: Editor) {
+  if (!editor || editor.isDestroyed) return null
+  const { view, state } = editor
+  const { selection } = state
+  if (!selection) return null
+
+  try {
+    const { from, to } = selection
+    const startCoords = view.coordsAtPos(from)
+    const endCoords = view.coordsAtPos(to)
+
+    if (!startCoords || !endCoords) return null
+
+    return {
+      top: startCoords.top,
+      left: startCoords.left,
+      width: Math.max(0, endCoords.left - startCoords.left),
+      height: startCoords.bottom - startCoords.top
+    }
+  } catch (err) {
+    return null
+  }
+}
 
 interface RichTextEditorProps {
   content: string;
   onChange: (content: string) => void;
+  blueprintMode?: boolean;
+  onInsertBlock?: (type: 'text' | 'image_grid' | 'video' | 'embed') => void;
 }
 
 const FONTS = [
@@ -1761,11 +1992,26 @@ const SIZES = [
   { label: '48px', value: '48px' },
 ]
 
-export default function RichTextEditor({ content, onChange }: RichTextEditorProps) {
+export default function RichTextEditor({ content, onChange, blueprintMode = true, onInsertBlock }: RichTextEditorProps) {
+  const [mounted, setMounted] = useState(false)
   const [promptState, setPromptState] = useState<{ type: 'link' | 'imageLink', url: string, text: string } | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   
+  const isComposingRef = useRef(false)
+  const isTypingRef = useRef(false)
+  const [showEffectDropdown, setShowEffectDropdown] = useState(false)
+
+  // content가 string이 아니거나 { html: ... }과 같은 객체 형태로 올 수 있으므로 안전하게 정규화
+  let safeContent = ''
+  if (content) {
+    if (typeof content === 'string') {
+      safeContent = content
+    } else if (typeof content === 'object' && content !== null) {
+      safeContent = (content as any).html || ''
+    }
+  }
+
   // 타이핑 감지 상태 및 복구 타이머
   const [isTyping, setIsTyping] = useState(false)
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -1786,6 +2032,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
 
   // 컴포넌트 마운트/언마운트 시 라이프사이클 관리
   useEffect(() => {
+    setMounted(true)
     resetIdleTimer()
     return () => {
       if (idleTimeoutRef.current) clearTimeout(idleTimeoutRef.current)
@@ -1795,6 +2042,33 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
 
   const [lasso, setLasso] = useState<{ active: boolean; startX: number; startY: number; currentX: number; currentY: number } | null>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
+
+  const toggleBoldSafe = () => {
+    if (editor && !editor.isDestroyed) {
+      const { selection } = editor.state
+      if (selection instanceof TextSelection) {
+        editor.chain().focus().toggleBold().run()
+      }
+    }
+  }
+
+  const toggleItalicSafe = () => {
+    if (editor && !editor.isDestroyed) {
+      const { selection } = editor.state
+      if (selection instanceof TextSelection) {
+        editor.chain().focus().toggleItalic().run()
+      }
+    }
+  }
+
+  const toggleUnderlineSafe = () => {
+    if (editor && !editor.isDestroyed) {
+      const { selection } = editor.state
+      if (selection instanceof TextSelection) {
+        editor.chain().focus().toggleUnderline().run()
+      }
+    }
+  }
 
   const editor = useEditor({
     extensions: [
@@ -1817,8 +2091,10 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
       ColumnBlock,
       Column,
       FaqBlock,
+      FocusOutlineExtension,
+      CtrlAOverride,
     ],
-    content,
+    content: safeContent,
     immediatelyRender: false,
     onUpdate: ({ editor }) => {
       // Use setTimeout to decouple the state update from Tiptap's synchronous transaction loop,
@@ -1827,7 +2103,7 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
         isInternalUpdate.current = true;
         setIsTyping(true)
         if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
-        
+
         // 사용자가 연속 입력을 하다가 손을 떼는(타이핑이 멈추는) 즉시 켜지도록 디바운스 시간을 150ms로 대폭 압축!
         typingTimeoutRef.current = setTimeout(() => {
           setIsTyping(false)
@@ -1856,19 +2132,168 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
       attributes: {
         class: 'prose prose-sm sm:prose-base focus:outline-none min-h-[60px] max-w-none text-neutral-900',
       },
+      handleDOMEvents: {
+        click: (view, event) => {
+          const target = event.target as HTMLElement;
+          const handleTab = target.closest('.columns-drag-handle-tab');
+          if (handleTab) {
+            event.preventDefault();
+            event.stopPropagation();
+            
+            // Find absolute ProseMirror position inside the editor DOM
+            const pos = view.posAtDOM(handleTab, 0);
+            if (typeof pos === 'number') {
+              const { state, dispatch } = view;
+              const $pos = state.doc.resolve(pos);
+              
+              let depth = $pos.depth;
+              let foundPos = -1;
+              while (depth >= 0) {
+                const node = $pos.node(depth);
+                if (node && node.type.name === 'columnBlock') {
+                  foundPos = $pos.before(depth);
+                  break;
+                }
+                depth--;
+              }
+              
+              if (foundPos >= 0) {
+                // Force state transformation to select the columnBlock node programmatically
+                const tr = state.tr.setSelection(NodeSelection.create(state.doc, foundPos));
+                dispatch(tr);
+                view.focus();
+                
+                // Force an immediate Tippy menu position refresh transaction
+                setTimeout(() => {
+                  if (editor && !editor.isDestroyed) {
+                    editor.view.dispatch(editor.state.tr);
+                  }
+                }, 20);
+                return true;
+              }
+            }
+          }
+          return false;
+        },
+        compositionstart: () => {
+          isComposingRef.current = true
+          isTypingRef.current = true
+          setIsTyping(true)
+          if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+          const bubbleMenu = document.querySelector('[data-tippy-root]') as HTMLElement
+          if (bubbleMenu) {
+            bubbleMenu.style.opacity = '0'
+            bubbleMenu.style.pointerEvents = 'none'
+          }
+          return false
+        },
+        compositionupdate: () => {
+          isComposingRef.current = true
+          isTypingRef.current = true
+          setIsTyping(true)
+          if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+          const bubbleMenu = document.querySelector('[data-tippy-root]') as HTMLElement
+          if (bubbleMenu) {
+            bubbleMenu.style.opacity = '0'
+            bubbleMenu.style.pointerEvents = 'none'
+          }
+          return false
+        },
+        compositionend: () => {
+          isComposingRef.current = false
+          setIsTyping(true)
+          if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+          typingTimeoutRef.current = setTimeout(() => {
+            setIsTyping(false)
+            isTypingRef.current = false
+            const bubbleMenu = document.querySelector('[data-tippy-root]') as HTMLElement
+            if (bubbleMenu) {
+              bubbleMenu.style.opacity = ''
+              bubbleMenu.style.pointerEvents = ''
+            }
+          }, 150)
+          return false
+        },
+        keydown: () => {
+          isTypingRef.current = true
+          setIsTyping(true)
+          if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+          const bubbleMenu = document.querySelector('[data-tippy-root]') as HTMLElement
+          if (bubbleMenu) {
+            bubbleMenu.style.opacity = '0'
+            bubbleMenu.style.pointerEvents = 'none'
+          }
+          typingTimeoutRef.current = setTimeout(() => {
+            setIsTyping(false)
+            isTypingRef.current = false
+            const bubbleMenu = document.querySelector('[data-tippy-root]') as HTMLElement
+            if (bubbleMenu) {
+              bubbleMenu.style.opacity = ''
+              bubbleMenu.style.pointerEvents = ''
+            }
+          }, 150)
+          return false
+        }
+      },
+      handleKeyDown: (view, event) => {
+        if ((event.ctrlKey || event.metaKey) && event.key === 'a') {
+          const { state, dispatch } = view
+          const { selection } = state
+          const { $from } = selection
+          
+          let depth = $from.depth
+          let textBlockNode = null
+          let startPos = 0
+          let endPos = 0
+          while (depth > 0) {
+            const node = $from.node(depth)
+            if (node && node.type.isTextblock) {
+              textBlockNode = node
+              startPos = $from.start(depth)
+              endPos = $from.end(depth)
+              break
+            }
+            depth--
+          }
+
+          if (textBlockNode) {
+            const isFullySelected = (selection.from === startPos && selection.to === endPos)
+            if (!isFullySelected) {
+              event.preventDefault()
+              const tr = state.tr.setSelection(TextSelection.create(state.doc, startPos, endPos))
+              dispatch(tr)
+              return true
+            }
+          }
+        }
+        return false
+      }
     },
   })
 
   useEffect(() => {
-    if (editor && !editor.isDestroyed && !isInternalUpdate.current && content !== editor.getHTML()) {
+    if (editor && !editor.isDestroyed && !isInternalUpdate.current && safeContent !== editor.getHTML()) {
       // setTimeout을 사용하여 React lifecycle 내부에서의 동기적인 렌더링 충돌(flushSync) 방지
       setTimeout(() => {
-        if (!editor.isDestroyed && !isInternalUpdate.current && content !== editor.getHTML()) {
-          editor.commands.setContent(content)
+        if (!editor.isDestroyed && !isInternalUpdate.current && safeContent !== editor.getHTML()) {
+          editor.commands.setContent(safeContent)
         }
       }, 0)
     }
-  }, [content, editor])
+  }, [safeContent, editor])
+
+  useEffect(() => {
+    if (!editor) return
+    const handleUpdate = () => {
+      setShowEffectDropdown(false)
+    }
+    editor.on('selectionUpdate', handleUpdate)
+    editor.on('focus', handleUpdate)
+    return () => {
+      editor.off('selectionUpdate', handleUpdate)
+      editor.off('focus', handleUpdate)
+    }
+  }, [editor])
 
   useEffect(() => {
     if (!lasso?.active) return;
@@ -2032,12 +2457,21 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
       const formData = new FormData()
       formData.append('file', file)
 
-      const url = await uploadFileAction(formData)
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      })
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || '이미지 업로드에 실패했습니다.')
+      }
+      const data = await response.json()
+      const url = data.url
 
       editor.chain().focus().setImage({ src: url }).run()
-    } catch (error) {
+    } catch (error: any) {
       console.error('Image upload failed:', error)
-      alert('이미지 업로드에 실패했습니다.')
+      alert(error?.message || '이미지 업로드에 실패했습니다.')
     } finally {
       setIsUploading(false)
       // Reset input value to allow uploading the same file again
@@ -2084,22 +2518,24 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
 
       {/* Floating Menu */}
       <FloatingMenu
-        editor={editor}
-        updateDelay={250}
+        {...({
+          editor,
+          updateDelay: 250,
+          tippyOptions: { appendTo: () => document.body },
+          shouldShow: ({ state, editor }: any) => {
+            if (!editor || !editor.isFocused || editor.view.dragging) return false
+            const { $from, empty } = state.selection
+            if (!empty) return false
 
-        shouldShow={({ state, editor }) => {
-          if (!editor || !editor.isFocused || editor.view.dragging) return false
-          const { $from, empty } = state.selection
-          if (!empty) return false
-          
-          // React rendering 루프 충돌 방지를 위해 일반 paragraph이면서 완전 비어있는 줄일 때만 띄우도록 필터링
-          const isParagraph = $from.parent.type.name === 'paragraph'
-          const isLineEmpty = $from.parent.textContent.length === 0
-          return isParagraph && isLineEmpty
-        }}
+            // React rendering 루프 충돌 방지를 위해 일반 paragraph이면서 완전 비어있는 줄일 때만 띄우도록 필터링
+            const isParagraph = $from.parent.type.name === 'paragraph'
+            const isLineEmpty = $from.parent.textContent.length === 0
+            return isParagraph && isLineEmpty
+          }
+        } as any)}
       >
         <div
-          className="flex bg-[#252525] border border-neutral-700/60 rounded-lg shadow-xl overflow-hidden p-1 transition-all duration-200 transform ease-out -translate-y-6 animate-in fade-in zoom-in-95"
+          className="flex bg-[#252525] border border-neutral-700/60 rounded-lg shadow-xl p-1 transition-all duration-200 transform ease-out -translate-y-6 translate-x-[115px] animate-in fade-in zoom-in-95 z-[99999]"
         >
           <ToolbarButton onClick={addImage} title="이미지 삽입">
             {isUploading ? <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" /> : <ImageIcon size={18} />}
@@ -2114,6 +2550,60 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
               아코디언
             </span>
           </ToolbarButton>
+
+          <ToolbarButton
+            onClick={addButtonLink}
+            title="버튼 스타일 링크 추가"
+          >
+            <span className="flex items-center gap-1 text-[11px] font-bold text-neutral-300 hover:text-white px-1">
+              버튼
+            </span>
+          </ToolbarButton>
+
+          <div className="relative flex items-center">
+            <button
+              onMouseDown={e => e.preventDefault()}
+              onClick={() => setShowEffectDropdown(!showEffectDropdown)}
+              type="button"
+              className={`p-1.5 rounded hover:bg-neutral-800 transition-all flex items-center gap-1 text-[11px] font-bold ${showEffectDropdown ? 'text-blue-400 bg-neutral-800' : 'text-neutral-300 hover:text-white'}`}
+              title="텍스트 효과 (애니메이션) 추가"
+            >
+              <span>✨ 효과</span>
+              <ChevronDown size={12} className={`transition-transform duration-200 ${showEffectDropdown ? 'rotate-180' : ''}`} />
+            </button>
+            {showEffectDropdown && (
+              <div 
+                className="absolute top-full left-0 mt-1.5 bg-[#252525] border border-neutral-700/60 rounded-lg shadow-2xl py-1 z-[99999] min-w-[140px] flex flex-col gap-0.5 animate-in fade-in slide-in-from-top-2 duration-150"
+                onMouseDown={e => e.preventDefault()}
+              >
+                {[
+                  { label: 'Typing Text', value: 'typing' },
+                  { label: 'Splitting Text', value: 'splitting' },
+                  { label: 'Sliding Text', value: 'sliding' },
+                  { label: 'Shimmering Text', value: 'shimmering' },
+                  { label: 'Rolling Text', value: 'rolling' },
+                  { label: 'Rotating Text', value: 'rotating' },
+                  { label: 'Highlight Text', value: 'highlight' },
+                  { label: 'Morphing Text', value: 'morphing' },
+                  { label: 'Gradient Text', value: 'gradient' },
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    onMouseDown={e => e.preventDefault()}
+                    onClick={() => {
+                      editor.chain().focus().insertAnimatedTextGroup({ animationType: opt.value, texts: JSON.stringify(['여기에 움직이는 텍스트를 입력하세요']) }).run()
+                      setShowEffectDropdown(false)
+                    }}
+                    type="button"
+                    className="w-full text-left px-3 py-1.5 text-[11px] font-bold text-neutral-300 hover:text-white hover:bg-neutral-800/80 transition-colors cursor-pointer"
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="w-[1px] h-4 bg-neutral-600 mx-1 self-center" />
           <ToolbarButton onClick={() => editor.chain().focus().insertColumns('50-50').run()} title="50:50 분할 상자"><div className="flex items-center gap-1 text-[10px] font-bold"><Columns2 size={14} />5:5</div></ToolbarButton>
           <ToolbarButton onClick={() => editor.chain().focus().insertColumns('30-70').run()} title="30:70 분할 상자"><div className="flex items-center gap-1 text-[10px] font-bold"><Columns2 size={14} />3:7</div></ToolbarButton>
@@ -2126,29 +2616,35 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
 
       {/* Text Bubble Menu */}
       <BubbleMenu
-        pluginKey="textBubbleMenu"
-        editor={editor}
-        updateDelay={250}
+        {...({
+          pluginKey: "textBubbleMenu",
+          editor,
+          updateDelay: 250,
+          tippyOptions: { appendTo: () => document.body },
+          shouldShow: ({ state, editor }: any) => {
+            if (editor.view.dragging) return false;
+            if (editor.view.composing || isComposingRef.current || isTypingRef.current) return false;
 
-        shouldShow={({ state, editor }) => {
-          if (editor.view.dragging) return false;
-          let hasImage = false;
-          if (editor.isActive('image') || editor.isActive('customImage')) hasImage = true;
-          else if ('node' in state.selection && (state.selection as any).node) {
-            hasImage = (state.selection as any).node.type.name === 'image' || (state.selection as any).node.type.name === 'customImage';
-          } else if (!state.selection.empty) {
-            state.selection.content().content.descendants((node) => {
-              if (node.type.name === 'image' || node.type.name === 'customImage') hasImage = true;
-            });
+            let hasImage = false;
+            if (editor.isActive('image') || editor.isActive('customImage')) hasImage = true;
+            else if ('node' in state.selection && (state.selection as any).node) {
+              hasImage = (state.selection as any).node.type.name === 'image' || (state.selection as any).node.type.name === 'customImage';
+            } else if (!state.selection.empty) {
+              state.selection.content().content.descendants((node: any) => {
+                if (node.type.name === 'image' || node.type.name === 'customImage') hasImage = true;
+              });
+            }
+            if (hasImage) return false;
+
+            // 사용자가 에디터 상에서 글을 활발하게 타이핑(입력)하는 중일 때는 툴바가 타이핑 시야를 방해하지 않도록 즉각 소멸
+            if (isTyping) return false;
+
+            // Selection이 비어있지 않고 에디터가 포커싱된 상태에서만 버블탭 노출 (타이핑 시야 분산 차단)
+            // 노드 단독 선택(NodeSelection) 상태가 아닐 때만 텍스트 버블 메뉴 노출 보장 (모듈 번들러 프로토타입 격리 이슈 타개)
+            const isNodeSel = 'node' in state.selection && (state.selection as any).node;
+            return editor.isFocused && !isNodeSel && !state.selection.empty;
           }
-          if (hasImage) return false;
-          
-          // 사용자가 에디터 상에서 글을 활발하게 타이핑(입력)하는 중일 때는 툴바가 타이핑 시야를 방해하지 않도록 즉각 소멸
-          if (isTyping) return false;
-          
-          // 에디터에 포커스가 유지되어 있고 타이핑을 멈춘 상태(혹은 커서 멈춘 대기선)이거나 드래그 영역 조작 시에만 텍스트 옵션 버블탭 노출
-          return editor.isFocused;
-        }}
+        } as any)}
         className="z-50"
       >
         <div
@@ -2160,178 +2656,451 @@ export default function RichTextEditor({ content, onChange }: RichTextEditorProp
             pointerEvents: showToolbar ? 'auto' : 'none',
             transition: 'opacity 0.28s ease, visibility 0.28s ease, transform 0.28s ease'
           }}
-          className="flex flex-col bg-[#252525] border border-neutral-700/60 rounded-xl shadow-2xl overflow-hidden min-w-[280px] transition-all duration-200 transform ease-out animate-in fade-in zoom-in-95"
+          className="flex flex-col bg-[#252525] border border-neutral-700/60 rounded-xl shadow-2xl min-w-[280px] transition-all duration-200 transform ease-out animate-in fade-in zoom-in-95"
         >
           <div className="flex items-center gap-0.5 p-1 border-b border-neutral-700/60">
-            <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} isActive={editor.isActive('bold')} title="굵게"><Bold size={15} /></ToolbarButton>
-            <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} isActive={editor.isActive('italic')} title="기울임"><Italic size={15} /></ToolbarButton>
-            <ToolbarButton onClick={() => editor.chain().focus().toggleUnderline().run()} isActive={editor.isActive('underline')} title="밑줄"><UnderlineIcon size={15} /></ToolbarButton>
+            <ToolbarButton onClick={toggleBoldSafe} isActive={editor.isActive('bold')} title="굵게"><Bold size={15} /></ToolbarButton>
+            <ToolbarButton onClick={toggleItalicSafe} isActive={editor.isActive('italic')} title="기울임"><Italic size={15} /></ToolbarButton>
+            <ToolbarButton onClick={toggleUnderlineSafe} isActive={editor.isActive('underline')} title="밑줄"><UnderlineIcon size={15} /></ToolbarButton>
             <div className="w-[1px] h-4 bg-neutral-600 mx-1" />
             <ToolbarButton onClick={setLink} isActive={editor.isActive('link')} title="일반 링크 삽입"><LinkIcon size={15} /></ToolbarButton>
             <ToolbarButton onClick={addButtonLink} isActive={false} title="버튼 스타일 링크"><MousePointerSquareDashed size={15} /></ToolbarButton>
           </div>
 
-          <div className="flex flex-col py-1">
-            <div className="flex items-center justify-between px-3 py-1.5 hover:bg-[#333] transition-colors w-full cursor-pointer">
-              <div className="flex items-center gap-3 text-sm text-neutral-200">
-                <span className="text-neutral-400 text-[15px]">✨</span>
-                <span>텍스트 효과</span>
-              </div>
-              <select
-                onChange={e => {
-                  if (e.target.value === '') return
-                  const val = e.target.value;
+              <div className="flex flex-col py-1">
+                <div className="flex items-center justify-between px-3 py-1.5 hover:bg-[#333] transition-colors w-full cursor-pointer">
+                  <div className="flex items-center gap-3 text-sm text-neutral-200">
+                    <span className="text-neutral-400 text-[15px]">✨</span>
+                    <span>텍스트 효과</span>
+                  </div>
+                  <select
+                    onChange={e => {
+                      if (e.target.value === '') return
+                      const val = e.target.value;
 
-                  const { from, to } = editor.state.selection;
-                  const selectedText = editor.state.doc.textBetween(from, to, ' ') || '기본 텍스트';
+                      const { from, to } = editor.state.selection;
+                      const selectedText = editor.state.doc.textBetween(from, to, ' ') || '기본 텍스트';
 
-                  if (val === 'rotating' || val === 'morphing') {
-                    const defaultTexts = [selectedText, "반갑습니다", "환영합니다"];
-                    editor.chain().focus().insertAnimatedTextGroup({ animationType: val, texts: JSON.stringify(defaultTexts) }).run()
-                  } else {
-                    editor.chain().focus().insertAnimatedTextGroup({ animationType: val, texts: JSON.stringify([selectedText]) }).run()
-                  }
-                  e.target.value = ''
-                }}
-                className="bg-transparent text-xs text-neutral-400 outline-none cursor-pointer text-right max-w-[100px]"
-              >
-                <option value="">적용하기...</option>
-                <option value="typing">Typing Text</option>
-                <option value="splitting">Splitting Text</option>
-                <option value="sliding">Sliding Text</option>
-                <option value="shimmering">Shimmering Text</option>
-                <option value="rolling">Rolling Text</option>
-                <option value="rotating">Rotating Text</option>
-                <option value="highlight">Highlight Text</option>
-                <option value="morphing">Morphing Text</option>
-                <option value="gradient">Gradient Text</option>
-              </select>
-            </div>
+                      if (val === 'rotating' || val === 'morphing') {
+                        const defaultTexts = [selectedText, "반갑습니다", "환영합니다"];
+                        editor.chain().focus().insertAnimatedTextGroup({ animationType: val, texts: JSON.stringify(defaultTexts) }).run()
+                      } else {
+                        editor.chain().focus().insertAnimatedTextGroup({ animationType: val, texts: JSON.stringify([selectedText]) }).run()
+                      }
+                      e.target.value = ''
+                    }}
+                    className="bg-transparent text-xs text-neutral-400 outline-none cursor-pointer text-right max-w-[100px]"
+                  >
+                    <option value="">적용하기...</option>
+                    <option value="typing">Typing Text</option>
+                    <option value="splitting">Splitting Text</option>
+                    <option value="sliding">Sliding Text</option>
+                    <option value="shimmering">Shimmering Text</option>
+                    <option value="rolling">Rolling Text</option>
+                    <option value="rotating">Rotating Text</option>
+                    <option value="highlight">Highlight Text</option>
+                    <option value="morphing">Morphing Text</option>
+                    <option value="gradient">Gradient Text</option>
+                  </select>
+                </div>
 
-            <div className="flex items-center justify-between px-3 py-1.5 hover:bg-[#333] transition-colors w-full cursor-pointer">
-              <div className="flex items-center gap-3 text-sm text-neutral-200">
-                <span className="text-neutral-400 font-serif font-bold text-[15px]">A</span>
-                <span>서체 및 크기</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <select
-                  onChange={e => {
-                    if (e.target.value === 'inherit') editor.chain().focus().unsetFontFamily().run()
-                    else editor.chain().focus().setFontFamily(e.target.value).run()
+                <div className="flex items-center justify-between px-3 py-1.5 hover:bg-[#333] transition-colors w-full cursor-pointer">
+                  <div className="flex items-center gap-3 text-sm text-neutral-200">
+                    <span className="text-neutral-400 font-serif font-bold text-[15px]">A</span>
+                    <span>서체 및 크기</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <select
+                      onChange={e => {
+                        if (e.target.value === 'inherit') editor.chain().focus().unsetFontFamily().run()
+                        else editor.chain().focus().setFontFamily(e.target.value).run()
+                      }}
+                      className="bg-transparent text-xs text-neutral-400 outline-none cursor-pointer max-w-[80px]"
+                      value={editor.getAttributes('textStyle').fontFamily || 'inherit'}
+                    >
+                      {FONTS.map(f => <option key={f.value} value={f.value} className="bg-neutral-800">{f.label}</option>)}
+                    </select>
+                    <select
+                      onChange={e => editor.chain().focus().setFontSize(e.target.value).run()}
+                      className="bg-transparent text-xs text-neutral-400 outline-none cursor-pointer max-w-[60px]"
+                      value={editor.getAttributes('textStyle').fontSize || '16px'}
+                    >
+                      {SIZES.map(s => <option key={s.value} value={s.value} className="bg-neutral-800">{s.label}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div
+                  onClick={() => {
+                    const { from, to } = editor.state.selection;
+                    let selectedText = editor.state.doc.textBetween(from, to, ' ').trim() || '여기에 질문을 입력하세요';
+                    // Q. 혹은 Q 접두사 완전히 제거
+                    selectedText = selectedText.replace(/^Q\s*\.\s*/i, '').replace(/^Q\s+/i, '');
+                    editor.chain().focus().insertFaqBlock({ question: selectedText, answer: '여기에 상세 답변을 작성해주세요.' }).run();
                   }}
-                  className="bg-transparent text-xs text-neutral-400 outline-none cursor-pointer max-w-[80px]"
-                  value={editor.getAttributes('textStyle').fontFamily || 'inherit'}
+                  className="flex items-center justify-between px-3 py-2 hover:bg-[#333] transition-colors w-full cursor-pointer border-t border-neutral-700/40"
                 >
-                  {FONTS.map(f => <option key={f.value} value={f.value} className="bg-neutral-800">{f.label}</option>)}
-                </select>
-                <select
-                  onChange={e => editor.chain().focus().setFontSize(e.target.value).run()}
-                  className="bg-transparent text-xs text-neutral-400 outline-none cursor-pointer max-w-[60px]"
-                  value={editor.getAttributes('textStyle').fontSize || '16px'}
-                >
-                  {SIZES.map(s => <option key={s.value} value={s.value} className="bg-neutral-800">{s.label}</option>)}
-                </select>
+                  <div className="flex items-center gap-3 text-sm text-neutral-200">
+                    <span className="font-semibold text-neutral-350">아코디언 (FAQ) 추가</span>
+                  </div>
+                  <span className="text-[10px] text-blue-400 font-extrabold uppercase bg-blue-500/10 px-1.5 py-0.5 rounded">생성</span>
+                </div>
               </div>
             </div>
+          </BubbleMenu>
 
-            <div
-              onClick={() => {
-                const { from, to } = editor.state.selection;
-                let selectedText = editor.state.doc.textBetween(from, to, ' ').trim() || '여기에 질문을 입력하세요';
-                // Q. 혹은 Q 접두사 완전히 제거
-                selectedText = selectedText.replace(/^Q\s*\.\s*/i, '').replace(/^Q\s+/i, '');
-                editor.chain().focus().insertFaqBlock({ question: selectedText, answer: '여기에 상세 답변을 작성해주세요.' }).run();
-              }}
-              className="flex items-center justify-between px-3 py-2 hover:bg-[#333] transition-colors w-full cursor-pointer border-t border-neutral-700/40"
-            >
-              <div className="flex items-center gap-3 text-sm text-neutral-200">
-                <span className="font-semibold text-neutral-300">아코디언 (FAQ) 추가</span>
-              </div>
-              <span className="text-[10px] text-blue-400 font-extrabold uppercase bg-blue-500/10 px-1.5 py-0.5 rounded">생성</span>
-            </div>
-          </div>
-        </div>
-      </BubbleMenu>
-
-      {/* Image Bubble Menu */}
-      <BubbleMenu
-        pluginKey="imageBubbleMenu"
-        editor={editor}
-        updateDelay={100}
-
-        shouldShow={({ state, editor }) => {
-          if (editor.view.dragging) return false;
-          let hasImage = false;
-          if (editor.isActive('image') || editor.isActive('customImage')) hasImage = true;
-          else if ('node' in state.selection && (state.selection as any).node) {
-            hasImage = (state.selection as any).node.type.name === 'image' || (state.selection as any).node.type.name === 'customImage';
-          }
-          return hasImage;
-        }}
-        className="z-50"
-      >
-        <div
-          className="flex flex-col gap-1 p-1.5 px-2 bg-[#2d2d2d] rounded-xl shadow-xl overflow-hidden text-white border border-neutral-700/60 w-max transition-all duration-200 transform ease-out animate-in fade-in zoom-in-95"
-        >
-          <div className="flex items-center gap-1 w-full justify-between">
-            <ToolbarButton onClick={() => editor.chain().focus().setImageAlign('left').run()} isActive={editor.getAttributes('customImage').align === 'left'} title="이미지 왼쪽으로 (텍스트 감싸기)">
-              <span className="text-[11px] font-bold text-neutral-300 px-1">좌측배치</span>
-            </ToolbarButton>
-            <ToolbarButton onClick={() => editor.chain().focus().setImageAlign('center').run()} isActive={editor.getAttributes('customImage').align === 'center' || !editor.getAttributes('customImage').align} title="이미지 가운데로">
-              <span className="text-[11px] font-bold text-neutral-300 px-1">가운데</span>
-            </ToolbarButton>
-            <ToolbarButton onClick={() => editor.chain().focus().setImageAlign('right').run()} isActive={editor.getAttributes('customImage').align === 'right'} title="이미지 오른쪽으로 (텍스트 감싸기)">
-              <span className="text-[11px] font-bold text-neutral-300 px-1">우측배치</span>
-            </ToolbarButton>
-            <div className="w-[1px] h-4 bg-neutral-600 mx-1" />
-            <ImageSizeInputs editor={editor} />
-            <div className="w-[1px] h-4 bg-neutral-600 mx-1" />
-            <ToolbarButton onClick={() => editor.chain().focus().deleteSelection().run()} isActive={false} title="이미지 삭제">
-              <span className="text-[11px] font-bold text-red-400 px-1">삭제</span>
-            </ToolbarButton>
-          </div>
-          <ImageLinkInput editor={editor} />
-        </div>
-      </BubbleMenu>
-
-      {/* Inline Prompt UI */}
-      <AnimatePresence>
-        {promptState && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="p-3 bg-neutral-50 border-b border-neutral-200 flex flex-col sm:flex-row gap-2 items-center w-full shadow-inner relative z-20"
+          {/* Image Bubble Menu */}
+          <BubbleMenu
+            {...({
+              pluginKey: "imageBubbleMenu",
+              editor,
+              updateDelay: 100,
+              tippyOptions: { appendTo: () => document.body },
+              shouldShow: ({ state, editor }: any) => {
+                if (editor.view.dragging) return false;
+                let hasImage = false;
+                if (editor.isActive('image') || editor.isActive('customImage')) hasImage = true;
+                else if ('node' in state.selection && (state.selection as any).node) {
+                  hasImage = (state.selection as any).node.type.name === 'image' || (state.selection as any).node.type.name === 'customImage';
+                }
+                return hasImage;
+              }
+            } as any)}
+            className="z-50"
           >
-            <div className="text-xs font-bold text-neutral-600 shrink-0 min-w-[70px]">
-              🔗 링크 추가
+            <div
+              className="flex flex-col gap-1 p-1.5 px-2 bg-[#2d2d2d] rounded-xl shadow-xl overflow-hidden text-white border border-neutral-700/60 w-max transition-all duration-200 transform ease-out animate-in fade-in zoom-in-95"
+            >
+              <div className="flex items-center gap-1 w-full justify-between">
+                <ToolbarButton onClick={() => editor.chain().focus().setImageAlign('left').run()} isActive={editor.getAttributes('customImage').align === 'left'} title="이미지 좌측 배치">
+                  <span className="text-[11px] font-bold text-neutral-300 px-1">좌측배치</span>
+                </ToolbarButton>
+                <ToolbarButton onClick={() => editor.chain().focus().setImageAlign('center').run()} isActive={editor.getAttributes('customImage').align === 'center' || !editor.getAttributes('customImage').align} title="가운데">
+                  <span className="text-[11px] font-bold text-neutral-300 px-1">가운데</span>
+                </ToolbarButton>
+                <ToolbarButton onClick={() => editor.chain().focus().setImageAlign('right').run()} isActive={editor.getAttributes('customImage').align === 'right'} title="이미지 우측 배치">
+                  <span className="text-[11px] font-bold text-neutral-300 px-1">우측배치</span>
+                </ToolbarButton>
+                <div className="w-[1px] h-4 bg-neutral-600 mx-1" />
+                <ImageSizeInputs editor={editor} />
+                <div className="w-[1px] h-4 bg-neutral-600 mx-1" />
+                <ToolbarButton onClick={() => editor.chain().focus().deleteSelection().run()} isActive={false} title="이미지 삭제">
+                  <span className="text-[11px] font-bold text-red-400 px-1">삭제</span>
+                </ToolbarButton>
+              </div>
+              <ImageLinkInput editor={editor} />
             </div>
+          </BubbleMenu>
 
-            <div className="flex-1 w-full flex flex-col sm:flex-row gap-2 items-center">
-              <input
-                type="text"
-                placeholder="이동할 URL (https://...)"
-                value={promptState.url}
-                onChange={e => setPromptState({ ...promptState, url: e.target.value })}
-                className="px-3 py-1.5 text-sm border border-neutral-300 rounded outline-none focus:border-blue-500 flex-1 w-full"
-                autoFocus
-                onKeyDown={e => { if (e.key === 'Enter') handlePromptSubmit() }}
-              />
-
-              <div className="flex gap-2 w-full sm:w-auto justify-end shrink-0">
-                <button onClick={handlePromptCancel} className="px-3 py-1.5 text-xs font-bold text-neutral-500 hover:text-neutral-700 bg-white border border-neutral-200 rounded">취소</button>
-                <button onClick={handlePromptSubmit} className="px-4 py-1.5 text-xs font-bold bg-blue-600 text-white rounded hover:bg-blue-700 shadow-sm">적용</button>
+          {/* Columns Bubble Menu */}
+          <BubbleMenu
+            {...({
+              pluginKey: "columnsBubbleMenu",
+              editor,
+              updateDelay: 100,
+              tippyOptions: { appendTo: () => document.body },
+              shouldShow: ({ state, editor }: any) => {
+                if (editor.view.dragging) return false;
+                // TypeScript unknown 속성 에러 방지를 위해 any 타입 캐스팅 적용
+                const { selection } = state;
+                const isNodeSelected = 'node' in selection && (selection as any).node;
+                if (isNodeSelected) {
+                  return (selection as any).node.type.name === 'columnBlock';
+                }
+                return false;
+              }
+            } as any)}
+            className="z-50"
+          >
+            <div
+              className="flex flex-col gap-1 p-1.5 px-2 bg-[#2d2d2d] rounded-xl shadow-xl overflow-hidden text-white border border-neutral-700/60 w-max transition-all duration-200 transform ease-out animate-in fade-in zoom-in-95"
+            >
+              <div className="flex items-center gap-1 w-full justify-between">
+                <span className="text-[10px] text-neutral-400 font-extrabold px-1.5 select-none uppercase tracking-wider">단락 레이아웃 프리셋:</span>
+                <ToolbarButton onClick={() => editor.chain().focus().setColumnsLayout('50-50').run()} isActive={editor.getAttributes('columnBlock').layout === '50-50'} title="5:5 분할">
+                  <span className="text-[11px] font-bold text-neutral-300 px-1">5:5</span>
+                </ToolbarButton>
+                <ToolbarButton onClick={() => editor.chain().focus().setColumnsLayout('33-33-33').run()} isActive={editor.getAttributes('columnBlock').layout === '33-33-33'} title="3:3:3 분할">
+                  <span className="text-[11px] font-bold text-neutral-300 px-1">3:3:3</span>
+                </ToolbarButton>
+                <ToolbarButton onClick={() => editor.chain().focus().setColumnsLayout('40-60').run()} isActive={editor.getAttributes('columnBlock').layout === '40-60'} title="4:6 분할">
+                  <span className="text-[11px] font-bold text-neutral-300 px-1">4:6</span>
+                </ToolbarButton>
+                <ToolbarButton onClick={() => editor.chain().focus().setColumnsLayout('60-40').run()} isActive={editor.getAttributes('columnBlock').layout === '60-40'} title="6:4 분할">
+                  <span className="text-[11px] font-bold text-neutral-300 px-1">6:4</span>
+                </ToolbarButton>
+                <ToolbarButton onClick={() => editor.chain().focus().setColumnsLayout('30-70').run()} isActive={editor.getAttributes('columnBlock').layout === '30-70'} title="3:7 분할">
+                  <span className="text-[11px] font-bold text-neutral-300 px-1">3:7</span>
+                </ToolbarButton>
+                <ToolbarButton onClick={() => editor.chain().focus().setColumnsLayout('70-30').run()} isActive={editor.getAttributes('columnBlock').layout === '70-30'} title="7:3 분할">
+                  <span className="text-[11px] font-bold text-neutral-300 px-1">7:3</span>
+                </ToolbarButton>
+                <div className="w-[1px] h-4 bg-neutral-600 mx-1" />
+                <ToolbarButton onClick={() => editor.chain().focus().deleteSelection().run()} isActive={false} title="컬럼 블록 삭제">
+                  <span className="text-[11px] font-bold text-red-400 px-1">블록 삭제</span>
+                </ToolbarButton>
               </div>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </BubbleMenu>
+
+
 
       {/* Tiptap content area */}
-      <div className="p-4 sm:p-6 bg-white min-h-[150px] cursor-text" onClick={() => { if (!promptState) editor.commands.focus() }}>
+      <div className="p-4 sm:p-6 bg-white min-h-[150px] cursor-text border border-neutral-200/80 rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.03),_0_1px_3px_rgba(0,0,0,0.01)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.05)] transition-all duration-300" onClick={() => { if (!promptState) editor.commands.focus() }}>
         <input type="file" accept="image/*" onChange={handleImageUpload} disabled={isUploading} className="hidden" ref={fileInputRef} />
         <EditorContent editor={editor} />
       </div>
+
+      {/* Blueprint Dynamic Style */}
+      {blueprintMode && (
+        <style>{`
+          .tiptap [data-button-link],
+          .tiptap [data-animated-group],
+          .tiptap .faq-block-container,
+          .tiptap [data-type="column-block"] {
+            outline: 2.5px dashed rgba(59, 130, 246, 0.6) !important;
+            outline-offset: 6px !important;
+            position: relative !important;
+            border-radius: 8px !important;
+            background-color: rgba(59, 130, 246, 0.015) !important;
+            transition: all 0.25s ease-in-out !important;
+          }
+          .tiptap [data-button-link]:hover,
+          .tiptap [data-animated-group]:hover,
+          .tiptap .faq-block-container:hover,
+          .tiptap [data-type="column-block"]:hover {
+            outline-color: rgba(59, 130, 246, 0.95) !important;
+            background-color: rgba(59, 130, 246, 0.035) !important;
+          }
+          .tiptap [data-button-link]::after {
+            content: '✦ BUTTON LINK';
+            position: absolute;
+            top: -14px;
+            left: -4px;
+            font-family: sans-serif;
+            font-size: 9px;
+            font-weight: 800;
+            background-color: #3b82f6;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 6px;
+            pointer-events: none;
+            z-index: 40;
+            letter-spacing: 0.05em;
+            box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
+          }
+          .tiptap [data-animated-group]::after {
+            content: '✦ ANIMATE TEXT';
+            position: absolute;
+            top: -14px;
+            left: -4px;
+            font-family: sans-serif;
+            font-size: 9px;
+            font-weight: 800;
+            background-color: #10b981;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 6px;
+            pointer-events: none;
+            z-index: 40;
+            letter-spacing: 0.05em;
+            box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
+          }
+          .tiptap .faq-block-container::after {
+            content: '✦ FAQ ACCORDION';
+            position: absolute;
+            top: -14px;
+            left: -4px;
+            font-family: sans-serif;
+            font-size: 9px;
+            font-weight: 800;
+            background-color: #f59e0b;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 6px;
+            pointer-events: none;
+            z-index: 40;
+            letter-spacing: 0.05em;
+            box-shadow: 0 2px 6px rgba(245, 158, 11, 0.3);
+          }
+          
+          /* Blueprint ON 상태일 때 컬럼 가이드라인 보더 및 핸들 탭 노출 강제 */
+          .tiptap [data-type="column-block"] {
+            border: 2.2px dashed rgba(59, 130, 246, 0.35) !important;
+            padding: 24px 18px 18px 18px !important;
+          }
+          .tiptap .columns-drag-handle-tab {
+            display: flex !important;
+          }
+          .tiptap [data-type="column-block"]:hover {
+            border-color: rgba(59, 130, 246, 0.75) !important;
+          }
+          .tiptap [data-type="column-block"].ProseMirror-selectednode {
+            outline: 2.8px solid rgba(59, 130, 246, 0.95) !important;
+            outline-offset: 4px !important;
+            box-shadow: 0 0 22px rgba(59, 130, 246, 0.28) !important;
+            border-color: rgba(59, 130, 246, 0.9) !important;
+            background-color: rgba(59, 130, 246, 0.035) !important;
+          }
+        `}</style>
+      )}
+
+      {/* Columns Grid Layout & Separator Overrides */}
+      <style>{`
+        /* 1. 부모 Columns Block: CSS Grid System 장착 및 아웃라인 가이드라인 사수 */
+        [data-type="column-block"] {
+          display: block !important;
+          width: 100% !important;
+          margin-top: 2.2rem !important;
+          margin-bottom: 2.2rem !important;
+          border: 2.2px solid transparent !important; /* 기본 상태에서는 보이지 않음 */
+          border-radius: 14px !important;
+          padding: 1.25rem 0 !important; /* 가이드라인 OFF 시 뷰와 완벽한 대칭 대칭 */
+          cursor: default !important; /* 내부 텍스트 선택권 보장을 위해 본체는 기본 커서 */
+          transition: all 0.25s ease-in-out !important;
+        }
+        
+        /* ⠿ Columns Block 물리 드래그 핸들 탭 초정밀 튜닝 */
+        .columns-drag-handle-tab {
+          display: none !important; /* 기본 에디터 모드에서는 숨김 처리 */
+          align-items: center !important;
+          gap: 4px !important;
+          background-color: #3b82f6 !important;
+          color: white !important;
+          font-family: monospace !important;
+          font-size: 8px !important;
+          font-weight: 900 !important;
+          padding: 4px 10px !important; /* 드래그 및 클릭 인지 범위를 극대화 */
+          border-radius: 6px 6px 0 0 !important;
+          cursor: grab !important;
+          user-select: none !important;
+          z-index: 35 !important;
+          letter-spacing: 0.05em !important;
+          box-shadow: 0 -2px 8px rgba(59, 130, 246, 0.15) !important;
+          transition: background-color 0.2s, transform 0.2s !important;
+        }
+        .columns-drag-handle-tab:hover {
+          background-color: #2563eb !important;
+          transform: translateY(-1.5px) !important;
+        }
+        .columns-drag-handle-tab:active {
+          cursor: grabbing !important;
+        }
+        .dark [data-type="column-block"] {
+          border-color: transparent !important;
+        }
+
+        /* 2. 실제 그리드 컨테이너 래퍼 (Content Hole) 스타일 */
+        [data-type="column-block"] .column-block-content-hole {
+          display: grid !important;
+          gap: 1.25rem !important; /* 10분할 중 1의 여백(Gap) 분산 */
+          width: 100% !important;
+        }
+
+        /* 6대 비율 프리셋 오차 없는 실시간 Grid 분할 매핑 (10-Column Grid) */
+        [data-type="column-block"][data-layout="50-50"] .column-block-content-hole {
+          grid-template-columns: repeat(2, minmax(0, 1fr)) !important; /* 5:5 */
+        }
+        [data-type="column-block"][data-layout="33-33-33"] .column-block-content-hole {
+          grid-template-columns: repeat(3, minmax(0, 1fr)) !important; /* 3:3:3 (남은 1은 gap과 패딩 여백 분산) */
+        }
+        [data-type="column-block"][data-layout="40-60"] .column-block-content-hole {
+          grid-template-columns: 4fr 6fr !important; /* 4:6 */
+        }
+        [data-type="column-block"][data-layout="60-40"] .column-block-content-hole {
+          grid-template-columns: 6fr 4fr !important; /* 6:4 */
+        }
+        [data-type="column-block"][data-layout="30-70"] .column-block-content-hole {
+          grid-template-columns: 3fr 7fr !important; /* 3:7 */
+        }
+        [data-type="column-block"][data-layout="70-30"] .column-block-content-hole {
+          grid-template-columns: 7fr 3fr !important; /* 7:3 */
+        }
+
+        /* 3. 자식 Column: 독립된 placeholder dashed card이자 수직 블록 스택 존 */
+        [data-type="column"] {
+          width: 100% !important;
+          min-height: 100px !important;
+          
+          /* 은은한 회색 점선 테두리 placeholder dashed card */
+          border: 1.5px dashed rgba(180, 180, 180, 0.45) !important;
+          border-radius: 12px !important;
+          background-color: rgba(250, 250, 250, 0.3) !important;
+          padding: 1.25rem !important;
+          
+          /* 자식 블록들이 세로 방향으로 차곡차곡 스택 정렬되도록 column 속성 강제 */
+          display: flex !important;
+          flex-direction: column !important;
+          gap: 0.5rem !important;
+          transition: all 0.22s ease-in-out !important;
+        }
+        [data-type="column"]:hover {
+          border-color: rgba(59, 130, 246, 0.5) !important;
+          background-color: rgba(250, 250, 250, 0.6) !important;
+        }
+        
+        .dark [data-type="column"] {
+          border-color: rgba(255, 255, 255, 0.08) !important;
+          background-color: rgba(255, 255, 255, 0.02) !important;
+        }
+        .dark [data-type="column"]:hover {
+          border-color: rgba(59, 130, 246, 0.35) !important;
+          background-color: rgba(255, 255, 255, 0.04) !important;
+        }
+
+        /* Force Tiptap BubbleMenu and FloatingMenu Tippy containers to sit on top of everything */
+        [data-tippy-root],
+        .tippy-box,
+        .tippy-content {
+          z-index: 99999999 !important;
+        }
+
+        /* Elevate the stacking context of empty paragraphs where FloatingMenu renders to prevent container trapping */
+        .tiptap p.is-empty,
+        .tiptap .active-paragraph-focus {
+          position: relative !important;
+          z-index: auto !important;
+        }
+      `}</style>
+
+      {/* Portal Selection Coordinate Link Popup */}
+      {promptState && promptState.type === 'link' && mounted && typeof document !== 'undefined' && (() => {
+        const coords = getSelectionCoords(editor)
+        if (!coords) return null
+        return createPortal(
+          <div
+            className="fixed bg-[#252525] border border-neutral-700/60 rounded-xl shadow-2xl p-2.5 w-[320px] flex items-center gap-2 z-[99999] cursor-default text-left origin-top animate-in fade-in zoom-in-95 duration-150 font-sans text-neutral-200"
+            style={{
+              top: `${coords.top + coords.height + 8}px`,
+              left: `${coords.left + coords.width / 2}px`,
+              transform: 'translateX(-50%)',
+            }}
+            onClick={e => e.stopPropagation()}
+            onMouseDown={e => e.stopPropagation()}
+            onKeyDown={e => e.stopPropagation()}
+            onKeyUp={e => e.stopPropagation()}
+            onKeyPress={e => e.stopPropagation()}
+          >
+            <input
+              type="text"
+              placeholder="연결할 하이퍼링크 URL 입력 (https://...)"
+              value={promptState.url}
+              onChange={e => setPromptState({ ...promptState, url: e.target.value })}
+              className="px-2.5 py-1.5 text-xs bg-neutral-800 text-white border border-neutral-700 rounded-lg outline-none focus:border-blue-500 flex-1 w-full"
+              autoFocus
+              onKeyDown={e => {
+                if (e.key === 'Enter') handlePromptSubmit()
+                if (e.key === 'Escape') handlePromptCancel()
+              }}
+            />
+            <div className="flex gap-1 shrink-0">
+              <button onClick={handlePromptCancel} className="px-2.5 py-1.5 text-[10px] font-bold text-neutral-400 hover:text-white bg-neutral-850 rounded-lg">취소</button>
+              <button onClick={handlePromptSubmit} className="px-3 py-1.5 text-[10px] font-bold bg-blue-600 text-white rounded-lg hover:bg-blue-700">적용</button>
+            </div>
+          </div>,
+          document.body
+        )
+      })()}
     </div>
   )
 }

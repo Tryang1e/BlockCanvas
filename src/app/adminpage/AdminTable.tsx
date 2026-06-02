@@ -1,20 +1,46 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { deleteUserAction, updateUserRoleAction, impersonateUserAction } from '@/app/actions/admin'
+import { deleteUserAction, updateUserRoleAction, impersonateUserAction, resetUser2FAAction } from '@/app/actions/admin'
 import Link from 'next/link'
 
 export default function AdminTable({ profiles }: { profiles: any[] }) {
   const router = useRouter()
   const [loading, setLoading] = useState<string | null>(null)
+  const [isMounted, setIsMounted] = useState(false)
+
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
+  // 0. URL helper for subdomain routing
+  const getFullUrl = (subdomain: string, path: string = '') => {
+    if (!isMounted || typeof window === 'undefined') return path
+    const host = window.location.host
+    const protocol = window.location.protocol
+    
+    // Remove current subdomain if exists to get base domain
+    let baseDomain = host
+    if (host.includes('craftopia.work')) {
+      baseDomain = 'craftopia.work'
+    } else if (host.includes('localhost')) {
+      // test.localhost:3000 -> localhost:3000
+      const parts = host.split('.')
+      if (parts.length > 1) {
+        baseDomain = parts[parts.length - 1]
+      }
+    }
+    
+    return `${protocol}//${subdomain}.${baseDomain}${path}`
+  }
   
   // 1. 클릭 시 사용자 상세 정보를 확인하는 모달 상태
   const [selectedUserProfile, setSelectedUserProfile] = useState<any | null>(null)
   
   const [modalConfig, setModalConfig] = useState<{
     isOpen: boolean;
-    type: 'role' | 'delete' | null;
+    type: 'role' | 'delete' | 'reset2fa' | null;
     targetId: string | null;
     targetName: string | null;
     targetRole: string | null;
@@ -36,6 +62,10 @@ export default function AdminTable({ profiles }: { profiles: any[] }) {
     setModalConfig({ isOpen: true, type: 'delete', targetId: id, targetName: name, targetRole: null, selectedRole: '' })
   }
 
+  const openReset2FAModal = (id: string, name: string) => {
+    setModalConfig({ isOpen: true, type: 'reset2fa', targetId: id, targetName: name, targetRole: null, selectedRole: '' })
+  }
+
   const closeModal = () => {
     setModalConfig({ isOpen: false, type: null, targetId: null, targetName: null, targetRole: null, selectedRole: '' })
   }
@@ -52,6 +82,20 @@ export default function AdminTable({ profiles }: { profiles: any[] }) {
       } else if (modalConfig.type === 'role') {
         const res = await updateUserRoleAction(id, modalConfig.selectedRole)
         if (res?.error) alert(`오류: ${res.error}`)
+      } else if (modalConfig.type === 'reset2fa') {
+        const res = await resetUser2FAAction(id)
+        if (res?.error) {
+          alert(`오류: ${res.error}`)
+        } else {
+          alert('해당 사용자의 2FA 보안 설정이 성공적으로 초기화되었습니다.')
+          if (selectedUserProfile && selectedUserProfile.id === id) {
+            setSelectedUserProfile({
+              ...selectedUserProfile,
+              two_factor_enabled: false,
+              two_factor_secret: null
+            })
+          }
+        }
       }
     } catch (err: any) {
       alert(`오류: ${err.message || '서버 통신 실패'}`)
@@ -78,7 +122,7 @@ export default function AdminTable({ profiles }: { profiles: any[] }) {
         alert(`대리 로그인 실패: ${res.error}`)
       } else {
         // 성공 시 즉각 해당 사용자의 대시보드로 통째로 밀어넣으며 하드 리플레시(세션 갱신)!
-        window.location.href = `/creator/${creatorName}/dashboard`
+        window.location.href = getFullUrl(creatorName, '/dashboard')
       }
     } catch (err: any) {
       alert(`시스템 에러: ${err.message || '네트워크 통신 예외 발생'}`)
@@ -96,6 +140,7 @@ export default function AdminTable({ profiles }: { profiles: any[] }) {
               <th className="px-6 py-3 font-semibold uppercase">크리에이터 닉네임</th>
               <th className="px-6 py-3 font-semibold uppercase">디스코드 / 이메일</th>
               <th className="px-6 py-3 font-semibold uppercase">권한 (Role)</th>
+              <th className="px-6 py-3 font-semibold uppercase">2차 보안 (2FA)</th>
               <th className="px-6 py-3 font-semibold uppercase">가입일</th>
               <th className="px-6 py-3 font-semibold uppercase text-right">관리 작업</th>
             </tr>
@@ -127,16 +172,38 @@ export default function AdminTable({ profiles }: { profiles: any[] }) {
                       {profile.role}
                     </span>
                   </td>
+                  <td className="px-6 py-4">
+                    {profile.two_factor_enabled ? (
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-200/50 rounded-md text-[10px] font-bold tracking-wide uppercase">
+                          ✅ 활성화
+                        </span>
+                        <button
+                          onClick={() => openReset2FAModal(profile.id, profile.creator_name)}
+                          type="button"
+                          className="px-1.5 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-600 border border-amber-200/40 rounded-md text-[9px] font-bold transition-all"
+                          title="2FA 강제 초기화"
+                        >
+                          초기화
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="px-2 py-0.5 bg-neutral-50 text-neutral-400 border border-neutral-200/50 rounded-md text-[10px] font-bold tracking-wide uppercase">
+                        미설정
+                      </span>
+                    )}
+                  </td>
                   <td className="px-6 py-4 tabular-nums text-xs">
-                  {new Date(profile.created_at).toLocaleDateString()}
+                  {isMounted ? new Date(profile.created_at).toLocaleDateString() : ''}
                   </td>
                   <td className="px-6 py-4 text-right space-x-3">
-                    <Link 
-                      href={`/creator/${profile.creator_name}/dashboard`}
+                    <a 
+                      href={getFullUrl(profile.creator_name, '/dashboard')}
+                      target="_blank"
                       className="text-neutral-600 hover:text-neutral-900 hover:underline font-bold text-[11px] uppercase"
                     >
                       대시보드 보기
-                    </Link>
+                    </a>
                     <button 
                       onClick={() => openRoleModal(profile.id, profile.creator_name, profile.role)}
                       disabled={loading === profile.id}
@@ -166,14 +233,32 @@ export default function AdminTable({ profiles }: { profiles: any[] }) {
       {modalConfig.isOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className={`p-6 border-b ${modalConfig.type === 'delete' ? 'border-red-100 bg-red-50' : 'border-blue-100 bg-blue-50'}`}>
-              <h3 className={`text-lg font-black tracking-tight ${modalConfig.type === 'delete' ? 'text-red-600' : 'text-blue-600'}`}>
-                {modalConfig.type === 'delete' ? '계정 영구 삭제' : '권한 설정'}
+            <div className={`p-6 border-b ${
+              modalConfig.type === 'delete' 
+                ? 'border-red-100 bg-red-50' 
+                : modalConfig.type === 'reset2fa' 
+                  ? 'border-amber-100 bg-amber-50' 
+                  : 'border-blue-100 bg-blue-50'
+            }`}>
+              <h3 className={`text-lg font-black tracking-tight ${
+                modalConfig.type === 'delete' 
+                  ? 'text-red-600' 
+                  : modalConfig.type === 'reset2fa' 
+                    ? 'text-amber-700' 
+                    : 'text-blue-600'
+              }`}>
+                {modalConfig.type === 'delete' 
+                  ? '계정 영구 삭제' 
+                  : modalConfig.type === 'reset2fa' 
+                    ? '2차 보안(2FA) 초기화' 
+                    : '권한 설정'}
               </h3>
             </div>
             <div className="p-6 text-neutral-700 font-medium text-sm leading-relaxed">
               {modalConfig.type === 'delete' ? (
                 <>정말로 <span className="font-bold text-black">{modalConfig.targetName}</span> 사용자를 삭제하시겠습니까?<br/><span className="text-red-500 mt-2 block text-xs font-bold">이 작업은 취소할 수 없으며 모든 데이터가 날아갑니다.</span></>
+              ) : modalConfig.type === 'reset2fa' ? (
+                <>정말로 <span className="font-bold text-black">{modalConfig.targetName}</span> 사용자의 2차 OTP 보안 설정을 해제(초기화)하시겠습니까?<br/><span className="text-amber-600 mt-2 block text-xs font-bold">초기화 시 해당 사용자는 OTP 2차 인증 없이 비밀번호만으로 즉시 로그인할 수 있게 됩니다.</span></>
               ) : (
                 <div className="space-y-4">
                   <p><span className="font-bold text-black">{modalConfig.targetName}</span> 님의 역할을 선택하세요.</p>
@@ -204,14 +289,24 @@ export default function AdminTable({ profiles }: { profiles: any[] }) {
               <button 
                 onClick={confirmAction}
                 disabled={loading !== null || (modalConfig.type === 'role' && modalConfig.selectedRole === modalConfig.targetRole)}
-                className={`px-4 py-2 text-sm font-bold text-white rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 ${modalConfig.type === 'delete' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+                className={`px-4 py-2 text-sm font-bold text-white rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 ${
+                  modalConfig.type === 'delete' 
+                    ? 'bg-red-600 hover:bg-red-700' 
+                    : modalConfig.type === 'reset2fa' 
+                      ? 'bg-amber-600 hover:bg-amber-700' 
+                      : 'bg-blue-600 hover:bg-blue-700'
+                }`}
               >
                 {loading === modalConfig.targetId ? (
                   <>
                     <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin block"></span> 처리중...
                   </>
                 ) : (
-                  modalConfig.type === 'delete' ? '삭제하기' : '저장하기'
+                  modalConfig.type === 'delete' 
+                    ? '삭제하기' 
+                    : modalConfig.type === 'reset2fa' 
+                      ? '초기화하기' 
+                      : '저장하기'
                 )}
               </button>
             </div>
@@ -292,9 +387,22 @@ export default function AdminTable({ profiles }: { profiles: any[] }) {
                 </div>
 
                 <div className="flex justify-between items-center py-1">
+                  <span className="text-neutral-400">2차 보안 인증 (2FA)</span>
+                  {selectedUserProfile.two_factor_enabled ? (
+                    <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-200/50 rounded-md text-[10px] font-bold tracking-wide uppercase font-bold">
+                      ✅ 활성화됨
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-0.5 bg-neutral-100 text-neutral-400 border border-neutral-200/50 rounded-md text-[10px] font-bold tracking-wide uppercase">
+                      비활성화
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex justify-between items-center py-1">
                   <span className="text-neutral-400">가입 날짜</span>
                   <span className="text-neutral-800 dark:text-white">
-                    {new Date(selectedUserProfile.created_at).toLocaleString()}
+                    {isMounted ? new Date(selectedUserProfile.created_at).toLocaleString() : ''}
                   </span>
                 </div>
               </div>
@@ -306,23 +414,23 @@ export default function AdminTable({ profiles }: { profiles: any[] }) {
                 </h4>
                 <div className="grid grid-cols-2 gap-2.5">
                   {/* 1. 사용자 대시보드 바로가기 */}
-                  <Link
-                    href={`/creator/${selectedUserProfile.creator_name}/dashboard`}
+                  <a
+                    href={getFullUrl(selectedUserProfile.creator_name, '/dashboard')}
                     target="_blank"
                     className="px-3 py-3 bg-neutral-50 hover:bg-neutral-100 dark:bg-neutral-950/40 dark:hover:bg-neutral-950 border border-neutral-200/50 dark:border-neutral-800/80 text-neutral-700 dark:text-neutral-300 rounded-2xl text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 active:scale-[0.98]"
                   >
                     <span>📊 대시보드 이동</span>
-                  </Link>
+                  </a>
 
                   {/* 2. 포트폴리오 사이트 바로가기 (비활성 시 disabled 및 디밍) */}
                   {selectedUserProfile.portfolios && selectedUserProfile.portfolios.is_published ? (
-                    <Link
-                      href={`/creator/${selectedUserProfile.creator_name}`}
+                    <a
+                      href={getFullUrl(selectedUserProfile.creator_name)}
                       target="_blank"
                       className="px-3 py-3 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/20 dark:hover:bg-indigo-950/40 border border-indigo-200/50 dark:border-indigo-900/40 text-indigo-600 dark:text-indigo-400 rounded-2xl text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 active:scale-[0.98]"
                     >
                       <span>🎨 포트폴리오 가기</span>
-                    </Link>
+                    </a>
                   ) : (
                     <button
                       type="button"
@@ -352,6 +460,20 @@ export default function AdminTable({ profiles }: { profiles: any[] }) {
                   className="w-full sm:w-auto px-4 py-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/20 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-900/40 text-rose-600 dark:text-rose-400 rounded-xl text-xs font-bold transition-all text-center flex items-center justify-center gap-1 active:scale-[0.98]"
                 >
                   🔑 비밀번호 리셋하러 가기
+                </button>
+              )}
+
+              {/* 🔒 2FA 강제 초기화 단추 */}
+              {selectedUserProfile.two_factor_enabled && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedUserProfile(null)
+                    openReset2FAModal(selectedUserProfile.id, selectedUserProfile.creator_name)
+                  }}
+                  className="w-full sm:w-auto px-4 py-2.5 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/20 dark:hover:bg-amber-950/40 border border-amber-200 dark:border-amber-900/40 text-amber-600 dark:text-amber-400 rounded-xl text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 active:scale-[0.98]"
+                >
+                  🔒 2FA 보안 해제하기
                 </button>
               )}
 

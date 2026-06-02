@@ -1,31 +1,47 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { uploadFileAction } from '@/app/actions/upload'
 import { updateBannerAction } from '@/app/actions/banner'
 import { useRouter } from 'next/navigation'
+import ImageCropperModal from '@/components/ui/ImageCropperModal'
 
 export default function BannerUploadButton({ creatorName, currentBanner }: { creatorName: string, currentBanner: string }) {
   const [isUploading, setIsUploading] = useState(false)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [isCropperOpen, setIsCropperOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    setSelectedFile(file)
+    setIsCropperOpen(true)
+  }
 
+  const handleCropComplete = async (croppedFile: File) => {
+    setIsCropperOpen(false)
     setIsUploading(true)
     try {
       const formData = new FormData()
-      formData.append('file', file)
+      formData.append('file', croppedFile)
       
-      const url = await uploadFileAction(formData)
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      })
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || '배너 업로드에 실패했습니다.')
+      }
+      const data = await response.json()
+      const url = data.url
       if (url) {
         await updateBannerAction(creatorName, url)
         window.location.reload()
       }
-    } catch (err) {
-      alert('배너 업로드 실패')
+    } catch (err: any) {
+      alert(err?.message || '배너 업로드 실패')
       console.error(err)
     }
     setIsUploading(false)
@@ -67,6 +83,14 @@ export default function BannerUploadButton({ creatorName, currentBanner }: { cre
         className="hidden" 
         ref={fileInputRef} 
         onChange={handleFileChange} 
+      />
+
+      <ImageCropperModal
+        isOpen={isCropperOpen}
+        file={selectedFile}
+        cropType="rect"
+        onClose={() => setIsCropperOpen(false)}
+        onCrop={handleCropComplete}
       />
     </div>
   )

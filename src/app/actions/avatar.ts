@@ -16,6 +16,6 @@ export async function updateAvatarAction(creatorName: string, avatarUrl: string 
     data: { avatar_url: avatarUrl }
   })
 
-  revalidatePath(`/creator/${creatorName}`)
+  revalidatePath(`/sites/${creatorName}`)
   return { success: true }
 }

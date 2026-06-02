@@ -82,8 +82,12 @@ export async function GET(request: Request) {
       if (url.includes('instagram.com')) favicon = 'https://static.cdninstagram.com/rsrc.php/v3/yI/r/VsKofmUGAk-.png';
     }
     if (favicon && !favicon.startsWith('http')) {
-      const urlObj = new URL(url);
-      favicon = new URL(favicon, urlObj.origin).toString();
+      try {
+        const urlObj = new URL(url);
+        favicon = new URL(favicon, urlObj.origin).toString();
+      } catch (e) {
+        // ignore
+      }
     }
     
     // Attempt to make image URL absolute if it is relative

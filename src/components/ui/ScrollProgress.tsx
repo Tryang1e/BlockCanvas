@@ -10,6 +10,13 @@ interface ScrollProgressContextType {
 
 const ScrollProgressContext = createContext<ScrollProgressContextType | null>(null);
 
+// 서버/클라이언트 불일치 방지용 전역 마운트 검사 헬퍼
+const useIsMounted = () => {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  return mounted;
+};
+
 // 가장 가까운 스크롤 가능한 부모 엘리먼트를 실시간 자동 색출하는 지능형 헬퍼 함수
 function getScrollParent(node: HTMLElement | null): HTMLElement | null {
   if (!node) return null;
@@ -84,7 +91,11 @@ export function ScrollProgress({
   className?: string;
   [key: string]: any;
 }) {
+  const mounted = useIsMounted();
   const context = useScrollProgress();
+
+  if (!mounted) return null;
+
   const scrollYProgress = context?.scrollYProgress;
 
   const style: React.CSSProperties = {
@@ -109,10 +120,10 @@ export function ScrollProgress({
     scaleY: mode === 'scaleY' || mode === 'height' ? scrollYProgress : 1,
   };
 
-  // Animate UI 공식 디자인 미학: 그림자 없이 아주 절제되고 슬릭(Sleek)하며 모던한 단일 하이엔드 테마 컬러 바 렌더링
   return (
     <motion.div
       style={motionStyle}
+      initial={false}
       className={cn(
         "bg-[#313131] dark:bg-white transition-colors",
         className

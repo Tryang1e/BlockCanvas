@@ -82,7 +82,9 @@ function ProjectCard({ project, creatorName, isOwner, isOverlay, onOpenProject, 
     transform: CSS.Transform.toString(transform),
     transition,
     zIndex: isOverlay ? 999 : isDragging ? 0 : 1,
-    opacity: isDragging && !isOverlay ? 0 : 1,
+    opacity: isDragging && !isOverlay ? 0.35 : 1,
+    border: isDragging && !isOverlay ? '3px dashed rgba(59,130,246,0.6)' : undefined,
+    backgroundColor: isDragging && !isOverlay ? 'rgba(59,130,246,0.03)' : undefined,
     borderRadius: 'var(--card-corner-radius, 0px)',
     height: isGridItem ? calculatedHeight : undefined, // 이미지 그리드일 때만 기하학적 정밀 수식 작동!
     aspectRatio: isGridItem ? undefined : '16 / 9', // 일반 비디오 섹션 등에서는 오리지널 16:9 보장!

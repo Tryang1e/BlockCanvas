@@ -6,6 +6,8 @@ import Image from 'next/image'
 import { ArrowRight, Sparkles, Move, Users, Shield, Cpu, Compass, ArrowUp, Mail } from 'lucide-react'
 import InfiniteMarquee from '@/components/ui/InfiniteMarquee'
 import CustomCursor from '@/components/ui/CustomCursor'
+import UserSidebar from '@/components/layout/UserSidebar'
+import LandingScroll from '@/components/ui/LandingScroll'
 
 // Import GSAP safely
 import { gsap } from 'gsap'
@@ -32,9 +34,10 @@ interface CreatorProfile {
 
 interface Props {
   creators: CreatorProfile[];
+  userProfile: any;
 }
 
-export default function MainLandingClient({ creators }: Props) {
+export default function MainLandingClient({ creators, userProfile }: Props) {
   const [scrollProgress, setScrollProgress] = useState(0)
 
   // Track active slide index for vertical side dot navigation
@@ -581,475 +584,442 @@ export default function MainLandingClient({ creators }: Props) {
     }
   }, [creators])
 
-  const mergedCreators = [
-    ...creators,
-    ...(creators.length < 5 ? [
-      {
-        id: 'staff-1',
-        creator_name: 'steve_builder',
-        display_name: 'Steve Buildmaster',
-        avatar_url: null,
-        role: 'creator',
-        portfolios: {
-          headline: 'Chief Spatial & Monolith Architect',
-          about_text: '웅장한 천상 제국 돔 성곽 및 판타지 요새 총괄 설계 담당 주석 아티스트'
-        }
-      },
-      {
-        id: 'staff-2',
-        creator_name: 'level_designer_x',
-        display_name: 'Alex Design',
-        avatar_url: null,
-        role: 'creator',
-        portfolios: {
-          headline: 'Lead Megacity Level Designer',
-          about_text: '한 칸의 오차도 없는 완벽한 하이테크 미래 메트로폴리스 도시 구획 감독'
-        }
-      },
-      {
-        id: 'staff-3',
-        creator_name: 'mc_pixel_art',
-        display_name: 'PixelCraft',
-        avatar_url: null,
-        role: 'creator',
-        portfolios: {
-          headline: 'Asset Architecture Director',
-          about_text: '인게임 거대 3D 입체 조형물 및 자산 모듈 총괄 관리 이사'
-        }
-      }
-    ] : [])
-  ] as any[]
+  const mergedCreators = creators as any[]
 
   return (
-    <div
-      ref={mainContainerRef}
-      className="min-h-screen bg-[#FAF9F5] text-[#1E2022] font-sans overflow-x-hidden selection:bg-black selection:text-white relative cursor-default w-full"
-    >
-      {/* 📐 Premium Native CSS Scroll Snapping Engine - Delegated to high-perf JS sweep controller */}
-      <style dangerouslySetInnerHTML={{
-        __html: `
-        html, body {
-          scroll-behavior: smooth !important;
-          overflow-y: auto !important;
-          overflow-x: hidden !important;
-        }
-        .snap-section {
-          height: 100vh !important;
-          height: 100dvh !important;
-          position: relative !important;
-          overflow: hidden !important;
-        }
-      `}} />
-
-      {/* 🎯 Premium Dynamic Mix-blend Custom Circle Cursor */}
-      <CustomCursor />
-
-      {/* 🧭 Premium Vertical Section Navigation Indicators */}
-      <div className="fixed right-6 top-1/2 -translate-y-1/2 text[1px] z-40 hidden md:flex flex-col gap-4">
-        {[
-          { label: 'Main', idx: 0 },
-          { label: 'About Us', idx: 1 },
-          { label: 'Creators', idx: 2 }
-        ].map((item) => {
-          const isActive = currentIdx === item.idx
-          return (
-            <button
-              key={item.idx}
-              onClick={() => {
-                if (typeof window !== 'undefined' && (window as any).scrollToLandingIdx) {
-                  (window as any).scrollToLandingIdx(item.idx)
-                }
-              }}
-              className="group relative flex items-center justify-end focus:outline-none pointer-events-auto"
-            >
-              <span className="absolute right-8 bg-neutral-900/90 backdrop-blur-md text-white text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md opacity-0 translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 pointer-events-none whitespace-nowrap shadow-md">
-                {item.label}
-              </span>
-              <div
-                className={`w-3.5 h-3.5 rounded-full flex items-center justify-center transition-all duration-300 ${isActive
-                  ? 'border-2 border-black bg-transparent scale-110'
-                  : 'bg-neutral-300 hover:bg-neutral-500 scale-75'
-                  }`}
-              >
-                {isActive && <div className="w-1.5 h-1.5 bg-black rounded-full" />}
-              </div>
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Top thin progress scroll tracking bar */}
+    <LandingScroll>
       <div
-        className="fixed top-0 left-0 h-[3px] bg-black z-50 transition-all duration-100 ease-out"
-        style={{ width: `${scrollProgress}%` }}
-      />
-
-      {/* 🏛️ Pure Minimal Translucent Header Bar */}
-      <header className="fixed top-0 left-0 right-0 z-[45] bg-[#FAF9F5]/75 backdrop-blur-md border-b border-neutral-200/40 py-5 w-full pointer-events-none">
-        <div className="w-full px-6 md:px-12 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3 group magnetic-target pointer-events-auto">
-            <div className="relative w-5 h-5 transition-transform duration-500 group-hover:rotate-90">
-              <Image src="/logo_icon.png" alt="BlockCanvas Logo" fill className="object-contain" />
-            </div>
-            <span className="font-extrabold text-sm tracking-widest uppercase text-black">
-              BLOCKCANVAS
-            </span>
-          </Link>
-
-          <nav className="hidden md:flex items-center gap-8 text-[9px] font-bold text-neutral-400 uppercase tracking-widest pointer-events-auto">
-            <a href="#hero-section" className="hover:text-black transition-colors magnetic-target">Main</a>
-            <a href="#about-section" className="hover:text-black transition-colors magnetic-target">About Us</a>
-            <a href="#staff-section" className="hover:text-black transition-colors magnetic-target">Creators</a>
-          </nav>
-
-          <div className="pointer-events-auto">
-            <Link
-              href="/login"
-              className="text-[9px] font-bold text-neutral-400 hover:text-black transition-colors py-1.5 px-4 border border-neutral-200 bg-white hover:bg-neutral-50 magnetic-target"
-            >
-              로그인
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      {/* 🚀 STAGE 1: Hero Section - Extreme Wide Monolith Parallax */}
-      <section
-        id="hero-section"
-        ref={mainHeroRef}
-        className="snap-section w-full bg-[#FAF9F5] flex flex-col justify-center border-b border-neutral-200 relative overflow-hidden"
+        ref={mainContainerRef}
+        className="min-h-screen bg-[#FAF9F5] text-[#1E2022] font-sans overflow-x-hidden selection:bg-black selection:text-white relative cursor-default w-full"
       >
-        {/* Dynamic Space Particles background aligned with creator portfolios */}
-        <div className="absolute inset-0 bg-[#FAF9F5] z-0">
-          <div
-            className="hero-bg-grid absolute inset-0 opacity-30 pointer-events-none origin-center"
-            style={{ backgroundImage: 'linear-gradient(to right, #E2E2D9 1px, transparent 1px), linear-gradient(to bottom, #E2E2D9 1px, transparent 1px)', backgroundSize: '48px 48px' }}
-          />
-          <div
-            ref={heroZoomImgRef}
-            className="absolute inset-0 w-full h-full overflow-hidden origin-center"
-          >
-            <Image
-              src="/Main_Banner.png"
-              alt="BlockCanvas Cinematic Monolith"
-              fill
-              className="object-cover brightness-90 opacity-90"
-              priority
-            />
-            <div className="absolute inset-0 bg-gradient-to-b from-[#FAF9F5]/3 via-transparent to-[#FAF9F5]" />
-          </div>
-        </div>
 
-        {/* Top spacer to account for header heights */}
-        <div className="h-24 md:h-32" />
+        {/* 🎯 Premium Dynamic Mix-blend Custom Circle Cursor */}
+        <CustomCursor />
 
-        <div className="relative z-20 w-full px-6 md:px-12 flex flex-col items-center text-center my-auto">
-          <h1 className="hero-kinetic-title text-6xl md:text-9xl lg:text-[10rem] font-black tracking-tighter leading-[0.85] uppercase select-none luxury-text-heavy flex items-center justify-center gap-0.5 md:gap-1.5">
-            {"BLOCKCANVAS".split("").map((letter, i) => (
-              <span
-                key={i}
-                className="gsap-letter inline-block cursor-default"
-                style={{ display: 'inline-block', transformOrigin: 'bottom center' }}
-              >
-                {letter}
-              </span>
-            ))}
-          </h1>
-        </div>
-      </section>
-
-      {/* 🏛️ STAGE 2.5: Brand Mission About Section (pixelnetwork.kr/#about 레이아웃 구조 차용, 디자인 톤앤매너 완벽 유지) */}
-      <section
-        id="about-section"
-        className="snap-section w-full bg-[#FAF9F5] flex flex-col justify-center px-6 md:px-12 relative overflow-hidden z-20 border-b border-neutral-200"
-      >
-        {/* Dynamic Watermark Background Layer wrapped safely to prevent horizontal overflow */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-          <div className="about-watermark absolute top-[-5%] left-[-2%] text-[24vw] font-black text-neutral-900 opacity-[0.02] select-none tracking-tighter uppercase leading-none">
-            canvas
-          </div>
-        </div>
-
-        {/* CAD Blueprint grid overlay matching drawing-board aesthetic */}
-        <div className="absolute inset-0 opacity-[0.015] pointer-events-none" style={{ backgroundImage: 'linear-gradient(to right, #000 1px, transparent 1px), linear-gradient(to bottom, #000 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
-
-        <div className="about-content-box w-full max-w-5xl mx-auto text-left relative z-10 flex flex-col justify-center items-start">
-          <span className="text-neutral-400 text-[16px] font-bold uppercase tracking-widest mb-4 block flex items-center gap-1.5 font-mono">
-            <Compass size={11} className="text-neutral-400 animate-spin" style={{ animationDuration: '6s' }} />
-            <span>About Us</span>
-          </span>
-
-          {/* Heading - Dynamic contrast layout matching pixelnetwork */}
-          <h2 className="text-5xl md:text-7xl lg:text-[5.4rem] text-neutral-900 leading-[1.1] tracking-tighter mb-12 w-full">
-            <span className="uppercase block luxury-text-heavy-dark select-none">BLOCKCANVAS</span>
-            <span className="font-light text-neutral-400 block mt-4 text-3xl md:text-5xl lg:text-[2.8rem] tracking-tight">크리에이터들을 위한 공간</span>
-          </h2>
-
-          {/* Core description paragraphs split layout */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-24 w-full mt-6">
-            <p className="text-base md:text-[1.125rem] text-[#333333] font-normal leading-relaxed">
-              BlockCanvas는 여러 크리에이터들이 좁은 공간에 머무르지 않고, 더 넓은 세상에서 아티스트로서 온전한 가치를 인정받을 수 있는 혁신적인 커뮤니티를 지향합니다. 크리에이터가 중심이 되어 높은 신뢰도와 상상력을 바탕으로 각 분야 최고의 디자이너들과 함께합니다.
-            </p>
-            <p className="text-base md:text-[1.125rem] text-[#333333] font-normal leading-relaxed">
-              단순한 퀄리티를 넘어 여러 크리에이터가 한대 모여 수 많은 작품들을 남겨 여러 이용자들에게 온전히 다가갈 수 있도록 공간을 제공합니다. 누구나 손쉽게 교류하도록 여러 디자이너에게는 넓은 공간을 크리에이터에게는 다양한 영감을 주는 공간을 제공합니다.
-            </p>
-          </div>
-
-          {/* Premium call-to-action buttons */}
-          <div className="flex flex-row gap-4 items-center mt-12 md:mt-16 w-full pointer-events-auto">
-            <Link
-              href="#staff-section"
-              className="rounded-full bg-neutral-900 text-[#FAF9F5] hover:bg-neutral-800 px-8 py-3.5 text-[12px] font-bold uppercase tracking-widest flex items-center gap-2 transition-all duration-300 shadow-sm hover:shadow-lg magnetic-target"
-            >
-              <Users size={12} />
-              <span>explore creators</span>
-            </Link>
-
-            <Link
-              href="/login"
-              className="rounded-full border border-neutral-900 bg-transparent text-neutral-900 hover:bg-neutral-900 hover:text-[#FAF9F5] px-8 py-3.5 text-[12px] font-bold uppercase tracking-widest transition-all duration-300 magnetic-target"
-            >
-              <span>start building</span>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-
-      {/* 👥 STAGE 4: Guild Architects (수석 빌더 스태프 - 럭셔리 마키 프로필 트랙 + 통합 푸터) */}
-      <section
-        id="staff-section"
-        ref={staffPanelRef}
-        className={`snap-section w-full bg-[#FAF9F5] flex flex-col justify-center relative overflow-hidden transform ${showFooterPopup ? '-translate-y-[80px] scale-[0.98]' : 'translate-y-0 scale-100'
-          }`}
-        style={{ transition: 'all 1.5s cubic-bezier(0.16, 1, 0.3, 1)' }}
-      >
-        <div className="w-full px-6 md:px-12 text-left mb-12 max-w-6xl mx-auto relative z-10">
-          <span className="text-neutral-400 text-[9px] font-bold uppercase tracking-widest mb-2 block flex items-center gap-1.5 font-mono">
-            <Users size={11} className="text-neutral-500" />
-            <span>GUILD ARCHITECTS</span>
-          </span>
-          <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight uppercase luxury-text-heavy-dark">
-            BlockCanvas Creators
-          </h2>
-          <p className="text-[10px] md:text-xs text-neutral-400 font-mono mt-2 uppercase tracking-wider block">
-            [ HOVER OVER CARDS TO PREVIEW THEIR MASTERPIECES & VIEW PORTFOLIOS ]
-          </p>
-        </div>
-
-        <div className="w-full py-8 border-y border-neutral-200/60 bg-[#FAF9F5]/40 backdrop-blur-sm relative overflow-hidden z-10">
-          {/* Technical Telemetry Metadata */}
-          <div className="absolute top-2 left-6 text-[7px] text-neutral-400 font-mono font-bold tracking-widest uppercase z-10 pointer-events-none">
-            [ TRACK STATUS: ACTIVE // SPEED: 30S_LOOP // RESOLVING_GRID: ON ]
-          </div>
-          <div className="absolute top-2 right-6 text-[7px] text-neutral-400 font-mono font-bold tracking-widest uppercase z-10 pointer-events-none">
-            [ ACTIVE_BUILDERS: {mergedCreators.length} // LATENCY: 0.04MS ]
-          </div>
-
-          <InfiniteMarquee speed={30}>
-            {mergedCreators.map((creator, index) => {
-              const avatarSrc = creator.avatar_url || '/default_avatar.png'
-              const bannerSrc = creator.portfolios?.banner_url || '/default_banner.png'
-
-              return (
-                <div
-                  key={creator.id}
-                  className="group relative w-[310px] md:w-[350px] bg-white border border-neutral-200/70 flex flex-col rounded-[32px] transition-all duration-500 ease-out hover:border-black hover:-translate-y-2 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.08)] overflow-hidden pointer-events-auto z-10"
-                >
-                  {/* Banner Image Area - Acts as the Portfolio Cover Banner (Elegant: h-[170px]) */}
-                  <div className="relative w-full h-[170px] bg-neutral-100 overflow-hidden">
-                    <Image
-                      src={bannerSrc}
-                      alt="User Banner"
-                      fill
-                      className="object-cover group-hover:scale-105 transition-transform duration-1000 brightness-95"
-                    />
-
-                    {/* Dark gradient mask on top of banner for tech look */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-black/5 pointer-events-none" />
-
-                    {/* Member sequence number at the top right */}
-                    <div className="absolute top-4 right-4 text-white/50 text-[8px] font-mono font-bold">
-                      #{String(index + 1).padStart(2, '0')}
-                    </div>
-                  </div>
-
-                  {/* Avatar overlapping banner bottom boundary - Render Avatar with custom 3D placeholder if empty */}
-                  <div className="absolute top-[130px] left-1/2 -translate-x-1/2 z-20">
-                    <div className="relative w-[90px] h-[90px] rounded-full flex items-center justify-center bg-white text-white font-black text-xl border-4 border-white shadow-[0_6px_16px_rgba(0,0,0,0.12)] group-hover:scale-105 transition-transform duration-500 overflow-hidden">
-                      <Image src={avatarSrc} alt={creator.display_name} fill className="object-cover" />
-                      {/* Interactive ring overlay */}
-                      <div className="absolute inset-0 rounded-full border-2 border-white/20 opacity-0 group-hover:opacity-100 animate-spin duration-1000 pointer-events-none" style={{ animationDuration: '3s' }} />
-                    </div>
-                  </div>
-
-                  {/* Content Body - Perfectly balanced layout padding */}
-                  <div className="pt-16 px-6 pb-6 flex flex-col justify-between flex-grow text-center">
-                    <div className="mb-4">
-                      <h3 className="text-lg font-black text-black tracking-tight group-hover:text-[#3b82f6] transition-colors">{creator.display_name}</h3>
-                    </div>
-
-                    {/* Premium action button at the bottom */}
-                    <div className="w-full">
-                      <Link
-                        href={`/creator/${creator.creator_name}`}
-                        className="text-[9px] font-black text-black hover:bg-neutral-900 hover:text-[#FAF9F5] transition-all inline-flex items-center gap-1 justify-center py-2.5 px-4 border border-neutral-200 rounded-full w-full hover:border-black transition-all duration-300 magnetic-target"
-                      >
-                        <span>EXPLORE CANVAS</span>
-                        <ArrowRight size={9} className="group-hover:translate-x-0.5 transition-transform duration-300" />
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </InfiniteMarquee>
-        </div>
-      </section>
-
-      <section
-        id="footer-section"
-        className={`fixed bottom-0 left-0 w-full bg-[#1A1A1A] border-t border-[#222222] z-40 transform ${showFooterPopup ? 'translate-y-0 opacity-100 shadow-[0_-30px_60px_rgba(0,0,0,0.4)]' : 'translate-y-full opacity-0 pointer-events-none'
-          }`}
-        style={{ transition: 'all 1.5s cubic-bezier(0.16, 1, 0.3, 1)' }}
-      >
-        <footer className="w-full text-white pt-10 pb-8 px-6 md:px-12 lg:px-24 pointer-events-auto">
-          <div className="max-w-[1200px] mx-auto">
-
-            {/* Top Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-8 mb-8 text-left">
-
-              {/* Column 1: Support / Inquiry */}
-              <div className="md:col-span-4 flex flex-col">
-                <h3 className="text-[#888888] font-bold text-xs mb-6 tracking-widest uppercase">Support Canvas</h3>
-
-                <div
-                  onClick={(e) => {
-                    e.preventDefault()
-                  }}
-                  className="bg-transparent hover:bg-[#222222] border border-transparent hover:border-[#333333] transition-all rounded-lg p-4 flex items-center justify-between group mb-2 cursor-default select-none"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded bg-[#333333] flex items-center justify-center text-[#AAAAAA] group-hover:text-[#FF424D] transition-colors">
-                      <Mail size={16} />
-                    </div>
-                    <span className="font-semibold text-xs text-[#CCCCCC] group-hover:text-white transition-colors">Contact Us</span>
-                  </div>
-                  <span className="text-[#666666] group-hover:text-white transition-colors">→</span>
-                </div>
-
-                <a href="mailto:support@blockcanvas.com" className="bg-transparent hover:bg-[#222222] border border-transparent hover:border-[#333333] transition-all rounded-lg p-4 flex items-center justify-between group cursor-pointer">
-                  <span className="font-semibold text-xs text-[#CCCCCC] group-hover:text-white transition-colors ml-11">Business Inquiry</span>
-                  <span className="text-[#666666] group-hover:text-white transition-colors">↗</span>
-                </a>
-              </div>
-
-              {/* Column 2: Site Map */}
-              <div className="md:col-span-3 md:col-start-6 flex flex-col">
-                <h3 className="text-[#888888] font-bold text-xs mb-6 tracking-widest uppercase">Site</h3>
-                <ul className="space-y-1">
-                  <li>
-                    <button
-                      onClick={() => {
-                        toggleFooterPopup(false)
-                        if (typeof window !== 'undefined' && (window as any).scrollToLandingIdx) {
-                          (window as any).scrollToLandingIdx(0)
-                        }
-                      }}
-                      className="flex items-center justify-between w-full p-3 rounded-lg hover:bg-[#222222] group transition-all text-[#CCCCCC] hover:text-white text-xs cursor-pointer focus:outline-none"
-                    >
-                      <span className="font-semibold">Home</span>
-                      <span className="text-[#666666] group-hover:text-white transition-colors text-sm">→</span>
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      onClick={() => {
-                        toggleFooterPopup(false)
-                        if (typeof window !== 'undefined' && (window as any).scrollToLandingIdx) {
-                          (window as any).scrollToLandingIdx(1)
-                        }
-                      }}
-                      className="flex items-center justify-between w-full p-3 rounded-lg hover:bg-[#222222] group transition-all text-[#CCCCCC] hover:text-white text-xs cursor-pointer focus:outline-none"
-                    >
-                      <span className="font-semibold">About Us</span>
-                      <span className="text-[#666666] group-hover:text-white transition-colors text-sm">↓</span>
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      onClick={() => {
-                        toggleFooterPopup(false)
-                        if (typeof window !== 'undefined' && (window as any).scrollToLandingIdx) {
-                          (window as any).scrollToLandingIdx(2)
-                        }
-                      }}
-                      className="flex items-center justify-between w-full p-3 rounded-lg hover:bg-[#222222] group transition-all text-[#CCCCCC] hover:text-white text-xs cursor-pointer focus:outline-none"
-                    >
-                      <span className="font-semibold">Creators list</span>
-                      <span className="text-[#666666] group-hover:text-white transition-colors text-sm">↓</span>
-                    </button>
-                  </li>
-                </ul>
-              </div>
-
-              {/* Column 3: Socials */}
-              <div className="md:col-span-3 md:col-start-10 flex flex-col">
-                <h3 className="text-[#888888] font-bold text-xs mb-6 tracking-widest uppercase">Socials</h3>
-                <ul className="space-y-1">
-                  <li>
-                    <a href="https://youtube.com" target="_blank" rel="noopener noreferrer" className="flex items-center justify-between w-full p-3 rounded-lg hover:bg-[#222222] group transition-all text-[#CCCCCC] hover:text-white text-xs cursor-pointer">
-                      <span className="font-semibold">YouTube</span>
-                      <span className="text-[#666666] group-hover:text-white transition-colors text-xs">↗</span>
-                    </a>
-                  </li>
-                  <li>
-                    <a
-                      href="https://discord.gg/xbA5Y5QWf5"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-between w-full p-3 rounded-lg hover:bg-[#222222] group transition-all text-[#CCCCCC] hover:text-white text-xs cursor-pointer"
-                    >
-                      <span className="font-semibold">Discord</span>
-                      <span className="text-[#666666] group-hover:text-white transition-colors text-xs">↗</span>
-                    </a>
-                  </li>
-                </ul>
-              </div>
-            </div>
-
-            {/* Bottom Bar with Centered Circular Top Button */}
-            <div className="flex flex-col items-center justify-center pt-6 border-t border-[#222222] relative">
+        {/* 🧭 Premium Vertical Section Navigation Indicators */}
+        <div className="fixed right-6 top-1/2 -translate-y-1/2 text[1px] z-40 hidden md:flex flex-col gap-4">
+          {[
+            { label: 'Main', idx: 0 },
+            { label: 'About Us', idx: 1 },
+            { label: 'Creators', idx: 2 }
+          ].map((item) => {
+            const isActive = currentIdx === item.idx
+            return (
               <button
+                key={item.idx}
                 onClick={() => {
-                  toggleFooterPopup(false)
                   if (typeof window !== 'undefined' && (window as any).scrollToLandingIdx) {
-                    (window as any).scrollToLandingIdx(0)
+                    (window as any).scrollToLandingIdx(item.idx)
                   }
                 }}
-                className="absolute top-[-24px] left-1/2 -translate-x-1/2 w-12 h-12 rounded-full bg-white text-black flex items-center justify-center border border-[#333333] hover:bg-neutral-100 hover:scale-105 transition-all shadow-lg text-lg font-bold group z-30 cursor-pointer"
+                className="group relative flex items-center justify-end focus:outline-none pointer-events-auto"
               >
-                <span className="text-black group-hover:-translate-y-0.5 transition-transform duration-300 pointer-events-none">↑</span>
-              </button>
-
-              <div className="flex flex-col items-center text-center mt-4 w-full">
-                <div className="flex items-center gap-2 mb-2 justify-center">
-                  <div className="relative w-6 h-6 opacity-90">
-                    <Image src="/logo_icon_white.png" alt="BlockCanvas Logo" fill className="object-contain" />
-                  </div>
-                  <span className="font-black text-base tracking-tighter text-white">BLOCKCANVAS<span className="text-[#FF424D]">.</span></span>
+                <span className="absolute right-8 bg-neutral-900/90 backdrop-blur-md text-white text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md opacity-0 translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 pointer-events-none whitespace-nowrap shadow-md">
+                  {item.label}
+                </span>
+                <div
+                  className={`w-3.5 h-3.5 rounded-full flex items-center justify-center transition-all duration-300 ${isActive
+                    ? 'border-2 border-black bg-transparent scale-110'
+                    : 'bg-neutral-300 hover:bg-neutral-500 scale-75'
+                    }`}
+                >
+                  {isActive && <div className="w-1.5 h-1.5 bg-black rounded-full" />}
                 </div>
-                <p className="text-[#666666] text-[10px] font-medium">© 2026 BlockCanvas Studio. All rights reserved.</p>
-                <p className="text-[#444444] text-[8px] mt-2 font-medium max-w-xl leading-relaxed text-center opacity-40">
-                  Open Source Licenses: Next.js, React, Tailwind CSS, Framer Motion, GSAP, Prisma, Radix UI, Lucide, Lenis, Animate UI.
-                </p>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Top thin progress scroll tracking bar */}
+        <div
+          className="fixed top-0 left-0 h-[3px] bg-black z-50 transition-all duration-100 ease-out"
+          style={{ width: `${scrollProgress}%` }}
+        />
+
+        {/* 🏛️ Pure Minimal Translucent Header Bar */}
+        <header className="fixed top-0 left-0 right-0 z-[45] bg-[#FAF9F5]/75 backdrop-blur-md border-b border-neutral-200/40 py-5 w-full pointer-events-none">
+          <div className="w-full px-6 md:px-12 flex items-center justify-between">
+            <Link href="/" className="flex items-center gap-3 group magnetic-target pointer-events-auto">
+              <div className="relative w-5 h-5 transition-transform duration-500 group-hover:rotate-90">
+                <Image src="/logo_icon.png" alt="BlockCanvas Logo" fill className="object-contain" />
               </div>
+              <span className="font-extrabold text-sm tracking-widest uppercase text-black">
+                BLOCKCANVAS
+              </span>
+            </Link>
+
+            <nav className="hidden md:flex items-center gap-8 text-[9px] font-bold text-neutral-400 uppercase tracking-widest pointer-events-auto">
+              <a href="#hero-section" className="hover:text-black transition-colors magnetic-target">Main</a>
+              <a href="#about-section" className="hover:text-black transition-colors magnetic-target">About Us</a>
+              <a href="#staff-section" className="hover:text-black transition-colors magnetic-target">Creators</a>
+            </nav>
+
+            <div className="pointer-events-auto">
+              {userProfile ? (
+                <UserSidebar
+                  userName={userProfile.display_name || userProfile.creator_name}
+                  userHandle={userProfile.creator_name}
+                  avatarUrl={userProfile.avatar_url || ''}
+                  isOwner={true}
+                />
+              ) : (
+                <Link
+                  href="/login"
+                  className="text-[9px] font-bold text-neutral-400 hover:text-black transition-colors py-1.5 px-4 border border-neutral-200 bg-white hover:bg-neutral-50 magnetic-target"
+                >
+                  로그인
+                </Link>
+              )}
+            </div>
+          </div>
+        </header>
+
+        {/* 🚀 STAGE 1: Hero Section - Extreme Wide Monolith Parallax */}
+        <section
+          id="hero-section"
+          ref={mainHeroRef}
+          className="snap-section w-full bg-[#FAF9F5] flex flex-col justify-center border-b border-neutral-200 relative overflow-hidden"
+        >
+          {/* Dynamic Space Particles background aligned with creator portfolios */}
+          <div className="absolute inset-0 bg-[#FAF9F5] z-0">
+            <div
+              className="hero-bg-grid absolute inset-0 opacity-30 pointer-events-none origin-center"
+              style={{ backgroundImage: 'linear-gradient(to right, #E2E2D9 1px, transparent 1px), linear-gradient(to bottom, #E2E2D9 1px, transparent 1px)', backgroundSize: '48px 48px' }}
+            />
+            <div
+              ref={heroZoomImgRef}
+              className="absolute inset-0 w-full h-full overflow-hidden origin-center"
+            >
+              <Image
+                src="/Main_Banner.png"
+                alt="BlockCanvas Cinematic Monolith"
+                fill
+                className="object-cover brightness-90 opacity-90"
+                priority
+              />
+              <div className="absolute inset-0 bg-gradient-to-b from-[#FAF9F5]/3 via-transparent to-[#FAF9F5]" />
+            </div>
+          </div>
+
+          {/* Top spacer to account for header heights */}
+          <div className="h-24 md:h-32" />
+
+          <div className="relative z-20 w-full px-6 md:px-12 flex flex-col items-center text-center my-auto">
+            <h1 className="hero-kinetic-title text-6xl md:text-9xl lg:text-[10rem] font-black tracking-tighter leading-[0.85] uppercase select-none luxury-text-heavy flex items-center justify-center gap-0.5 md:gap-1.5">
+              {"BLOCKCANVAS".split("").map((letter, i) => (
+                <span
+                  key={i}
+                  className="gsap-letter inline-block cursor-default"
+                  style={{ display: 'inline-block', transformOrigin: 'bottom center' }}
+                >
+                  {letter}
+                </span>
+              ))}
+            </h1>
+          </div>
+        </section>
+
+        {/* 🏛️ STAGE 2.5: Brand Mission About Section (pixelnetwork.kr/#about 레이아웃 구조 차용, 디자인 톤앤매너 완벽 유지) */}
+        <section
+          id="about-section"
+          className="snap-section w-full bg-[#FAF9F5] flex flex-col justify-center px-6 md:px-12 relative overflow-hidden z-20 border-b border-neutral-200"
+        >
+          {/* Dynamic Watermark Background Layer wrapped safely to prevent horizontal overflow */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+            <div className="about-watermark absolute top-[-5%] left-[-2%] text-[24vw] font-black text-neutral-900 opacity-[0.02] select-none tracking-tighter uppercase leading-none">
+              canvas
+            </div>
+          </div>
+
+          {/* CAD Blueprint grid overlay matching drawing-board aesthetic */}
+          <div className="absolute inset-0 opacity-[0.015] pointer-events-none" style={{ backgroundImage: 'linear-gradient(to right, #000 1px, transparent 1px), linear-gradient(to bottom, #000 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+
+          <div className="about-content-box w-full max-w-5xl mx-auto text-left relative z-10 flex flex-col justify-center items-start">
+            <span className="text-neutral-400 text-[16px] font-bold uppercase tracking-widest mb-4 block flex items-center gap-1.5 font-mono">
+              <Compass size={11} className="text-neutral-400 animate-spin" style={{ animationDuration: '6s' }} />
+              <span>About Us</span>
+            </span>
+
+            {/* Heading - Dynamic contrast layout matching pixelnetwork */}
+            <h2 className="text-5xl md:text-7xl lg:text-[5.4rem] text-neutral-900 leading-[1.1] tracking-tighter mb-12 w-full">
+              <span className="uppercase block luxury-text-heavy-dark select-none">BLOCKCANVAS</span>
+              <span className="font-light text-neutral-400 block mt-4 text-3xl md:text-5xl lg:text-[2.8rem] tracking-tight">크리에이터들을 위한 공간</span>
+            </h2>
+
+            {/* Core description paragraphs split layout */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-24 w-full mt-6">
+              <p className="text-base md:text-[1.125rem] text-[#333333] font-normal leading-relaxed">
+                BlockCanvas는 여러 크리에이터들이 좁은 공간에 머무르지 않고, 더 넓은 세상에서 아티스트로서 온전한 가치를 인정받을 수 있는 혁신적인 커뮤니티를 지향합니다. 크리에이터가 중심이 되어 높은 신뢰도와 상상력을 바탕으로 각 분야 최고의 디자이너들과 함께합니다.
+              </p>
+              <p className="text-base md:text-[1.125rem] text-[#333333] font-normal leading-relaxed">
+                단순한 퀄리티를 넘어 여러 크리에이터가 한데 모여 수 많은 작품들을 남겨 여러 이용자들에게 온전히 다가갈 수 있도록 공간을 제공합니다. 누구나 손쉽게 교류하도록 여러 디자이너에게는 넓은 공간을 크리에이터에게는 다양한 영감을 주는 공간을 제공합니다.
+              </p>
             </div>
 
-          </div>
-        </footer>
-      </section>
+            {/* Premium call-to-action buttons */}
+            <div className="flex flex-row gap-4 items-center mt-12 md:mt-16 w-full pointer-events-auto">
+              <Link
+                href="#staff-section"
+                className="rounded-full bg-neutral-900 text-[#FAF9F5] hover:bg-neutral-800 px-8 py-3.5 text-[12px] font-bold uppercase tracking-widest flex items-center gap-2 transition-all duration-300 shadow-sm hover:shadow-lg magnetic-target"
+              >
+                <Users size={12} />
+                <span>explore creators</span>
+              </Link>
 
-    </div>
+              <Link
+                href="/login"
+                className="rounded-full border border-neutral-900 bg-transparent text-neutral-900 hover:bg-neutral-900 hover:text-[#FAF9F5] px-8 py-3.5 text-[12px] font-bold uppercase tracking-widest transition-all duration-300 magnetic-target"
+              >
+                <span>start building</span>
+              </Link>
+            </div>
+          </div>
+        </section>
+
+
+        {/* 👥 STAGE 4: Guild Architects (수석 빌더 스태프 - 럭셔리 마키 프로필 트랙 + 통합 푸터) */}
+        <section
+          id="staff-section"
+          ref={staffPanelRef}
+          className={`snap-section w-full bg-[#FAF9F5] flex flex-col justify-center relative overflow-hidden transform ${showFooterPopup ? '-translate-y-[80px] scale-[0.98]' : 'translate-y-0 scale-100'
+            }`}
+          style={{ transition: 'all 1.5s cubic-bezier(0.16, 1, 0.3, 1)' }}
+        >
+          <div className="w-full px-6 md:px-12 text-left mb-12 max-w-6xl mx-auto relative z-10">
+            <span className="text-neutral-400 text-[9px] font-bold uppercase tracking-widest mb-2 block flex items-center gap-1.5 font-mono">
+              <Users size={11} className="text-neutral-500" />
+              <span>GUILD ARCHITECTS</span>
+            </span>
+            <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight uppercase luxury-text-heavy-dark">
+              BlockCanvas Creators
+            </h2>
+            <p className="text-[10px] md:text-xs text-neutral-400 font-mono mt-2 uppercase tracking-wider block">
+              [ HOVER OVER CARDS TO PREVIEW THEIR MASTERPIECES & VIEW PORTFOLIOS ]
+            </p>
+          </div>
+
+          <div className="w-full py-8 border-y border-neutral-200/60 bg-[#FAF9F5]/40 backdrop-blur-sm relative overflow-hidden z-10">
+            {/* Technical Telemetry Metadata */}
+            <div className="absolute top-2 left-6 text-[7px] text-neutral-400 font-mono font-bold tracking-widest uppercase z-10 pointer-events-none">
+              [ TRACK STATUS: ACTIVE // SPEED: 30S_LOOP // RESOLVING_GRID: ON ]
+            </div>
+            <div className="absolute top-2 right-6 text-[7px] text-neutral-400 font-mono font-bold tracking-widest uppercase z-10 pointer-events-none">
+              [ ACTIVE_BUILDERS: {mergedCreators.length} // LATENCY: 0.04MS ]
+            </div>
+
+            <InfiniteMarquee speed={30}>
+              {mergedCreators.map((creator, index) => {
+                const avatarSrc = creator.avatar_url || '/default_avatar.png'
+                const bannerSrc = creator.portfolios?.banner_url || '/default_banner.png'
+
+                return (
+                  <div
+                    key={creator.id}
+                    className="group relative w-[310px] md:w-[350px] bg-white border border-neutral-200/70 flex flex-col rounded-[32px] transition-all duration-500 ease-out hover:border-black hover:-translate-y-2 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.08)] overflow-hidden pointer-events-auto z-10"
+                  >
+                    {/* Banner Image Area - Acts as the Portfolio Cover Banner (Elegant: h-[170px]) */}
+                    <div className="relative w-full h-[170px] bg-neutral-100 overflow-hidden">
+                      <Image
+                        src={bannerSrc}
+                        alt="User Banner"
+                        fill
+                        className="object-cover group-hover:scale-105 transition-transform duration-1000 brightness-95"
+                      />
+
+                      {/* Dark gradient mask on top of banner for tech look */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-black/5 pointer-events-none" />
+
+                      {/* Member sequence number at the top right */}
+                      <div className="absolute top-4 right-4 text-white/50 text-[8px] font-mono font-bold">
+                        #{String(index + 1).padStart(2, '0')}
+                      </div>
+                    </div>
+
+                    {/* Avatar overlapping banner bottom boundary - Render Avatar with custom 3D placeholder if empty */}
+                    <div className="absolute top-[130px] left-1/2 -translate-x-1/2 z-20">
+                      <div className="relative w-[90px] h-[90px] rounded-full flex items-center justify-center bg-white text-white font-black text-xl border-4 border-white shadow-[0_6px_16px_rgba(0,0,0,0.12)] group-hover:scale-105 transition-transform duration-500 overflow-hidden">
+                        <Image src={avatarSrc} alt={creator.display_name} fill className="object-cover" />
+                        {/* Interactive ring overlay */}
+                        <div className="absolute inset-0 rounded-full border-2 border-white/20 opacity-0 group-hover:opacity-100 animate-spin duration-1000 pointer-events-none" style={{ animationDuration: '3s' }} />
+                      </div>
+                    </div>
+
+                    {/* Content Body - Perfectly balanced layout padding */}
+                    <div className="pt-16 px-6 pb-6 flex flex-col justify-between flex-grow text-center">
+                      <div className="mb-4">
+                        <h3 className="text-lg font-black text-black tracking-tight group-hover:text-[#3b82f6] transition-colors">{creator.display_name}</h3>
+                      </div>
+
+                      {/* Premium action button at the bottom */}
+                      <div className="w-full">
+                        {(() => {
+                          const isLocal = typeof window !== 'undefined' && (window.location.hostname.includes('localhost') || window.location.hostname.includes('127.0.0.1'))
+                          const baseDomain = isLocal ? 'localhost:3000' : 'craftopia.work'
+                          const protocol = typeof window !== 'undefined' ? window.location.protocol : 'https:'
+                          // Note: Using a regular <a> tag or absolute URL in Link to jump subdomains
+                          return (
+                            <a
+                              href={`${protocol}//${creator.creator_name}.${baseDomain}`}
+                              className="text-[9px] font-black text-black hover:bg-neutral-900 hover:text-[#FAF9F5] transition-all inline-flex items-center gap-1 justify-center py-2.5 px-4 border border-neutral-200 rounded-full w-full hover:border-black transition-all duration-300 magnetic-target"
+                            >
+                              <span>EXPLORE CANVAS</span>
+                              <ArrowRight size={9} className="group-hover:translate-x-0.5 transition-transform duration-300" />
+                            </a>
+                          )
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </InfiniteMarquee>
+          </div>
+        </section>
+
+        <section
+          id="footer-section"
+          className={`fixed bottom-0 left-0 w-full bg-[#1A1A1A] border-t border-[#222222] z-40 transform ${showFooterPopup ? 'translate-y-0 opacity-100 shadow-[0_-30px_60px_rgba(0,0,0,0.4)]' : 'translate-y-full opacity-0 pointer-events-none'
+            }`}
+          style={{ transition: 'all 1.5s cubic-bezier(0.16, 1, 0.3, 1)' }}
+        >
+          <footer className="w-full text-white pt-10 pb-8 px-6 md:px-12 lg:px-24 pointer-events-auto">
+            <div className="max-w-[1200px] mx-auto">
+
+              {/* Top Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-8 mb-8 text-left">
+
+                {/* Column 1: Support / Inquiry */}
+                <div className="md:col-span-4 flex flex-col">
+                  <h3 className="text-[#888888] font-bold text-xs mb-6 tracking-widest uppercase">Support Canvas</h3>
+
+                  <div
+                    onClick={(e) => {
+                      e.preventDefault()
+                    }}
+                    className="bg-transparent hover:bg-[#222222] border border-transparent hover:border-[#333333] transition-all rounded-lg p-4 flex items-center justify-between group mb-2 cursor-default select-none"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded bg-[#333333] flex items-center justify-center text-[#AAAAAA] group-hover:text-[#FF424D] transition-colors">
+                        <Mail size={16} />
+                      </div>
+                      <span className="font-semibold text-xs text-[#CCCCCC] group-hover:text-white transition-colors">Contact Us</span>
+                    </div>
+                    <span className="text-[#666666] group-hover:text-white transition-colors">→</span>
+                  </div>
+
+                  <a href="mailto:support@blockcanvas.com" className="bg-transparent hover:bg-[#222222] border border-transparent hover:border-[#333333] transition-all rounded-lg p-4 flex items-center justify-between group cursor-pointer">
+                    <span className="font-semibold text-xs text-[#CCCCCC] group-hover:text-white transition-colors ml-11">Business Inquiry</span>
+                    <span className="text-[#666666] group-hover:text-white transition-colors">↗</span>
+                  </a>
+                </div>
+
+                {/* Column 2: Site Map */}
+                <div className="md:col-span-3 md:col-start-6 flex flex-col">
+                  <h3 className="text-[#888888] font-bold text-xs mb-6 tracking-widest uppercase">Site</h3>
+                  <ul className="space-y-1">
+                    <li>
+                      <button
+                        onClick={() => {
+                          toggleFooterPopup(false)
+                          if (typeof window !== 'undefined' && (window as any).scrollToLandingIdx) {
+                            (window as any).scrollToLandingIdx(0)
+                          }
+                        }}
+                        className="flex items-center justify-between w-full p-3 rounded-lg hover:bg-[#222222] group transition-all text-[#CCCCCC] hover:text-white text-xs cursor-pointer focus:outline-none"
+                      >
+                        <span className="font-semibold">Home</span>
+                        <span className="text-[#666666] group-hover:text-white transition-colors text-sm">→</span>
+                      </button>
+                    </li>
+                    <li>
+                      <button
+                        onClick={() => {
+                          toggleFooterPopup(false)
+                          if (typeof window !== 'undefined' && (window as any).scrollToLandingIdx) {
+                            (window as any).scrollToLandingIdx(1)
+                          }
+                        }}
+                        className="flex items-center justify-between w-full p-3 rounded-lg hover:bg-[#222222] group transition-all text-[#CCCCCC] hover:text-white text-xs cursor-pointer focus:outline-none"
+                      >
+                        <span className="font-semibold">About Us</span>
+                        <span className="text-[#666666] group-hover:text-white transition-colors text-sm">↓</span>
+                      </button>
+                    </li>
+                    <li>
+                      <button
+                        onClick={() => {
+                          toggleFooterPopup(false)
+                          if (typeof window !== 'undefined' && (window as any).scrollToLandingIdx) {
+                            (window as any).scrollToLandingIdx(2)
+                          }
+                        }}
+                        className="flex items-center justify-between w-full p-3 rounded-lg hover:bg-[#222222] group transition-all text-[#CCCCCC] hover:text-white text-xs cursor-pointer focus:outline-none"
+                      >
+                        <span className="font-semibold">Creators list</span>
+                        <span className="text-[#666666] group-hover:text-white transition-colors text-sm">↓</span>
+                      </button>
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Column 3: Socials */}
+                <div className="md:col-span-3 md:col-start-10 flex flex-col">
+                  <h3 className="text-[#888888] font-bold text-xs mb-6 tracking-widest uppercase">Socials</h3>
+                  <ul className="space-y-1">
+                    <li>
+                      <a href="https://youtube.com" target="_blank" rel="noopener noreferrer" className="flex items-center justify-between w-full p-3 rounded-lg hover:bg-[#222222] group transition-all text-[#CCCCCC] hover:text-white text-xs cursor-pointer">
+                        <span className="font-semibold">YouTube</span>
+                        <span className="text-[#666666] group-hover:text-white transition-colors text-xs">↗</span>
+                      </a>
+                    </li>
+                    <li>
+                      <a
+                        href="https://discord.gg/xbA5Y5QWf5"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-between w-full p-3 rounded-lg hover:bg-[#222222] group transition-all text-[#CCCCCC] hover:text-white text-xs cursor-pointer"
+                      >
+                        <span className="font-semibold">Discord</span>
+                        <span className="text-[#666666] group-hover:text-white transition-colors text-xs">↗</span>
+                      </a>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Bottom Bar with Centered Circular Top Button */}
+              <div className="flex flex-col items-center justify-center pt-6 border-t border-[#222222] relative">
+                <button
+                  onClick={() => {
+                    toggleFooterPopup(false)
+                    if (typeof window !== 'undefined' && (window as any).scrollToLandingIdx) {
+                      (window as any).scrollToLandingIdx(0)
+                    }
+                  }}
+                  className="absolute top-[-24px] left-1/2 -translate-x-1/2 w-12 h-12 rounded-full bg-white text-black flex items-center justify-center border border-[#333333] hover:bg-neutral-100 hover:scale-105 transition-all shadow-lg text-lg font-bold group z-30 cursor-pointer"
+                >
+                  <span className="text-black group-hover:-translate-y-0.5 transition-transform duration-300 pointer-events-none">↑</span>
+                </button>
+
+                <div className="flex flex-col items-center text-center mt-4 w-full">
+                  <div className="flex items-center gap-2 mb-2 justify-center">
+                    <div className="relative w-6 h-6 opacity-90">
+                      <Image src="/logo_icon_white.png" alt="BlockCanvas Logo" fill className="object-contain" />
+                    </div>
+                    <span className="font-black text-base tracking-tighter text-white">BLOCKCANVAS<span className="text-[#FF424D]">.</span></span>
+                  </div>
+                  <p className="text-[#666666] text-[10px] font-medium">© 2026 BlockCanvas Studio. All rights reserved.</p>
+                  <p className="text-[#444444] text-[8px] mt-2 font-medium max-w-xl leading-relaxed text-center opacity-40">
+                    Open Source Licenses: Next.js, React, Tailwind CSS, Framer Motion, GSAP, Prisma, Radix UI, Lucide, Lenis, Animate UI.
+                  </p>
+                </div>
+              </div>
+
+            </div>
+          </footer>
+        </section>
+
+      </div>
+    </LandingScroll>
   )
 }
