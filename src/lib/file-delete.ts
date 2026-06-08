@@ -61,8 +61,6 @@ export async function deleteUserPhysicalFiles(profileId: string) {
       }
     }
 
-    console.log(`[File Delete] Scanning finished. Found ${urlsToDelete.size} unique candidate URLs.`)
-
     // 5. Physically delete files
     const uploadsRoot = path.join(process.cwd(), 'public', 'uploads')
     for (const url of urlsToDelete) {
@@ -83,7 +81,6 @@ export async function deleteUserPhysicalFiles(profileId: string) {
           // Check if file exists before deleting
           await fs.access(absolutePath)
           await fs.unlink(absolutePath)
-          console.log(`[File Delete] Successfully deleted physical file: ${absolutePath}`)
         } catch (e) {
           // File might not exist or be inaccessible, just ignore
           console.warn(`[File Delete] File was not found or could not be accessed: ${absolutePath}`)

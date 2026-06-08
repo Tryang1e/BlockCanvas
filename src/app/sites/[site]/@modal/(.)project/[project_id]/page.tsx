@@ -7,7 +7,6 @@ export default async function InterceptedProjectDetailPage({ params }: { params:
   const { site, project_id } = await params
   const creator_name = site
   const normalizedName = decodeURIComponent(creator_name)
-  console.log(`Intercepted Route Hit! site: ${site}, project_id: ${project_id}`)
 
   const project = await prisma.project.findUnique({
     where: { id: project_id },
@@ -36,14 +35,12 @@ export default async function InterceptedProjectDetailPage({ params }: { params:
   })
 
   if (!project) {
-    console.log(`Project not found! project_id: ${project_id}`)
     return notFound()
   }
   if (project.creator.role === 'user') {
     return notFound()
   }
   if (project.creator.creator_name.toLowerCase() !== normalizedName.toLowerCase()) {
-    console.log(`Creator mismatch! project.creator: ${project.creator.creator_name}, params: ${normalizedName}`)
     return notFound()
   }
 

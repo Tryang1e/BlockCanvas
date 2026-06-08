@@ -141,6 +141,5 @@ export async function publishProjectAction(formData: FormData) {
     ? `${protocol}://${normalizedName}.localhost${port}`
     : `${protocol}://${normalizedName}.${rootDomain}`
   
-  console.log(`[Publish] Redirecting to Portfolio: ${finalUrl}`)
   return redirect(finalUrl)
 }

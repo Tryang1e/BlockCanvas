@@ -32,14 +32,11 @@ export async function createPortfolioAction(creatorName: string) {
 
 export async function deletePortfolioAction(creatorName: string) {
   try {
-    console.log(`[Delete Action] Deleting portfolio for creator: ${creatorName}`)
     const authCreatorId = await requireAuth(creatorName)
-    console.log(`[Delete Action] Auth Creator ID: ${authCreatorId}`)
 
-    const deleteResult = await prisma.portfolio.deleteMany({
+    await prisma.portfolio.deleteMany({
       where: { creator_id: authCreatorId }
     })
-    console.log(`[Delete Action] Delete Result:`, deleteResult)
 
     revalidatePath(`/sites/${creatorName}/dashboard`)
     revalidatePath(`/sites/${creatorName}/dashboard/portfolio`)

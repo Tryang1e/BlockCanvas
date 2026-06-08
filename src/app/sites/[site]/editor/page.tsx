@@ -102,10 +102,6 @@ export default async function ProjectEditorPage({
           content
         }
       })
-      console.log(`[Editor] Mapped ${initialWidgets.length} Widgets successfully.`)
-    }
- else {
-      console.log(`[Editor] Project NOT FOUND: ID=${project_id}`)
     }
   }
 

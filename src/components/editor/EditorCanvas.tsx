@@ -422,13 +422,6 @@ function MediaWidget({ url, onChange }: { url: string, onChange: (url: string) =
     safeUrl.includes('twitch.tv')
   )
 
-  useEffect(() => {
-    console.log('[MediaWidget] Raw URL Prop:', url)
-    console.log('[MediaWidget] Safe Extracted URL:', safeUrl)
-    console.log('[MediaWidget] isExternalVideo Evaluated:', isExternalVideo)
-    console.log('[MediaWidget] isAudio Evaluated:', isAudio)
-  }, [url, safeUrl, isExternalVideo, isAudio])
-
   return (
     <div className="w-full bg-white border border-neutral-200 rounded-md p-4 shadow-sm">
       {isEditing ? (
