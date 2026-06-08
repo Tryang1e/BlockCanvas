@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { cookies } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
 import { verifySession } from '@/lib/session'
+import { logger } from '@/lib/logger'
 
 export default async function ProjectEditorPage({
   params,
@@ -102,6 +103,9 @@ export default async function ProjectEditorPage({
           content
         }
       })
+      logger.debug(`[Editor] Mapped ${initialWidgets.length} Widgets successfully.`)
+    } else {
+      logger.debug(`[Editor] Project NOT FOUND: ID=${project_id}`)
     }
   }
 

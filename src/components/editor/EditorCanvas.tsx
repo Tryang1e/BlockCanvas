@@ -4,6 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import PublishSettingsModal from '@/components/editor/PublishSettingsModal'
 import ProjectDetailsViewer from '@/components/creator/ProjectDetailsViewer'
+import { logger } from '@/lib/logger'
 import { useState, useEffect } from 'react'
 import {
   DndContext,
@@ -416,11 +417,18 @@ function MediaWidget({ url, onChange }: { url: string, onChange: (url: string) =
 
   const isAudio = safeUrl && safeUrl.match(/\.(mp3|wav|ogg)$/i)
   const isExternalVideo = safeUrl && !isAudio && (
-    safeUrl.includes('youtube.com') || 
-    safeUrl.includes('youtu.be') || 
-    safeUrl.includes('vimeo.com') || 
+    safeUrl.includes('youtube.com') ||
+    safeUrl.includes('youtu.be') ||
+    safeUrl.includes('vimeo.com') ||
     safeUrl.includes('twitch.tv')
   )
+
+  useEffect(() => {
+    logger.debug('[MediaWidget] Raw URL Prop:', url)
+    logger.debug('[MediaWidget] Safe Extracted URL:', safeUrl)
+    logger.debug('[MediaWidget] isExternalVideo Evaluated:', isExternalVideo)
+    logger.debug('[MediaWidget] isAudio Evaluated:', isAudio)
+  }, [url, safeUrl, isExternalVideo, isAudio])
 
   return (
     <div className="w-full bg-white border border-neutral-200 rounded-md p-4 shadow-sm">

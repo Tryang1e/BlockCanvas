@@ -2,11 +2,13 @@ import { prisma } from '@/lib/prisma'
 import { notFound } from 'next/navigation'
 import ProjectDetailsViewer from '@/components/creator/ProjectDetailsViewer'
 import ProjectModal from '@/components/creator/ProjectModal'
+import { logger } from '@/lib/logger'
 
 export default async function InterceptedProjectDetailPage({ params }: { params: Promise<{ site: string, project_id: string }> }) {
   const { site, project_id } = await params
   const creator_name = site
   const normalizedName = decodeURIComponent(creator_name)
+  logger.debug(`Intercepted Route Hit! site: ${site}, project_id: ${project_id}`)
 
   const project = await prisma.project.findUnique({
     where: { id: project_id },
@@ -35,12 +37,14 @@ export default async function InterceptedProjectDetailPage({ params }: { params:
   })
 
   if (!project) {
+    logger.debug(`Project not found! project_id: ${project_id}`)
     return notFound()
   }
   if (project.creator.role === 'user') {
     return notFound()
   }
   if (project.creator.creator_name.toLowerCase() !== normalizedName.toLowerCase()) {
+    logger.debug(`Creator mismatch! project.creator: ${project.creator.creator_name}, params: ${normalizedName}`)
     return notFound()
   }
 

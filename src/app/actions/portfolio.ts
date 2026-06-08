@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { requireAuth } from '@/lib/server-auth'
+import { logger } from '@/lib/logger'
 
 export async function createPortfolioAction(creatorName: string) {
   const authCreatorId = await requireAuth(creatorName)
@@ -32,11 +33,14 @@ export async function createPortfolioAction(creatorName: string) {
 
 export async function deletePortfolioAction(creatorName: string) {
   try {
+    logger.debug(`[Delete Action] Deleting portfolio for creator: ${creatorName}`)
     const authCreatorId = await requireAuth(creatorName)
+    logger.debug(`[Delete Action] Auth Creator ID: ${authCreatorId}`)
 
-    await prisma.portfolio.deleteMany({
+    const deleteResult = await prisma.portfolio.deleteMany({
       where: { creator_id: authCreatorId }
     })
+    logger.debug(`[Delete Action] Delete Result:`, deleteResult)
 
     revalidatePath(`/sites/${creatorName}/dashboard`)
     revalidatePath(`/sites/${creatorName}/dashboard/portfolio`)

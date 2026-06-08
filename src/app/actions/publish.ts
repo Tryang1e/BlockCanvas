@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { requireAuth } from '@/lib/server-auth'
 import { headers } from 'next/headers'
+import { logger } from '@/lib/logger'
 
 export async function publishProjectAction(formData: FormData) {
   const creatorName = formData.get('creator_name') as string
@@ -140,6 +141,7 @@ export async function publishProjectAction(formData: FormData) {
   const finalUrl = isLocal 
     ? `${protocol}://${normalizedName}.localhost${port}`
     : `${protocol}://${normalizedName}.${rootDomain}`
-  
+
+  logger.debug(`[Publish] Redirecting to Portfolio: ${finalUrl}`)
   return redirect(finalUrl)
 }
