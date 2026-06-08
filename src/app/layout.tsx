@@ -16,6 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  // 상대 경로 메타데이터(OG 이미지/사이트맵 등)의 기준이 되는 절대 URL.
+  metadataBase: new URL("https://craftopia.work"),
   title: "BlockCanvas | 블록을 쌓아 만드는 나만의 포트폴리오",
   description: "BlockCanvas는 드래그 앤 드롭으로 블록을 자유롭게 배치하여 만드는 크리에이터 전용 매직 캔버스 포트폴리오 플랫폼입니다.",
   openGraph: {

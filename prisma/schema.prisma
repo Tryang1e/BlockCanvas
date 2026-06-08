@@ -46,6 +46,8 @@ model Portfolio {
   theme_bg_effect String? @default("none")
   is_published  Boolean @default(true)
   creator       Profile @relation(fields: [creator_id], references: [id], onDelete: Cascade)
+
+  @@index([is_published]) // explore: 공개 포트폴리오 필터
 }
 
 model PortfolioSection {
@@ -61,6 +63,8 @@ model PortfolioSection {
   animation_type String  @default("fade-in")
   creator      Profile   @relation(fields: [creator_id], references: [id], onDelete: Cascade)
   projects     Project[]
+
+  @@index([creator_id]) // 크리에이터별 섹션 조회
 }
 
 model Project {
@@ -81,6 +85,10 @@ model Project {
   section       PortfolioSection? @relation(fields: [section_id], references: [id], onDelete: SetNull)
   widgets       ProjectWidget[]
   wip_logs      WipLog[]
+
+  @@index([creator_id])                 // 크리에이터별 프로젝트 조회
+  @@index([section_id])                 // 섹션별 프로젝트 조회
+  @@index([is_published, created_at])   // explore: 공개 프로젝트 최신순
 }
 
 model ProjectWidget {
@@ -90,6 +98,8 @@ model ProjectWidget {
   content    String? // JSON string
   sort_order Int     @default(0)
   project    Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+
+  @@index([project_id]) // 프로젝트별 위젯 조회
 }
 
 model SiteSetting {
@@ -113,6 +123,8 @@ model AuditLog {
   target_id  String?
   details    String?
   created_at DateTime @default(now())
+
+  @@index([created_at]) // 감사 로그 최신순 조회
 }
 
 model CreatorLog {
@@ -122,6 +134,8 @@ model CreatorLog {
   target_id    String?
   details      String?
   created_at   DateTime @default(now())
+
+  @@index([creator_name, created_at]) // 크리에이터별 활동 로그 최신순
 }
 
 model ContactMessage {
@@ -137,6 +151,9 @@ model ContactMessage {
   sender_name  String?
   created_at   DateTime @default(now())
   creator      Profile  @relation(fields: [creator_id], references: [id], onDelete: Cascade)
+
+  @@index([creator_id, created_at]) // 크리에이터별 메시지함 최신순
+  @@index([email, created_at])      // 이메일 기준 레이트리밋 조회
 }
 
 model WipLog {
@@ -152,4 +169,6 @@ model WipLog {
   project     Project? @relation(fields: [project_id], references: [id], onDelete: SetNull)
 
   @@index([creator_id])
+  @@index([project_id]) // 프로젝트별 WIP 로그 조회
+  @@index([created_at]) // explore: 전체 WIP 로그 최신순
 }
