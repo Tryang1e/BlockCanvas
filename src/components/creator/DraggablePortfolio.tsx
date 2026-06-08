@@ -354,10 +354,10 @@ export default function DraggablePortfolio({
       const allSectionIds = Array.from(new Set(items.map(p => p.section_id)))
       if (!allSectionIds.includes(targetSectionId)) allSectionIds.push(targetSectionId)
 
-      let newProjects: any[] = []
+      const newProjects: any[] = []
       
       for (const sId of allSectionIds) {
-        let sectionProjects = filteredItems.filter(p => p.section_id === sId)
+        const sectionProjects = filteredItems.filter(p => p.section_id === sId)
         
         if (sId === targetSectionId) {
           if (overId) {

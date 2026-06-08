@@ -80,7 +80,7 @@ export default function ShootingStars() {
       }
     }
 
-    let shootingStars: ShootingStar[] = []
+    const shootingStars: ShootingStar[] = []
     let animationId: number
     let frame = 0
 

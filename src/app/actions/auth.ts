@@ -40,7 +40,7 @@ export async function login(formData: FormData) {
     return { error: '로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.' }
   }
 
-  let profile = await prisma.profile.findFirst({
+  const profile = await prisma.profile.findFirst({
     where: { email }
   })
 

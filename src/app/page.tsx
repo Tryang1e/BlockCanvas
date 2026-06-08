@@ -24,7 +24,7 @@ export default async function Home() {
     where: { key: 'FEATURED_CREATORS' }
   })
 
-  let whereClause: any = {
+  const whereClause: any = {
     portfolios: {
       is_published: true
     }
@@ -39,7 +39,7 @@ export default async function Home() {
   }
 
   // 2. Fetch real published creators from database to showcase in Hall of Fame marquee
-  let creators = await prisma.profile.findMany({
+  const creators = await prisma.profile.findMany({
     where: whereClause,
     take: 12, // Allow a few more if customized
     include: {

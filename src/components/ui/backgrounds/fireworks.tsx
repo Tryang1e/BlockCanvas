@@ -60,7 +60,7 @@ export default function Fireworks() {
       }
     }
 
-    let particles: Particle[] = []
+    const particles: Particle[] = []
     const colors = ['#ff595e', '#ffca3a', '#8ac926', '#1982c4', '#6a4c93', '#ffffff']
 
     const createFirework = (x: number, y: number) => {

@@ -139,7 +139,7 @@ export default function BusinessCardContact({
     const ghost1 = containerRef.current?.querySelector('.ghost-card-1')
     const ghost2 = containerRef.current?.querySelector('.ghost-card-2')
 
-    let ctx = gsap.context(() => {
+    const ctx = gsap.context(() => {
       // 1. Initial State
       if (spotlight) gsap.set(spotlight, { scale: 0, opacity: 0 })
       if (leftContainer) gsap.set(leftContainer, { clipPath: 'inset(0 100% 0 0)' })

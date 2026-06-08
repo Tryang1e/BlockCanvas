@@ -227,10 +227,10 @@ export default function ProjectManagementList({ initialProjects, sections: initi
     const allSectionIds = Array.from(new Set(items.map(p => p.section_id || 'unassigned')))
     if (!allSectionIds.includes(targetSectionId)) allSectionIds.push(targetSectionId)
 
-    let newProjects: any[] = []
+    const newProjects: any[] = []
     
     for (const sId of allSectionIds) {
-      let sectionProjects = filteredItems.filter(p => (p.section_id || 'unassigned') === sId)
+      const sectionProjects = filteredItems.filter(p => (p.section_id || 'unassigned') === sId)
       
       if (sId === targetSectionId) {
         if (overId) {
@@ -334,7 +334,7 @@ export default function ProjectManagementList({ initialProjects, sections: initi
     
     // Rebuild full array
     const allSectionIds = Array.from(new Set([...sections.map(s => s.id), 'unassigned']))
-    let finalProjects: any[] = []
+    const finalProjects: any[] = []
     for (const sId of allSectionIds) {
       if (sId === targetSectionId) {
         finalProjects.push(...targetSectionItems)
