@@ -58,7 +58,8 @@ export async function login(formData: FormData) {
 
   // 만약 2차 인증(2FA)이 활성화되어 있는 경우, 로그인 성공 토큰 대신 5분 임시 인증 토큰 반환
   if (profile.two_factor_enabled) {
-    const tempToken = signSession(profile.creator_name + ':temp_2fa')
+    // 2FA 챌린지용 임시 토큰은 5분만 유효하도록 짧은 TTL 적용.
+    const tempToken = signSession(profile.creator_name + ':temp_2fa', 5 * 60 * 1000)
     return { requires2FA: true, tempToken }
   }
 
