@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-export function middleware(request: NextRequest) {
+// Next.js 16: `middleware` 컨벤션이 deprecated 되어 `proxy`로 이관됨.
+// 서브도메인({creator}.craftopia.work) → /sites/[site] 리라이트 및 레거시 경로 리다이렉트를 담당한다.
+export function proxy(request: NextRequest) {
   const url = request.nextUrl
   const path = url.pathname
-  
+
   // 1. Get hostname (Support x-forwarded-host for tunnels)
   const forwardedHost = request.headers.get('x-forwarded-host')
   const originalHost = request.headers.get('host') || ''
@@ -32,14 +34,11 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  // Critical Debug Log
-  console.log(`[Middleware] Host: ${hostname} (Orig: ${originalHost}, Fwd: ${forwardedHost}) | Subdomain: ${subdomain} | Path: ${path}`)
-
   // 4. Skip internal / system / common paths
   if (
-    path.startsWith('/api') || 
-    path.startsWith('/_next') || 
-    path.startsWith('/sites') || 
+    path.startsWith('/api') ||
+    path.startsWith('/_next') ||
+    path.startsWith('/sites') ||
     path.startsWith('/uploads') ||
     path === '/favicon.ico' ||
     path.startsWith('/adminpage')
@@ -55,7 +54,6 @@ export function middleware(request: NextRequest) {
     if (subdomain && !excludedSubdomains.includes(subdomain.toLowerCase())) {
       const protocol = isLocal ? 'http' : 'https'
       const baseDomain = isLocal ? 'localhost:3000' : rootDomain
-      console.log(`[Middleware] Redirecting subdomain /login to main domain: ${protocol}://${baseDomain}/login`)
       return NextResponse.redirect(`${protocol}://${baseDomain}/login`)
     }
     return NextResponse.next()
@@ -66,7 +64,6 @@ export function middleware(request: NextRequest) {
     if (subdomain && !excludedSubdomains.includes(subdomain.toLowerCase())) {
       const protocol = isLocal ? 'http' : 'https'
       const baseDomain = isLocal ? 'localhost:3000' : rootDomain
-      console.log(`[Middleware] Redirecting subdomain ${path} to main domain /explore: ${protocol}://${baseDomain}/explore`)
       return NextResponse.redirect(`${protocol}://${baseDomain}/explore`)
     }
   }
@@ -75,18 +72,16 @@ export function middleware(request: NextRequest) {
   if ((path === '/creators' || path === '/feed') && (!subdomain || excludedSubdomains.includes(subdomain.toLowerCase()))) {
     const protocol = isLocal ? 'http' : 'https'
     const baseDomain = isLocal ? 'localhost:3000' : rootDomain
-    console.log(`[Middleware] Redirecting legacy route ${path} to /explore: ${protocol}://${baseDomain}/explore`)
     return NextResponse.redirect(`${protocol}://${baseDomain}/explore`)
   }
-  
+
   // 6. Subdomain Routing Logic
   if (subdomain && !excludedSubdomains.includes(subdomain.toLowerCase())) {
-    
+
     // 6a. Legacy path redirection (e.g., /creator/test/editor -> /editor)
     if (path.startsWith('/creator/')) {
-      const parts = path.split('/').filter(Boolean)
-      const newPath = '/' + parts.slice(2).join('/')
-      console.log(`[Middleware] Redirecting legacy path: ${path} -> ${newPath}`)
+      const segments = path.split('/').filter(Boolean)
+      const newPath = '/' + segments.slice(2).join('/')
       return NextResponse.redirect(new URL(newPath, request.url))
     }
 
@@ -94,13 +89,12 @@ export function middleware(request: NextRequest) {
     const normalizedPath = path === '/' ? '' : path
     const rewriteUrl = request.nextUrl.clone()
     rewriteUrl.pathname = `/sites/${subdomain}${normalizedPath}`
-    
+
     return NextResponse.rewrite(rewriteUrl)
   }
 
   // 7. Handle WWW or Root
   if (subdomain === 'www') {
-    console.log(`[Middleware] WWW detected, serving root page`)
     return NextResponse.rewrite(new URL(path, request.url))
   }
 

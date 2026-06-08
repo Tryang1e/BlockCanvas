@@ -4,11 +4,15 @@
 
 ### 툴 사용
 
-- Next.js
+- Next.js 16 (App Router, `proxy.ts` 서브도메인 라우팅)
+- React 19 / TypeScript
 - Tailwind CSS
-- TypeScript
-- Supabase
-- Vercel
+- Prisma 7 + SQLite (libsql 어댑터, 로컬 `dev.db`)
+- 자체 호스팅(Windows) + Cloudflare Tunnel 퍼블리싱
+
+> 참고: 초기 구상에는 Supabase/Vercel 이 적혀 있었으나, 실제 구현은 **Prisma + 로컬 SQLite + Cloudflare Tunnel** 자체 호스팅 구조로 진행되었습니다.
+
+Cloudflare Tunnel 실행 예시:
 
 ./cloudflared.exe --config ./.cloudflared/config.yml tunnel run --protocol quic
 
@@ -116,8 +120,8 @@ http://craftopia.work/adminpage
 //    - 크리에이터 대시보드(조회수, 방문자 통계 분석) 제공.
 보류
 
-## 🗄️ 데이터베이스 스키마 구상 (Supabase)
-*본격적인 개발 전 변경될 수 있음*
+## 🗄️ 데이터베이스 스키마 (Prisma + SQLite)
+*실제 스키마는 [`prisma/schema.prisma`](prisma/schema.prisma) 참고. 아래는 초기 구상.*
 
 - **`Profiles` (유저 정보)**: UUID, 역할(Admin/User), 닉네임, 프로필 사진, 소셜 링크, 외주 가능 여부.
 - **`Portfolios` (포트폴리오 대시보드)**: 소개글, 커스텀 주소 식별자(`creator_name`).
@@ -130,12 +134,21 @@ http://craftopia.work/adminpage
     ```bash
     npm install
     ```
-2. **환경 변수 설정 (`.env.local`)**
-    ```env
-    NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-    NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+2. **환경 변수 설정 (`.env`)**
+    ```bash
+    cp .env.example .env
     ```
-3. **로컬 개발 서버 실행**
+    - `SESSION_SECRET` 는 32자 이상의 강력한 무작위 값으로 채워야 합니다(없으면 앱이 실행을 거부).
+      ```bash
+      node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+      ```
+    - 전체 변수 설명은 [`.env.example`](.env.example) 참고.
+3. **데이터베이스 준비 (Prisma)**
+    ```bash
+    npx prisma generate
+    npx prisma db push   # 최초 1회 스키마 -> dev.db 반영
+    ```
+4. **로컬 개발 서버 실행**
     ```bash
     npm run dev
     ```

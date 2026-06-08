@@ -32,6 +32,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# 단, 환경변수 템플릿은 커밋 대상에 포함한다.
+!.env.example
 
 # vercel
 .vercel
@@ -64,3 +66,6 @@ next-env.d.ts
 
 # Minecraft server (separate project, ~800MB world/jar data — never commit)
 /MC_SER/
+
+# 외부 참고용 UI 라이브러리 사본 (자체 .git 보유 — 추적/린트 제외)
+/temp_animate_ui/

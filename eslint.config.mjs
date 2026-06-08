@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // 외부 참고용으로 복사해 둔 UI 라이브러리(자체 .git 보유). 린트/빌드 대상 아님.
+    "temp_animate_ui/**",
   ]),
 ]);
 
