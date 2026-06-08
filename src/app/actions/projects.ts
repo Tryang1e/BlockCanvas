@@ -86,7 +86,7 @@ export async function createSimpleVideoProjectAction(
         sort_order: newOrder,
         category_id: "1", // default
         is_published: true,
-        thumbnail_url: "https://images.unsplash.com/photo-1611162617474-5b21e879e113?auto=format&fit=crop&q=80&w=1000" // generic video thumbnail
+        thumbnail_url: null
       }
     })
 

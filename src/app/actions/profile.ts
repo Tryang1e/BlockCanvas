@@ -275,6 +275,8 @@ export async function getProfileForPreviewAction(creatorName: string) {
   const normalized = creatorName.toLowerCase()
   const profile = await prisma.profile.findFirst({
     where: { creator_name: normalized },
+    // 클라이언트(에디터 미리보기)로 반환되므로 비밀번호 해시·2FA 시크릿 등 민감 필드는 제외한다.
+    omit: { password: true, two_factor_secret: true },
     include: {
       portfolios: true
     }
@@ -282,4 +284,48 @@ export async function getProfileForPreviewAction(creatorName: string) {
   return profile
 }
 
+export async function updatePeersBadgePositionAction(creatorName: string, x: number, y: number) {
+  const authCreatorId = await requireAuth(creatorName)
 
+  const existing = await prisma.portfolio.findUnique({
+    where: { creator_id: authCreatorId }
+  })
+
+  let snsSettings: any = { discord: true, twitter: true, youtube: true, instagram: true, patreon: false, recommended_creators: [] }
+  if (existing?.sns_settings) {
+    try {
+      snsSettings = typeof existing.sns_settings === 'string' ? JSON.parse(existing.sns_settings) : existing.sns_settings
+    } catch (e) {}
+  }
+
+  const updatedSettings = {
+    ...snsSettings,
+    peers_badge_x: x,
+    peers_badge_y: y
+  }
+
+  await prisma.portfolio.update({
+    where: { creator_id: authCreatorId },
+    data: {
+      sns_settings: JSON.stringify(updatedSettings)
+    }
+  })
+
+  revalidatePath(`/sites/${creatorName}`)
+  return { success: true }
+}
+
+export async function acceptPrivacyPolicyAction(creatorName: string) {
+  const authCreatorId = await requireAuth(creatorName)
+
+  await prisma.profile.update({
+    where: { id: authCreatorId },
+    data: {
+      privacy_consented: true,
+      privacy_consented_at: new Date()
+    }
+  })
+
+  revalidatePath(`/sites/${creatorName}/dashboard`)
+  return { success: true }
+}

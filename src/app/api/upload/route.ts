@@ -1,10 +1,19 @@
 import { NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { cookies } from 'next/headers';
 import { validateUploadedFile } from '@/lib/upload-validator';
+import { verifySession } from '@/lib/session';
 
 export async function POST(request: Request) {
   try {
+    // 로그인한 크리에이터만 업로드 허용 (익명 업로드 / 디스크 채우기 DoS 방지)
+    const cookieStore = await cookies();
+    const session = verifySession(cookieStore.get('session')?.value);
+    if (!session) {
+      return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 });
+    }
+
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
 

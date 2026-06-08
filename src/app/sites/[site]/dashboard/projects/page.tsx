@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
+import { notFound } from 'next/navigation'
 import ProjectManagementList from '@/components/dashboard/ProjectManagementList'
 
 export default async function DashboardProjectsPage({
@@ -14,7 +15,9 @@ export default async function DashboardProjectsPage({
     where: { creator_name }
   })
 
-  if (!profile) return null
+  if (!profile || profile.role === 'user') {
+    notFound()
+  }
 
   const sections = await prisma.portfolioSection.findMany({
     where: { creator_id: profile.id },

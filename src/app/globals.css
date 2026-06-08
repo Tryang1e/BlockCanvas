@@ -127,6 +127,43 @@ html.lenis-scrolling iframe {
   @apply p-4 rounded-2xl border-2 border-dashed border-neutral-400 bg-neutral-50/50;
 }
 
+/* 접근성(#10): 모션 최소화를 선호하는 사용자에게는 CSS 애니메이션/트랜지션을 대폭 축소한다. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* 커스텀 스크롤바(#9): 크리에이터가 설정에서 켰을 때만 <html>에 .custom-scrollbar 가 붙는다.
+   라이트/다크 배경 모두에서 보이도록 중성 그레이 반투명 썸을 사용한다. */
+html.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(140, 140, 140, 0.55) transparent;
+}
+html.custom-scrollbar::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+html.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+html.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(150, 150, 150, 0.6), rgba(110, 110, 110, 0.6));
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background 0.2s ease;
+}
+html.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(180, 180, 180, 0.85), rgba(140, 140, 140, 0.85));
+  background-clip: padding-box;
+}
+
 .tiptap [data-type="column"]:focus-within {
   @apply border-solid border-neutral-600 bg-white shadow-sm;
 }

@@ -3,8 +3,49 @@
 import React from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { Sparkles } from 'lucide-react'
 import ProjectActionButtons from './ProjectActionButtons'
 import ScrollReveal from '@/components/ui/ScrollReveal'
+
+// Helper to extract first image from widgets or Tiptap JSON content
+const getFirstImageFromContent = (contentStr: string | null): string | null => {
+  if (!contentStr) return null
+  try {
+    const parsed = JSON.parse(contentStr)
+    if (Array.isArray(parsed)) {
+      for (const widget of parsed) {
+        if (widget.type === 'image' || widget.widget_type === 'image' || widget.type === 'image_grid') {
+          const urls = widget.content?.urls || widget.content || []
+          if (Array.isArray(urls) && urls[0]) {
+            return urls[0]
+          } else if (typeof urls === 'string') {
+            return urls
+          }
+        }
+      }
+    } else if (parsed && typeof parsed === 'object') {
+      if (parsed.content && Array.isArray(parsed.content)) {
+        for (const node of parsed.content) {
+          if (node.type === 'image' && node.attrs && node.attrs.src) {
+            return node.attrs.src
+          }
+        }
+      }
+    }
+  } catch (e) {
+    const imgRegex = /<img[^>]+src=["']([^"']+)["']/i
+    const match = contentStr.match(imgRegex)
+    if (match && match[1]) return match[1]
+  }
+  return null
+}
+
+const premiumGradients = [
+  'from-neutral-900 via-zinc-800 to-neutral-950',
+  'from-slate-900 via-slate-800 to-neutral-950',
+  'from-stone-900 via-stone-800 to-neutral-950',
+  'from-zinc-900 via-neutral-800 to-zinc-950'
+]
 
 interface ProjectCardProps {
   project: any
@@ -30,13 +71,13 @@ function getYouTubeEmbedUrl(url: string | null) {
 // 프로젝트 제목에서 [SIZE:WxH] 또는 [SIZE:W] 메타 지시어를 제거하여 렌더링용 순수 타이틀을 발굴하는 헬퍼
 export function parseProjectTitleAndSize(title: string) {
   if (!title) return { displayTitle: '', colSpanClass: 'lg:col-span-1', rowSpanClass: 'row-span-1', w: 1, h: 1 }
-  const match = title.match(/\[SIZE:([1-3])(?:x([1-3]))?\]/)
+  const match = title.match(/\[\s*SIZE\s*:\s*([1-3])\s*(?:[xX]\s*([1-3]))?\s*\]/i)
   if (match) {
     const wStr = match[1]
     const hStr = match[2] || '1'
     const w = parseInt(wStr, 10)
     const h = parseInt(hStr, 10)
-    const displayTitle = title.replace(/\[SIZE:[1-3](?:x[1-3])?\]/, '').trim()
+    const displayTitle = title.replace(/\[\s*SIZE\s*:\s*[1-3]\s*(?:[xX]\s*[1-3])?\s*\]/gi, '').trim()
     
     let colSpanClass = 'lg:col-span-1'
     if (wStr === '2') colSpanClass = 'lg:col-span-2 sm:col-span-2'
@@ -70,6 +111,8 @@ function ProjectCard({ project, creatorName, isOwner, isOverlay, onOpenProject, 
 
   const embedUrl = getYouTubeEmbedUrl(project.youtube_url)
   const { displayTitle, w, h } = parseProjectTitleAndSize(project.title)
+  const fallbackGradient = premiumGradients[Math.abs(project.id.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0)) % 4]
+  const projectThumbnail = project.thumbnail_url || getFirstImageFromContent(project.content)
 
   // 100% 퍼센트 붕괴를 영원히 소멸시키는 궁극의 Container Query 단일 픽셀 수식!!!
   // 부모 그리드가 이미 컨테이너 실시간 가로 너비를 환산하여 완벽한 1칸 너비 var(--col-width)를 넘겨주므로,
@@ -100,7 +143,7 @@ function ProjectCard({ project, creatorName, isOwner, isOverlay, onOpenProject, 
     >
       <ScrollReveal animationClass="opacity-0 translate-y-12 scale-95" className="w-full h-full" disableAnimation={globalIsDragging || isOverlay}>
         {/* 이미지/미디어 자체가 단 1px의 오차나 잘림 여백 없이 카드의 물리 WxH 전체를 100% 꽉 채우도록 구성 */}
-        <div 
+        <div
           className="w-full h-full relative border border-neutral-100 dark:border-neutral-800/80 overflow-hidden shadow-sm transition-all duration-500 bg-neutral-100 dark:bg-neutral-900"
           style={{ borderRadius: 'var(--card-corner-radius, 0px)' }}
         >
@@ -124,13 +167,23 @@ function ProjectCard({ project, creatorName, isOwner, isOverlay, onOpenProject, 
           ) : (
             // Standard Image Thumbnail (100% image-fill & object-cover)
             <div onClick={() => onOpenProject?.(project.id)} className="absolute inset-0 z-10 block cursor-pointer w-full h-full">
-              {project.thumbnail_url ? (
+              {projectThumbnail ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={project.thumbnail_url} alt={displayTitle} className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]" draggable={false} />
+                <img src={projectThumbnail} alt={displayTitle} className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]" draggable={false} />
               ) : (
-                <div className="w-full h-full bg-neutral-200 dark:bg-neutral-800 flex flex-col items-center justify-center text-neutral-400 font-medium">
-                  <span className="text-3xl mb-2">🖼️</span>
-                  <span>No Thumbnail</span>
+                <div className={`w-full h-full bg-gradient-to-br ${fallbackGradient} flex flex-col items-center justify-center p-6 text-center select-none relative overflow-hidden`}>
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.05)_0%,transparent_70%)] pointer-events-none" />
+                  <div className="text-[8px] text-white/30 tracking-[0.2em] font-black uppercase mb-3">
+                    PORTFOLIO
+                  </div>
+                  <h3 className="text-xs md:text-sm font-extrabold text-white/90 leading-snug tracking-tight max-w-[160px] line-clamp-3 my-1 break-keep">
+                    {displayTitle}
+                  </h3>
+                  <div className="flex items-center gap-1 mt-3 opacity-30">
+                    <span className="h-[1px] w-3 bg-white/40" />
+                    <Sparkles className="h-2.5 w-2.5 text-white" />
+                    <span className="h-[1px] w-3 bg-white/40" />
+                  </div>
                 </div>
               )}
             </div>
@@ -147,7 +200,7 @@ function ProjectCard({ project, creatorName, isOwner, isOverlay, onOpenProject, 
                 
                 <div className="flex justify-between items-center mt-3">
                   <p className="text-neutral-300 text-sm font-medium drop-shadow-md line-clamp-1 tracking-wider">
-                    {new Date(project.created_at).getFullYear()} {new Date(project.created_at).getMonth() + 1}
+                    {new Date(project.created_at).getFullYear()} {new Date(project.created_at).getMonth() + 1} {new Date(project.created_at).getDate()}
                   </p>
                 </div>
               </div>

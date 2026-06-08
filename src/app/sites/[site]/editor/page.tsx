@@ -1,7 +1,7 @@
 import EditorCanvas from '@/components/editor/EditorCanvas'
 import { prisma } from '@/lib/prisma'
 import { cookies } from 'next/headers'
-import { redirect } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { verifySession } from '@/lib/session'
 
 export default async function ProjectEditorPage({
@@ -21,6 +21,14 @@ export default async function ProjectEditorPage({
   
   if (session !== site.toLowerCase()) {
     redirect(`/`)
+  }
+
+  const profile = await prisma.profile.findUnique({
+    where: { creator_name }
+  })
+
+  if (!profile || profile.role === 'user') {
+    notFound()
   }
 
   let initialProject = null

@@ -14,12 +14,13 @@ export async function GET(
   }
 
   // 조립할 로컬 디스크 물리 경로: C:\Github\BlockCanvas\public\uploads\...
-  const physicalPath = path.join(
-    process.cwd(),
-    'public',
-    'uploads',
-    ...filePathArray
-  );
+  const uploadsRoot = path.join(process.cwd(), 'public', 'uploads');
+  const physicalPath = path.resolve(uploadsRoot, ...filePathArray);
+
+  // 경로 탐색(Path Traversal) 방지: uploads 디렉터리 하위 경로만 허용한다.
+  if (physicalPath !== uploadsRoot && !physicalPath.startsWith(uploadsRoot + path.sep)) {
+    return new NextResponse('File Not Found', { status: 404 });
+  }
 
   try {
     // 파일이 물리적으로 디스크에 실제로 존재하는지 확인

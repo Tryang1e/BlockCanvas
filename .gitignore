@@ -43,8 +43,24 @@ next-env.d.ts
 /src/generated/prisma
 /dev.db
 /dev.db-journal
+/prisma/dev.db
+/prisma/dev.db-journal
+*.db-wal
+*.db-shm
 /public/uploads/
 *.mp4
 *.zip
 *.rar
 *.tar.gz
+
+# Cloudflare tunnel (local infra + credentials — never commit)
+/CloudflaredTunnel/
+
+# throwaway dev scripts
+/scratch/
+
+# DB backups (compressed .db.br snapshots + log) — never commit
+/backups/
+
+# Minecraft server (separate project, ~800MB world/jar data — never commit)
+/MC_SER/

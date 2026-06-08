@@ -369,13 +369,13 @@ function ParsedTextContent({ content }: { content: string }) {
 // 3. 프로젝트 제목에서 [SIZE:WxH] 또는 [SIZE:W] 메타 태그를 읽어 col-span 및 row-span 클래스로 매핑해주는 파서
 export function parseProjectTitleAndSize(title: string) {
   if (!title) return { displayTitle: '', colSpanClass: 'lg:col-span-1', rowSpanClass: 'row-span-1', w: 1, h: 1 }
-  const match = title.match(/\[SIZE:([1-3])(?:x([1-3]))?\]/)
+  const match = title.match(/\[\s*SIZE\s*:\s*([1-3])\s*(?:[xX]\s*([1-3]))?\s*\]/i)
   if (match) {
     const wStr = match[1]
     const hStr = match[2] || '1'
     const w = parseInt(wStr, 10)
     const h = parseInt(hStr, 10)
-    const displayTitle = title.replace(/\[SIZE:[1-3](?:x[1-3])?\]/, '').trim()
+    const displayTitle = title.replace(/\[\s*SIZE\s*:\s*[1-3]\s*(?:[xX]\s*[1-3])?\s*\]/gi, '').trim()
     
     let colSpanClass = 'lg:col-span-1'
     if (wStr === '2') colSpanClass = 'lg:col-span-2 sm:col-span-2'
@@ -539,6 +539,18 @@ function SectionContainer({
   } else if (animType === 'slide-up') {
     hiddenClass = 'opacity-0 translate-y-24'
     visibleClass = 'opacity-100 translate-y-0'
+  } else if (animType === 'slide-down') {
+    hiddenClass = 'opacity-0 -translate-y-24'
+    visibleClass = 'opacity-100 translate-y-0'
+  } else if (animType === 'blur-in') {
+    hiddenClass = 'opacity-0 blur-md'
+    visibleClass = 'opacity-100 blur-none'
+  } else if (animType === 'pop') {
+    hiddenClass = 'opacity-0 scale-50'
+    visibleClass = 'opacity-100 scale-100'
+  } else if (animType === 'rotate-in') {
+    hiddenClass = 'opacity-0 rotate-6 scale-95'
+    visibleClass = 'opacity-100 rotate-0 scale-100'
   }
 
   const getAnimLabel = (type: string) => {
@@ -549,6 +561,10 @@ function SectionContainer({
       case 'slide-right': return '왼쪽에서 밀기'
       case 'slide-left': return '오른쪽에서 밀기'
       case 'slide-up': return '아래에서 밀기'
+      case 'slide-down': return '위에서 내려오기'
+      case 'blur-in': return '흐림에서 선명'
+      case 'pop': return '팡 터지기'
+      case 'rotate-in': return '회전하며 등장'
       default: return '위로 등장'
     }
   }
@@ -622,7 +638,11 @@ function SectionContainer({
                             { value: 'zoom-in', label: '🔍 팝업 확대' },
                             { value: 'slide-right', label: '➡️ 왼쪽에서 밀기' },
                             { value: 'slide-left', label: '⬅️ 오른쪽에서 밀기' },
-                            { value: 'slide-up', label: '⬆️ 아래에서 밀기' }
+                            { value: 'slide-up', label: '⬆️ 아래에서 밀기' },
+                            { value: 'slide-down', label: '⬇️ 위에서 내려오기' },
+                            { value: 'blur-in', label: '🌫️ 흐림에서 선명' },
+                            { value: 'pop', label: '✨ 팡 터지기' },
+                            { value: 'rotate-in', label: '🔄 회전하며 등장' }
                           ].map((option) => (
                             <button
                               key={option.value}

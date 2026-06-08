@@ -60,6 +60,24 @@ export function middleware(request: NextRequest) {
     }
     return NextResponse.next()
   }
+
+  // Redirect /creators, /feed, or /explore accessed on a subdomain to the main domain /explore
+  if (path === '/creators' || path === '/feed' || path === '/explore') {
+    if (subdomain && !excludedSubdomains.includes(subdomain.toLowerCase())) {
+      const protocol = isLocal ? 'http' : 'https'
+      const baseDomain = isLocal ? 'localhost:3000' : rootDomain
+      console.log(`[Middleware] Redirecting subdomain ${path} to main domain /explore: ${protocol}://${baseDomain}/explore`)
+      return NextResponse.redirect(`${protocol}://${baseDomain}/explore`)
+    }
+  }
+
+  // Redirect main domain /creators and /feed to /explore
+  if ((path === '/creators' || path === '/feed') && (!subdomain || excludedSubdomains.includes(subdomain.toLowerCase()))) {
+    const protocol = isLocal ? 'http' : 'https'
+    const baseDomain = isLocal ? 'localhost:3000' : rootDomain
+    console.log(`[Middleware] Redirecting legacy route ${path} to /explore: ${protocol}://${baseDomain}/explore`)
+    return NextResponse.redirect(`${protocol}://${baseDomain}/explore`)
+  }
   
   // 6. Subdomain Routing Logic
   if (subdomain && !excludedSubdomains.includes(subdomain.toLowerCase())) {

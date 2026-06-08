@@ -55,6 +55,12 @@ const nextConfig: NextConfig = {
             key: 'Strict-Transport-Security',
             value: 'max-age=31536000; includeSubDomains',
           },
+          {
+            // 최소 안전 CSP: 인라인 스타일/스크립트(script-src/style-src)는 건드리지 않아
+            // 기존 기능을 깨지 않으면서 플러그인 XSS·<base> 주입·클릭재킹을 차단한다.
+            key: 'Content-Security-Policy',
+            value: "object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+          },
         ],
       },
     ]

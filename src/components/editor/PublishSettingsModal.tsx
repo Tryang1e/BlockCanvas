@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { publishProjectAction } from '@/app/actions/publish'
 
 
@@ -33,10 +33,10 @@ export default function PublishSettingsModal({
   // Parse [SIZE:WxH] or [SIZE:W] and clean title from initialProject
   const getInitialSizeAndCleanTitle = () => {
     const rawTitle = initialProject?.title || ''
-    const sizeMatch = rawTitle.match(/\[SIZE:([1-3])(?:x([1-3]))?\]/)
+    const sizeMatch = rawTitle.match(/\[\s*SIZE\s*:\s*([1-3])\s*(?:[xX]\s*([1-3]))?\s*\]/i)
     const width = sizeMatch ? sizeMatch[1] : '1'
     const height = sizeMatch && sizeMatch[2] ? sizeMatch[2] : '1'
-    const cleanTitle = rawTitle.replace(/\[SIZE:[1-3](?:x[1-3])?\]/, '').trim()
+    const cleanTitle = rawTitle.replace(/\[\s*SIZE\s*:\s*[1-3]\s*(?:[xX]\s*[1-3])?\s*\]/gi, '').trim()
     return { width, height, cleanTitle }
   }
 
@@ -45,18 +45,29 @@ export default function PublishSettingsModal({
   const [cardHeight, setCardHeight] = useState<string>(initialData.height)
   const [title, setTitle] = useState<string>(initialData.cleanTitle)
 
-  // 프로젝트 제작 연도 및 월 설정 상태 추가
+  // 프로젝트 제작 연도, 월, 일 설정 상태 추가
   const getInitialYearAndMonth = () => {
     const d = initialProject?.created_at ? new Date(initialProject.created_at) : new Date()
     return {
       year: String(d.getFullYear()),
-      month: String(d.getMonth() + 1)
+      month: String(d.getMonth() + 1),
+      day: String(d.getDate())
     }
   }
 
   const initDate = getInitialYearAndMonth()
   const [projectYear, setProjectYear] = useState<string>(initDate.year)
   const [projectMonth, setProjectMonth] = useState<string>(initDate.month)
+  const [projectDay, setProjectDay] = useState<string>(initDate.day)
+  const [isDateChanged, setIsDateChanged] = useState<boolean>(false)
+
+  // 선택한 연도/월의 실제 총 일수를 구해 날짜 범위 초과 방어
+  useEffect(() => {
+    const maxDays = new Date(Number(projectYear), Number(projectMonth), 0).getDate()
+    if (Number(projectDay) > maxDays) {
+      setProjectDay(String(maxDays))
+    }
+  }, [projectYear, projectMonth, projectDay])
 
   // Extract all images uploaded inside the editor widgets
   const canvasImages = widgets
@@ -113,7 +124,9 @@ export default function PublishSettingsModal({
             <input type="hidden" name="widgets_json" value={JSON.stringify(widgets)} />
             {sectionId && <input type="hidden" name="section_id" value={sectionId} />}
             {finalCoverUrl && <input type="hidden" name="thumbnail_url" value={finalCoverUrl} />}
-            <input type="hidden" name="created_at" value={`${projectYear}-${String(projectMonth).padStart(2, '0')}-01T00:00:00.000Z`} />
+            {isDateChanged && (
+              <input type="hidden" name="created_at" value={`${projectYear}-${String(projectMonth).padStart(2, '0')}-${String(projectDay).padStart(2, '0')}T00:00:00.000Z`} />
+            )}
 
             {/* Header */}
             <div className="h-14 bg-white border-b border-neutral-200 flex items-center justify-between px-6 shrink-0">
@@ -257,12 +270,15 @@ export default function PublishSettingsModal({
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-neutral-600 mb-2">제작 연도 및 월 설정</label>
+                      <label className="block text-xs font-bold text-neutral-600 mb-2">제작 연도, 월, 일 설정</label>
                       <div className="flex gap-2">
                         <div className="flex-1">
                           <select 
                             value={projectYear} 
-                            onChange={e => setProjectYear(e.target.value)} 
+                            onChange={e => {
+                              setProjectYear(e.target.value)
+                              setIsDateChanged(true)
+                            }} 
                             className="w-full border border-neutral-300 rounded bg-white text-neutral-900 font-medium p-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-shadow"
                           >
                             {Array.from({ length: 2035 - 1995 + 1 }, (_, i) => String(1995 + i)).reverse().map(yr => (
@@ -273,7 +289,10 @@ export default function PublishSettingsModal({
                         <div className="flex-1">
                           <select 
                             value={projectMonth} 
-                            onChange={e => setProjectMonth(e.target.value)} 
+                            onChange={e => {
+                              setProjectMonth(e.target.value)
+                              setIsDateChanged(true)
+                            }} 
                             className="w-full border border-neutral-300 rounded bg-white text-neutral-900 font-medium p-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-shadow"
                           >
                             {Array.from({ length: 12 }, (_, i) => String(i + 1)).map(mon => (
@@ -281,9 +300,23 @@ export default function PublishSettingsModal({
                             ))}
                           </select>
                         </div>
+                        <div className="flex-1">
+                          <select 
+                            value={projectDay} 
+                            onChange={e => {
+                              setProjectDay(e.target.value)
+                              setIsDateChanged(true)
+                            }} 
+                            className="w-full border border-neutral-300 rounded bg-white text-neutral-900 font-medium p-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-shadow"
+                          >
+                            {Array.from({ length: new Date(Number(projectYear), Number(projectMonth), 0).getDate() }, (_, i) => String(i + 1)).map(d => (
+                              <option key={d} value={d}>{d}일</option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
                       <p className="text-[11px] text-neutral-500 mt-1.5">
-                        선택하신 년도와 월이 포트폴리오 메인 카드 하단에 노출됩니다.
+                        선택하신 년도, 월, 일이 포트폴리오 메인 카드 하단에 노출됩니다.
                       </p>
                     </div>
 

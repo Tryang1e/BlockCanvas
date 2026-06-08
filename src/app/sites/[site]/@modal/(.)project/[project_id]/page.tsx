@@ -17,6 +17,7 @@ export default async function InterceptedProjectDetailPage({ params }: { params:
           creator_name: true, 
           display_name: true,
           avatar_url: true,
+          role: true,
           portfolios: {
             select: {
               youtube_url: true,
@@ -36,6 +37,9 @@ export default async function InterceptedProjectDetailPage({ params }: { params:
 
   if (!project) {
     console.log(`Project not found! project_id: ${project_id}`)
+    return notFound()
+  }
+  if (project.creator.role === 'user') {
     return notFound()
   }
   if (project.creator.creator_name.toLowerCase() !== normalizedName.toLowerCase()) {

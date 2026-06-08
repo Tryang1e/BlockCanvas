@@ -5,6 +5,11 @@ import { useRouter } from 'next/navigation'
 import { deleteProjectAdminAction, toggleProjectPublishAdminAction } from '@/app/actions/admin'
 import Image from 'next/image'
 
+const cleanProjectTitle = (title: string) => {
+  if (!title) return ''
+  return title.replace(/\[\s*SIZE\s*:\s*[1-3]\s*(?:[xX]\s*[1-3])?\s*\]/gi, '').trim()
+}
+
 export default function AdminProjectTable({ 
   projects,
   currentPage,
@@ -174,7 +179,7 @@ export default function AdminProjectTable({
                         )}
                       </div>
                       <div className="flex flex-col justify-center">
-                        <div className="font-black text-neutral-900 text-sm line-clamp-1 mb-1">{project.title}</div>
+                        <div className="font-black text-neutral-900 text-sm line-clamp-1 mb-1">{cleanProjectTitle(project.title)}</div>
                         <div className="text-[11px] text-neutral-400 font-medium tracking-wide">
                           {(() => {
                             const d = new Date(project.created_at)
@@ -214,14 +219,14 @@ export default function AdminProjectTable({
                   </td>
                   <td className="px-6 py-5 text-right space-x-2">
                     <button 
-                      onClick={() => openPublishModal(project.id, project.title, project.is_published)}
+                      onClick={() => openPublishModal(project.id, cleanProjectTitle(project.title), project.is_published)}
                       disabled={loading === project.id}
                       className="px-3 py-1.5 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[11px] transition-colors disabled:opacity-50"
                     >
                       상태변경
                     </button>
                     <button 
-                      onClick={() => openDeleteModal(project.id, project.title)}
+                      onClick={() => openDeleteModal(project.id, cleanProjectTitle(project.title))}
                       disabled={loading === project.id}
                       className="px-3 py-1.5 rounded bg-red-50 hover:bg-red-100 text-red-600 font-bold text-[11px] transition-colors disabled:opacity-50"
                     >

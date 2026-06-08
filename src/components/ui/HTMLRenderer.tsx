@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import parse, { attributesToProps, domToReact, Element } from 'html-react-parser';
-import DOMPurify from 'isomorphic-dompurify';
+import { sanitizeRichHtml } from '@/lib/sanitize-html';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
 import { 
@@ -13,12 +13,18 @@ import {
   HighlightText, 
   TextMorph, 
   GradientText,
+  ScrambleText,
+  WaveText,
+  NeonText,
   DefaultButton,
   FlipButton,
   RippleButton,
-  LiquidButton
+  LiquidButton,
+  GlowButton,
+  ShineButton
 } from '@/components/ui/animate-ui';
 import { PreviewLinkCard } from '@/components/ui/preview-link-card';
+import MarqueeBlock from '@/components/ui/MarqueeBlock';
 
 // HTMLRenderer 내부 전용 고품격 아코디언 컴포넌트
 function FaqAccordion({ 
@@ -142,16 +148,13 @@ interface HTMLRendererProps {
 }
 
 export default function HTMLRenderer({ html }: HTMLRendererProps) {
-  const cleanHtml = DOMPurify.sanitize(html || '<p></p>', {
-    ADD_TAGS: ['iframe'],
-    ADD_ATTR: [
-      'data-animated-group', 'data-texts', 'data-text-size', 'data-is-bold', 'data-is-italic', 'data-font-family', 'data-align', 
-      'allowfullscreen', 'frameborder', 'scrolling', 
-      'data-button-link', 'data-style', 'data-bg-color', 'data-text', 'data-text-color', 'data-button-width', 'data-button-height',
-      'data-type', 'data-question', 'data-answer', 'data-q-font', 'data-q-size', 'data-q-color', 'data-q-bold', 'data-q-italic', 
-      'data-a-font', 'data-a-size', 'data-a-color', 'data-a-bold', 'data-a-italic', 'data-border-style', 'data-hover-bg'
-    ]
-  });
+  const cleanHtml = sanitizeRichHtml(html || '<p></p>', [
+    'data-animated-group', 'data-texts', 'data-text-size', 'data-is-bold', 'data-is-italic', 'data-font-family', 'data-align',
+    'data-button-link', 'data-style', 'data-bg-color', 'data-text', 'data-text-color', 'data-button-width', 'data-button-height',
+    'data-type', 'data-question', 'data-answer', 'data-q-font', 'data-q-size', 'data-q-color', 'data-q-bold', 'data-q-italic',
+    'data-a-font', 'data-a-size', 'data-a-color', 'data-a-bold', 'data-a-italic', 'data-border-style', 'data-hover-bg',
+    'data-items', 'data-speed', 'data-reverse', 'data-variant'
+  ]);
 
   const options = {
     replace: (domNode: any) => {
@@ -175,6 +178,37 @@ export default function HTMLRenderer({ html }: HTMLRendererProps) {
         };
 
         return <FaqAccordion question={question} answer={answer} styles={styles} />;
+      }
+
+      if (domNode instanceof Element && domNode.attribs && domNode.attribs['data-type'] === 'marquee') {
+        let items: string[] = [];
+        try {
+          items = JSON.parse(domNode.attribs['data-items'] || '[]');
+        } catch (e) {
+          // ignore parsing error
+        }
+        const speed = parseInt(domNode.attribs['data-speed'] || '25', 10) || 25;
+        const reverse = domNode.attribs['data-reverse'] === 'true';
+        const textSize = domNode.attribs['data-text-size'] || '1.25rem';
+        const isBold = domNode.attribs['data-is-bold'] !== 'false';
+        const fontFamily = domNode.attribs['data-font-family'] || 'inherit';
+        const textColor = domNode.attribs['data-text-color'] || '';
+        const variant = domNode.attribs['data-variant'] === 'pill' ? 'pill' : 'plain';
+
+        return (
+          <div className="my-4 block">
+            <MarqueeBlock
+              items={items}
+              speed={speed}
+              reverse={reverse}
+              textSize={textSize}
+              isBold={isBold}
+              fontFamily={fontFamily}
+              textColor={textColor}
+              variant={variant}
+            />
+          </div>
+        );
       }
 
       if (domNode instanceof Element && domNode.attribs && domNode.attribs['data-animated-group']) {
@@ -224,6 +258,9 @@ export default function HTMLRenderer({ html }: HTMLRendererProps) {
             case 'highlight': return <HighlightText text={parsedTexts[0]} />;
             case 'morphing': return <TextMorph texts={parsedTexts} className={`w-full ${alignClass}`} />;
             case 'gradient': return <GradientText text={parsedTexts[0]} />;
+            case 'scramble': return <ScrambleText text={parsedTexts[0]} />;
+            case 'wave': return <WaveText text={parsedTexts[0]} />;
+            case 'neon': return <NeonText text={parsedTexts[0]} />;
             default: return <TypingText text={parsedTexts[0]} />;
           }
         };
@@ -267,6 +304,8 @@ export default function HTMLRenderer({ html }: HTMLRendererProps) {
             case 'flip': btn = <FlipButton href={href} style={styleObj}>{text}</FlipButton>; break;
             case 'ripple': btn = <RippleButton href={href} style={styleObj}>{text}</RippleButton>; break;
             case 'liquid': btn = <LiquidButton href={href} style={styleObj}>{text}</LiquidButton>; break;
+            case 'glow': btn = <GlowButton href={href} style={styleObj}>{text}</GlowButton>; break;
+            case 'shine': btn = <ShineButton href={href} style={styleObj}>{text}</ShineButton>; break;
             default: btn = <DefaultButton href={href} style={styleObj}>{text}</DefaultButton>; break;
           }
           

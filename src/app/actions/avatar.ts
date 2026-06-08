@@ -2,17 +2,14 @@
 
 import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
+import { requireAuth } from '@/lib/server-auth'
 
 export async function updateAvatarAction(creatorName: string, avatarUrl: string | null) {
-  const profile = await prisma.profile.findUnique({
-    where: { creator_name: creatorName },
-    select: { id: true }
-  })
-
-  if (!profile) throw new Error('프로필을 찾을 수 없습니다.')
+  // 세션이 본인(또는 관리자)인지 검증하고, 검증된 프로필 ID로만 수정한다.
+  const authCreatorId = await requireAuth(creatorName)
 
   await prisma.profile.update({
-    where: { id: profile.id },
+    where: { id: authCreatorId },
     data: { avatar_url: avatarUrl }
   })
 

@@ -8,6 +8,10 @@ gsap.registerPlugin(ScrollTrigger)
 
 export default function HeroAnimator() {
   useEffect(() => {
+    if (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      return // 모션 최소화: 진입 애니메이션/패럴랙스 생략 (콘텐츠는 즉시 표시)
+    }
+
     let ctx = gsap.context(() => {
       // 1. Initial State (prevent flash before JS loads)
       gsap.set('.hero-avatar, .hero-title, .hero-subtitle, .hero-details, .hero-sns > *', { opacity: 0 })

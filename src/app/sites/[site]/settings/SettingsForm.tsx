@@ -25,6 +25,14 @@ export default function SettingsForm({ profile, allCreators = [] }: { profile: a
   const [searchQuery, setSearchQuery] = useState('')
   const recommendedCreators: string[] = snsSettings.recommended_creators || []
 
+  const peerCandidates = allCreators.filter((c: any) => 
+    !recommendedCreators.includes(c.creator_name) &&
+    (searchQuery === '' || 
+      c.display_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.creator_name?.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+  )
+
   const addRecommendedCreator = (username: string) => {
     if (recommendedCreators.includes(username)) return
     setSnsSettings(prev => ({
@@ -44,6 +52,15 @@ export default function SettingsForm({ profile, allCreators = [] }: { profile: a
   const toggleSns = (key: string) => {
     setSnsSettings(prev => ({ ...prev, [key]: !prev[key] }))
   }
+
+  // 명시적 boolean 설정용(커서/스크롤바 토글처럼 기본값 의미가 다른 키에 사용)
+  const setSnsValue = (key: string, value: boolean) => {
+    setSnsSettings(prev => ({ ...prev, [key]: value }))
+  }
+
+  // 커서는 기본 ON(명시적 false일 때만 꺼짐), 스크롤바는 기본 OFF(명시적 true일 때만 켜짐)
+  const cursorOn = snsSettings.custom_cursor !== false
+  const scrollbarOn = snsSettings.custom_scrollbar === true
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -169,6 +186,46 @@ export default function SettingsForm({ profile, allCreators = [] }: { profile: a
         </div>
       </section>
 
+      {/* Section: Interaction Effects (#9) */}
+      <section>
+        <h2 className="text-xl font-bold border-b border-neutral-100 pb-4 mb-6">인터랙션 효과 (Interaction Effects)</h2>
+        <p className="text-sm text-neutral-500 mb-6">방문자가 내 포트폴리오를 둘러볼 때 적용되는 마우스/스크롤 인터랙션을 켜고 끌 수 있습니다.</p>
+        <div className="space-y-4">
+          {/* Custom Cursor */}
+          <div className="flex items-center justify-between gap-4 p-4 border border-neutral-200 rounded-lg bg-white shadow-sm">
+            <div>
+              <div className="text-sm font-bold text-neutral-800">커스텀 마우스 커서</div>
+              <div className="text-xs text-neutral-500 mt-1 leading-relaxed">마우스를 따라다니는 미니멀한 포인터 효과입니다. 모바일·터치 기기나 모션 최소화 설정에서는 자동으로 비활성화됩니다.</div>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={cursorOn}
+              onClick={() => setSnsValue('custom_cursor', !cursorOn)}
+              className={`relative inline-flex h-7 w-14 flex-shrink-0 items-center rounded-full transition-colors ${cursorOn ? 'bg-blue-600' : 'bg-neutral-300'}`}
+            >
+              <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${cursorOn ? 'translate-x-8' : 'translate-x-1'}`} />
+            </button>
+          </div>
+          {/* Custom Scrollbar */}
+          <div className="flex items-center justify-between gap-4 p-4 border border-neutral-200 rounded-lg bg-white shadow-sm">
+            <div>
+              <div className="text-sm font-bold text-neutral-800">커스텀 스크롤바</div>
+              <div className="text-xs text-neutral-500 mt-1 leading-relaxed">기본 브라우저 스크롤바 대신 얇고 둥근 스크롤바를 사용합니다.</div>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={scrollbarOn}
+              onClick={() => setSnsValue('custom_scrollbar', !scrollbarOn)}
+              className={`relative inline-flex h-7 w-14 flex-shrink-0 items-center rounded-full transition-colors ${scrollbarOn ? 'bg-blue-600' : 'bg-neutral-300'}`}
+            >
+              <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${scrollbarOn ? 'translate-x-8' : 'translate-x-1'}`} />
+            </button>
+          </div>
+        </div>
+      </section>
+
       {/* Section: Footer Info */}
       <section>
         <h2 className="text-xl font-bold border-b border-neutral-100 pb-4 mb-6">푸터 대형 텍스트 설정</h2>
@@ -201,7 +258,7 @@ export default function SettingsForm({ profile, allCreators = [] }: { profile: a
           <label className="block text-xs font-bold mb-2 text-neutral-400 uppercase tracking-wider">내가 추천한 동료 목록</label>
           {recommendedCreators.length === 0 ? (
             <div className="text-sm text-neutral-400 italic p-4 border border-dashed border-neutral-200 rounded-lg bg-white/40 text-center">
-              아직 추천한 동료가 없습니다. 아래에서 검색하여 추가해보세요.
+              아직 추천한 동료가 없습니다. 아래에서 대상을 선택하거나 검색하여 추가해보세요.
             </div>
           ) : (
             <div className="flex flex-wrap gap-3">
@@ -235,58 +292,62 @@ export default function SettingsForm({ profile, allCreators = [] }: { profile: a
           )}
         </div>
 
-        {/* Creator Search & Suggest */}
-        <div className="relative">
-          <label className="block text-xs font-bold mb-2 text-neutral-400 uppercase tracking-wider">동료 크리에이터 검색</label>
-          <input
-            type="text"
-            placeholder="크리에이터 이름 또는 핸들 검색..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="w-full border border-neutral-300 p-4 rounded-lg bg-white focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all font-medium text-sm shadow-sm"
-          />
+        {/* Creator Search Input */}
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold mb-2 text-neutral-400 uppercase tracking-wider">동료 크리에이터 검색</label>
+            <input
+              type="text"
+              placeholder="크리에이터 이름 또는 핸들 검색..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full border border-neutral-300 p-4 rounded-lg bg-white focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all font-medium text-sm shadow-sm"
+            />
+          </div>
 
-          {searchQuery && (
-            <div className="absolute left-0 right-0 mt-2 bg-white border border-neutral-200 rounded-xl shadow-xl max-h-60 overflow-y-auto z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-              {allCreators.filter((c: any) => 
-                c.display_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                c.creator_name?.toLowerCase().includes(searchQuery.toLowerCase())
-              ).length === 0 ? (
-                <div className="p-4 text-center text-sm text-neutral-400">
-                  검색 결과가 없습니다.
-                </div>
-              ) : (
-                allCreators
-                  .filter((c: any) => 
-                    c.display_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    c.creator_name?.toLowerCase().includes(searchQuery.toLowerCase())
-                  )
-                  .map((creator: any) => (
-                    <button
-                      key={creator.creator_name}
-                      type="button"
-                      onClick={() => addRecommendedCreator(creator.creator_name)}
-                      className="w-full flex items-center justify-between p-3.5 hover:bg-neutral-50 transition-colors text-left border-b border-neutral-100 last:border-0"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="relative w-8 h-8 rounded-full overflow-hidden bg-neutral-200">
-                          <img src={creator.avatar_url || '/default_avatar.png'} alt={creator.display_name} className="object-cover w-full h-full" />
+          {/* Inline Peer Candidates Grid */}
+          <div>
+            <label className="block text-xs font-bold mb-3 text-neutral-400 uppercase tracking-wider">추천 후보 리스트</label>
+            {peerCandidates.length === 0 ? (
+              <div className="text-sm text-neutral-400 italic p-6 border border-dashed border-neutral-200 rounded-xl bg-white/40 text-center">
+                {searchQuery ? '검색 결과와 일치하는 크리에이터가 없습니다.' : '추천할 수 있는 다른 크리에이터가 없습니다.'}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {peerCandidates.map((creator: any) => (
+                  <div
+                    key={creator.creator_name}
+                    className="flex items-center justify-between p-3.5 bg-white border border-neutral-200 hover:border-neutral-300 hover:shadow-sm rounded-xl transition-all duration-200 group"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="relative w-9 h-9 rounded-full overflow-hidden bg-neutral-100 border border-neutral-200 flex-shrink-0">
+                        <img
+                          src={creator.avatar_url || '/default_avatar.png'}
+                          alt={creator.display_name}
+                          className="object-cover w-full h-full transition-transform duration-300 group-hover:scale-110"
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-neutral-800 truncate leading-snug">
+                          {creator.display_name}
                         </div>
-                        <div>
-                          <div className="text-sm font-bold text-neutral-800">{creator.display_name}</div>
-                          <div className="text-xs text-neutral-400 font-mono">@{creator.creator_name}</div>
+                        <div className="text-[10px] text-neutral-400 font-mono truncate leading-none">
+                          @{creator.creator_name}
                         </div>
                       </div>
-                      {recommendedCreators.includes(creator.creator_name) ? (
-                        <span className="text-xs bg-green-50 text-green-600 px-2 py-1 rounded-full font-bold">추천됨</span>
-                      ) : (
-                        <span className="text-xs text-neutral-400 hover:text-black font-bold">+ 추가</span>
-                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => addRecommendedCreator(creator.creator_name)}
+                      className="flex-shrink-0 bg-neutral-50 hover:bg-black hover:text-white text-neutral-600 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all border border-neutral-200 hover:border-black"
+                    >
+                      + 추천
                     </button>
-                  ))
-              )}
-            </div>
-          )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </section>
 

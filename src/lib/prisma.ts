@@ -13,7 +13,8 @@ const globalForPrisma = globalThis as unknown as {
 export const prisma =
   new PrismaClient({
     adapter,
-    log: ['query'],
+    // 운영 환경에서는 쿼리(매개변수 값 포함)를 로그에 남기지 않는다. 개발에서만 상세 로깅.
+    log: process.env.NODE_ENV === 'production' ? ['error'] : ['query', 'error', 'warn'],
   })
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma

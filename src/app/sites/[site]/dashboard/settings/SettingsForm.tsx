@@ -24,6 +24,14 @@ export default function SettingsForm({ profile, allCreators = [] }: { profile: a
   const [searchQuery, setSearchQuery] = useState('')
   const recommendedCreators: string[] = snsSettings.recommended_creators || []
 
+  const peerCandidates = allCreators.filter((c: any) => 
+    !recommendedCreators.includes(c.creator_name) &&
+    (searchQuery === '' || 
+      c.display_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.creator_name?.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+  )
+
   const addRecommendedCreator = (username: string) => {
     if (recommendedCreators.includes(username)) return
     setSnsSettings(prev => ({
@@ -43,6 +51,15 @@ export default function SettingsForm({ profile, allCreators = [] }: { profile: a
   const toggleSns = (key: string) => {
     setSnsSettings(prev => ({ ...prev, [key]: !prev[key] }))
   }
+
+  // 명시적 boolean 설정용(커서/스크롤바 토글처럼 기본값 의미가 다른 키에 사용)
+  const setSnsValue = (key: string, value: boolean) => {
+    setSnsSettings(prev => ({ ...prev, [key]: value }))
+  }
+
+  // 커서는 기본 ON(명시적 false일 때만 꺼짐), 스크롤바는 기본 OFF(명시적 true일 때만 켜짐)
+  const cursorOn = snsSettings.custom_cursor !== false
+  const scrollbarOn = snsSettings.custom_scrollbar === true
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -89,6 +106,105 @@ export default function SettingsForm({ profile, allCreators = [] }: { profile: a
         </div>
       </section>
 
+      {/* Section: Page Theme */}
+      <section>
+        <h2 className="text-lg font-bold border-b border-neutral-100 pb-3 mb-5">테마 설정 (Theme Settings)</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-[11px] font-bold mb-1.5 text-neutral-500 uppercase tracking-wide">배경 색상 (Background Color)</label>
+            <div className="flex items-center gap-4">
+              <input type="color" name="theme_bg_color" defaultValue={profile.theme_bg_color} className="w-10 h-10 rounded cursor-pointer border border-neutral-200 p-0" title="배경 색상" />
+              <span className="text-xs text-neutral-500">배너 이미지 아래 메인 배경 색상입니다.<br/>기본값은 #222222 입니다.</span>
+            </div>
+          </div>
+          <div>
+            <label className="block text-[11px] font-bold mb-1.5 text-neutral-500 uppercase tracking-wide">배경 애니메이션 효과 (Background Effect)</label>
+            <select name="theme_bg_effect" defaultValue={profile.theme_bg_effect ? profile.theme_bg_effect.split('|')[0] : 'none'} className="w-full border border-neutral-200 p-3 rounded-lg bg-neutral-50 focus:bg-white focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all font-medium text-sm">
+              <optgroup label="최적화 버전 (가벼움)">
+                <option value="none">사용 안 함 (None)</option>
+                <option value="floating_blocks">반투명 블록 떠오르기 (Floating Blocks)</option>
+                <option value="retro_grid">레트로 3D 모눈종이 (Retro Grid)</option>
+                <option value="moving_grid">은은한 모눈종이 (Moving Grid)</option>
+                <option value="css_stars">반짝이는 별빛 (Twinkling Stars)</option>
+                <option value="aurora">오로라 그라데이션 (Aurora Glow)</option>
+              </optgroup>
+              <optgroup label="고사양 버전 (화려함)">
+                <option value="flickering_grid">🔥 깜빡이는 픽셀 그리드 (Flickering Grid)</option>
+                <option value="shooting_stars">🔥 떨어지는 별똥별 (Shooting Stars)</option>
+                <option value="wavy_waves">🔥 일렁이는 3D 파동 (Wavy Background)</option>
+                <option value="particle_network">🔥 파티클 네트워크 (Particle Network)</option>
+                <option value="gravity_stars">🔥 인터랙티브 별빛 (Gravity Stars)</option>
+                <option value="fireworks">🔥 불꽃놀이 (Fireworks)</option>
+              </optgroup>
+              <optgroup label="Animate UI 버전 (고급형)">
+                <option value="animate_bubble">✨ 다이나믹 버블 (Bubble)</option>
+                <option value="animate_fireworks">✨ 불꽃축제 (Fireworks)</option>
+                <option value="animate_gradient">✨ 오로라 그라데이션 (Gradient)</option>
+                <option value="animate_gravity_stars">✨ 입체 별자리 (Gravity Stars)</option>
+                <option value="animate_hexagon">✨ 육각 패턴 (Hexagon)</option>
+                <option value="animate_stars">✨ 밤하늘 (Stars)</option>
+              </optgroup>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      {/* Section: Interaction Effects (#9) */}
+      <section>
+        <h2 className="text-lg font-bold border-b border-neutral-100 pb-3 mb-5">인터랙션 효과 (Interaction Effects)</h2>
+        <p className="text-xs text-neutral-500 mb-4 font-medium">방문자가 내 포트폴리오를 둘러볼 때 적용되는 마우스/스크롤 인터랙션을 켜고 끌 수 있습니다.</p>
+        <div className="space-y-3">
+          {/* Custom Cursor */}
+          <div className="flex items-center justify-between gap-4 p-3 border border-neutral-200 rounded-lg bg-white shadow-sm">
+            <div>
+              <div className="text-sm font-bold text-neutral-800">커스텀 마우스 커서</div>
+              <div className="text-[11px] text-neutral-500 mt-0.5 leading-relaxed">마우스를 따라다니는 미니멀한 포인터 효과입니다. 모바일·터치 기기나 모션 최소화 설정에서는 자동으로 비활성화됩니다.</div>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={cursorOn}
+              onClick={() => setSnsValue('custom_cursor', !cursorOn)}
+              className={`relative inline-flex h-7 w-14 flex-shrink-0 items-center rounded-full transition-colors ${cursorOn ? 'bg-blue-600' : 'bg-neutral-300'}`}
+            >
+              <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${cursorOn ? 'translate-x-8' : 'translate-x-1'}`} />
+            </button>
+          </div>
+          {/* Custom Scrollbar */}
+          <div className="flex items-center justify-between gap-4 p-3 border border-neutral-200 rounded-lg bg-white shadow-sm">
+            <div>
+              <div className="text-sm font-bold text-neutral-800">커스텀 스크롤바</div>
+              <div className="text-[11px] text-neutral-500 mt-0.5 leading-relaxed">기본 브라우저 스크롤바 대신 얇고 둥근 스크롤바를 사용합니다.</div>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={scrollbarOn}
+              onClick={() => setSnsValue('custom_scrollbar', !scrollbarOn)}
+              className={`relative inline-flex h-7 w-14 flex-shrink-0 items-center rounded-full transition-colors ${scrollbarOn ? 'bg-blue-600' : 'bg-neutral-300'}`}
+            >
+              <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${scrollbarOn ? 'translate-x-8' : 'translate-x-1'}`} />
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Section: Footer Info */}
+      <section>
+        <h2 className="text-lg font-bold border-b border-neutral-100 pb-3 mb-5">푸터 대형 텍스트 설정</h2>
+        <p className="text-xs text-neutral-500 mb-4 font-medium">포트폴리오 최하단에 표시되는 대형 배경 텍스트를 수정할 수 있습니다.</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-[11px] font-bold mb-1.5 text-neutral-500 uppercase tracking-wide">푸터 제목 (Footer Title)</label>
+            <input name="footer_title" defaultValue={profile.footer_title} placeholder="BLOCK CANVAS" className="w-full border border-neutral-200 p-3 rounded-lg bg-neutral-50 focus:bg-white focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all font-medium text-sm" />
+          </div>
+          <div>
+            <label className="block text-[11px] font-bold mb-1.5 text-neutral-500 uppercase tracking-wide">푸터 부제목 (Footer Subtitle)</label>
+            <input name="footer_subtitle" defaultValue={profile.footer_subtitle} placeholder="CREATOR" className="w-full border border-neutral-200 p-3 rounded-lg bg-neutral-50 focus:bg-white focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all font-medium text-sm" />
+          </div>
+        </div>
+      </section>
+
       {/* Section: Peer Recommendations */}
       <section className="bg-neutral-50/50 p-5 rounded-xl border border-neutral-200">
         <h2 className="text-lg font-bold border-b border-neutral-100 pb-3 mb-4 flex items-center justify-between">
@@ -104,7 +220,7 @@ export default function SettingsForm({ profile, allCreators = [] }: { profile: a
           <label className="block text-[11px] font-bold mb-2 text-neutral-400 uppercase tracking-wider">내가 추천한 동료 목록</label>
           {recommendedCreators.length === 0 ? (
             <div className="text-xs text-neutral-400 italic p-3 border border-dashed border-neutral-200 rounded-lg bg-white/40 text-center">
-              아직 추천한 동료가 없습니다. 아래에서 검색하여 추가해보세요.
+              아직 추천한 동료가 없습니다. 아래에서 대상을 선택하거나 검색하여 추가해보세요.
             </div>
           ) : (
             <div className="flex flex-wrap gap-2">
@@ -139,57 +255,61 @@ export default function SettingsForm({ profile, allCreators = [] }: { profile: a
         </div>
 
         {/* Creator Search & Suggest */}
-        <div className="relative">
-          <label className="block text-[11px] font-bold mb-2 text-neutral-400 uppercase tracking-wider">동료 크리에이터 검색</label>
-          <input
-            type="text"
-            placeholder="크리에이터 이름 또는 핸들 검색..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="w-full border border-neutral-200 p-3 rounded-lg bg-white focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all font-medium text-xs shadow-sm"
-          />
+        <div className="space-y-4">
+          <div>
+            <label className="block text-[11px] font-bold mb-2 text-neutral-400 uppercase tracking-wider">동료 크리에이터 검색</label>
+            <input
+              type="text"
+              placeholder="크리에이터 이름 또는 핸들 검색..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full border border-neutral-200 p-3 rounded-lg bg-white focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all font-medium text-xs shadow-sm"
+            />
+          </div>
 
-          {searchQuery && (
-            <div className="absolute left-0 right-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-lg max-h-48 overflow-y-auto z-50 animate-in fade-in slide-in-from-top-1 duration-200">
-              {allCreators.filter((c: any) => 
-                c.display_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                c.creator_name?.toLowerCase().includes(searchQuery.toLowerCase())
-              ).length === 0 ? (
-                <div className="p-3 text-center text-xs text-neutral-400">
-                  검색 결과가 없습니다.
-                </div>
-              ) : (
-                allCreators
-                  .filter((c: any) => 
-                    c.display_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    c.creator_name?.toLowerCase().includes(searchQuery.toLowerCase())
-                  )
-                  .map((creator: any) => (
-                    <button
-                      key={creator.creator_name}
-                      type="button"
-                      onClick={() => addRecommendedCreator(creator.creator_name)}
-                      className="w-full flex items-center justify-between p-2.5 hover:bg-neutral-50 transition-colors text-left border-b border-neutral-100 last:border-0"
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="relative w-6 h-6 rounded-full overflow-hidden bg-neutral-200">
-                          <img src={creator.avatar_url || '/default_avatar.png'} alt={creator.display_name} className="object-cover w-full h-full" />
+          {/* Inline Peer Candidates Grid */}
+          <div>
+            <label className="block text-[11px] font-bold mb-2.5 text-neutral-400 uppercase tracking-wider">추천 후보 리스트</label>
+            {peerCandidates.length === 0 ? (
+              <div className="text-xs text-neutral-400 italic p-5 border border-dashed border-neutral-200 rounded-xl bg-white/40 text-center">
+                {searchQuery ? '검색 결과와 일치하는 크리에이터가 없습니다.' : '추천할 수 있는 다른 크리에이터가 없습니다.'}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {peerCandidates.map((creator: any) => (
+                  <div
+                    key={creator.creator_name}
+                    className="flex items-center justify-between p-3 bg-white border border-neutral-200 hover:border-neutral-300 hover:shadow-sm rounded-xl transition-all duration-200 group"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="relative w-8 h-8 rounded-full overflow-hidden bg-neutral-100 border border-neutral-200 flex-shrink-0">
+                        <img
+                          src={creator.avatar_url || '/default_avatar.png'}
+                          alt={creator.display_name}
+                          className="object-cover w-full h-full transition-transform duration-300 group-hover:scale-110"
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-neutral-800 truncate leading-snug">
+                          {creator.display_name}
                         </div>
-                        <div>
-                          <div className="text-xs font-bold text-neutral-800">{creator.display_name}</div>
-                          <div className="text-[10px] text-neutral-400 font-mono">@{creator.creator_name}</div>
+                        <div className="text-[9px] text-neutral-400 font-mono truncate leading-none">
+                          @{creator.creator_name}
                         </div>
                       </div>
-                      {recommendedCreators.includes(creator.creator_name) ? (
-                        <span className="text-[10px] bg-green-50 text-green-600 px-1.5 py-0.5 rounded font-bold">추천됨</span>
-                      ) : (
-                        <span className="text-[10px] text-neutral-400 hover:text-black font-bold">+ 추가</span>
-                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => addRecommendedCreator(creator.creator_name)}
+                      className="flex-shrink-0 bg-neutral-50 hover:bg-black hover:text-white text-neutral-600 px-2 py-1 rounded text-[10px] font-bold transition-all border border-neutral-200 hover:border-black"
+                    >
+                      + 추천
                     </button>
-                  ))
-              )}
-            </div>
-          )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </section>
 

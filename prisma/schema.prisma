@@ -25,6 +25,8 @@ model Profile {
   wip_logs        WipLog[]
   two_factor_secret   String?
   two_factor_enabled  Boolean            @default(false)
+  privacy_consented   Boolean            @default(false)
+  privacy_consented_at DateTime?
 }
 
 model Portfolio {
@@ -129,6 +131,10 @@ model ContactMessage {
   email        String
   message      String
   is_read      Boolean  @default(false)
+  reply        String?
+  replied_at   DateTime?
+  reply_read   Boolean  @default(false)
+  sender_name  String?
   created_at   DateTime @default(now())
   creator      Profile  @relation(fields: [creator_id], references: [id], onDelete: Cascade)
 }

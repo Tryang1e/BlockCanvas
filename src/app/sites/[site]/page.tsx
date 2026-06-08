@@ -12,6 +12,7 @@ import JumpingScrollButton from '@/components/ui/JumpingScrollButton'
 import BusinessCardContact from '@/components/creator/BusinessCardContact'
 import HeroAnimator from '@/components/creator/HeroAnimator'
 import CustomCursor from '@/components/ui/CustomCursor'
+import CustomScrollbar from '@/components/ui/CustomScrollbar'
 import MagneticEffect from '@/components/ui/MagneticEffect'
 import { verifySession } from '@/lib/session'
 import ScrollFillText from '@/components/ui/ScrollFillText'
@@ -141,11 +142,7 @@ export default async function CreatorPortfolioPage({
     include: { portfolios: true }
   })
 
-  console.log('--- DEBUG PROFILE DATA ---')
-  console.log(JSON.stringify(profile, null, 2))
-  console.log('--------------------------')
-
-  if (!profile) {
+  if (!profile || profile.role === 'user') {
     notFound()
   }
 
@@ -281,8 +278,21 @@ export default async function CreatorPortfolioPage({
     theme_bg_color: portfolio?.theme_bg_color || '#222222'
   }
 
+  // 클라이언트 컴포넌트로 직렬화될 때 비밀번호 해시·2FA 시크릿·이메일 등 민감 필드가
+  // 브라우저로 새어 나가지 않도록, BusinessCardContact가 실제 사용하는 공개 필드만 추려 전달한다.
+  const safeProfile = {
+    creator_name: profile.creator_name,
+    display_name: profile.display_name,
+    avatar_url: profile.avatar_url,
+  }
+
   // 테마 종합 디자인 복합 설정 파싱
   const designConfig = parseThemeDesignConfig(portfolio?.theme_bg_effect)
+
+  // 인터랙션 설정(#9): 커스텀 커서는 기존 동작 유지를 위해 기본 ON(명시적 false일 때만 끔),
+  // 커스텀 스크롤바는 신규 기능이라 기본 OFF(명시적 true일 때만 켬).
+  const customCursorEnabled = (snsSettings as any).custom_cursor !== false
+  const customScrollbarEnabled = (snsSettings as any).custom_scrollbar === true
 
   return (
     <ScrollProgressProvider global>
@@ -307,7 +317,8 @@ export default async function CreatorPortfolioPage({
       <JumpingScrollButton />
       <ScrollSpyNav sections={sections} />
 
-      <CustomCursor />
+      {customCursorEnabled && <CustomCursor />}
+      {customScrollbarEnabled && <CustomScrollbar />}
       <HeroAnimator />
       
       {/* Top Navbar (Fixed across the whole page) */}
@@ -318,6 +329,7 @@ export default async function CreatorPortfolioPage({
         viewerSession={session || undefined}
         viewerName={viewerProfile?.display_name || session || undefined}
         viewerAvatarUrl={viewerProfile?.avatar_url || ''}
+        viewerRole={viewerProfile?.role || undefined}
       />
 
       {/* Hero Header */}
@@ -381,7 +393,13 @@ export default async function CreatorPortfolioPage({
 
             {/* Recommended Creators (AvatarGroup) rendered NEXT TO the profile avatar circle with Draggable custom layout */}
             {recommendedCreators && recommendedCreators.length > 0 && (
-              <DraggablePeersBadge creatorName={creator_name} recommendedCreators={recommendedCreators} />
+              <DraggablePeersBadge 
+                creatorName={creator_name} 
+                recommendedCreators={recommendedCreators} 
+                isOwner={isOwner}
+                initialX={(snsSettings as any).peers_badge_x || 0}
+                initialY={(snsSettings as any).peers_badge_y || 0}
+              />
             )}
           </div>
 
@@ -483,7 +501,7 @@ export default async function CreatorPortfolioPage({
         
         <BusinessCardContact 
           profileData={profileData} 
-          profile={profile} 
+          profile={safeProfile}
           footer_title={portfolio?.footer_title || undefined}
           footer_subtitle={portfolio?.footer_subtitle || undefined}
           recommendedCreators={recommendedCreators}

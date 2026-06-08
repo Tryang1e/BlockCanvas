@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import PasswordForm from '@/components/creator/PasswordForm'
 import AccountDeletion from '@/components/creator/AccountDeletion'
 import TwoFactorAuthSettings from '@/components/creator/TwoFactorAuthSettings'
+import PrivacyConsentStatus from '@/components/creator/PrivacyConsentStatus'
 
 export default async function DashboardAccountPage({
   params,
@@ -53,6 +54,12 @@ export default async function DashboardAccountPage({
 
         {/* Section: 2FA Settings */}
         <TwoFactorAuthSettings creatorName={creator_name} is2faEnabled={profile.two_factor_enabled} />
+
+        {/* Section: Privacy Consent Status */}
+        <PrivacyConsentStatus 
+          privacyConsented={profile.privacy_consented} 
+          privacyConsentedAt={profile.privacy_consented_at} 
+        />
 
         {/* Section: Danger Zone (Account Deletion) */}
         <AccountDeletion creatorName={creator_name} is2faEnabled={profile.two_factor_enabled} />

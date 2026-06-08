@@ -61,6 +61,18 @@ export async function fetchProjectDetails(projectId: string) {
     const session = verifySession(sessionToken)
     const isOwner = session === project.creator.creator_name
 
+    // 비공개(미발행) 프로젝트는 소유자 또는 관리자에게만 노출한다.
+    if (!project.is_published && !isOwner) {
+      let isAdmin = session === 'admin'
+      if (!isAdmin && session) {
+        const sp = await prisma.profile.findUnique({ where: { creator_name: session }, select: { role: true } })
+        isAdmin = sp?.role?.toLowerCase() === 'admin'
+      }
+      if (!isAdmin) {
+        return { success: false, error: 'Project not found' }
+      }
+    }
+
     let otherProjects: any[] = []
     let relatedType = 'creator'
 

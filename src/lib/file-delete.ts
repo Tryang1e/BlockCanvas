@@ -64,13 +64,21 @@ export async function deleteUserPhysicalFiles(profileId: string) {
     console.log(`[File Delete] Scanning finished. Found ${urlsToDelete.size} unique candidate URLs.`)
 
     // 5. Physically delete files
+    const uploadsRoot = path.join(process.cwd(), 'public', 'uploads')
     for (const url of urlsToDelete) {
       // Ensure the URL is a local upload and not a default avatar/banner or external URL
       if (url.startsWith('/uploads/') && !url.includes('default_avatar.png') && !url.includes('default_banner.png')) {
         // Map public URL to local public folder file path
         const relativePath = url.replace(/^\//, '') // remove leading slash
-        const absolutePath = path.join(process.cwd(), 'public', relativePath)
-        
+        const absolutePath = path.resolve(process.cwd(), 'public', relativePath)
+
+        // 경로 탐색(Path Traversal) 방지: 반드시 uploads 디렉터리 하위여야 한다.
+        // (예: '/uploads/../../dev.db' 같은 입력으로 DB 등 임의 파일이 삭제되는 것을 차단)
+        if (absolutePath !== uploadsRoot && !absolutePath.startsWith(uploadsRoot + path.sep)) {
+          console.warn(`[File Delete] Skipped path outside uploads directory: ${absolutePath}`)
+          continue
+        }
+
         try {
           // Check if file exists before deleting
           await fs.access(absolutePath)

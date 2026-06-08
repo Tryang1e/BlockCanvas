@@ -649,9 +649,9 @@ export default function MainLandingClient({ creators, userProfile }: Props) {
             </Link>
 
             <nav className="hidden md:flex items-center gap-8 text-[9px] font-bold text-neutral-400 uppercase tracking-widest pointer-events-auto">
-              <a href="#hero-section" className="hover:text-black transition-colors magnetic-target">Main</a>
+              <Link href="/" className="hover:text-black transition-colors magnetic-target">Main</Link>
               <a href="#about-section" className="hover:text-black transition-colors magnetic-target">About Us</a>
-              <a href="#staff-section" className="hover:text-black transition-colors magnetic-target">Creators</a>
+              <Link href="/explore" className="hover:text-black transition-colors magnetic-target">Explore</Link>
             </nav>
 
             <div className="pointer-events-auto">
@@ -661,6 +661,7 @@ export default function MainLandingClient({ creators, userProfile }: Props) {
                   userHandle={userProfile.creator_name}
                   avatarUrl={userProfile.avatar_url || ''}
                   isOwner={true}
+                  userRole={userProfile.role || undefined}
                 />
               ) : (
                 <Link
@@ -759,7 +760,7 @@ export default function MainLandingClient({ creators, userProfile }: Props) {
             {/* Premium call-to-action buttons */}
             <div className="flex flex-row gap-4 items-center mt-12 md:mt-16 w-full pointer-events-auto">
               <Link
-                href="#staff-section"
+                href="/explore"
                 className="rounded-full bg-neutral-900 text-[#FAF9F5] hover:bg-neutral-800 px-8 py-3.5 text-[12px] font-bold uppercase tracking-widest flex items-center gap-2 transition-all duration-300 shadow-sm hover:shadow-lg magnetic-target"
               >
                 <Users size={12} />
@@ -767,7 +768,7 @@ export default function MainLandingClient({ creators, userProfile }: Props) {
               </Link>
 
               <Link
-                href="/login"
+                href="#staff-section"
                 className="rounded-full border border-neutral-900 bg-transparent text-neutral-900 hover:bg-neutral-900 hover:text-[#FAF9F5] px-8 py-3.5 text-[12px] font-bold uppercase tracking-widest transition-all duration-300 magnetic-target"
               >
                 <span>start building</span>
@@ -946,18 +947,13 @@ export default function MainLandingClient({ creators, userProfile }: Props) {
                       </button>
                     </li>
                     <li>
-                      <button
-                        onClick={() => {
-                          toggleFooterPopup(false)
-                          if (typeof window !== 'undefined' && (window as any).scrollToLandingIdx) {
-                            (window as any).scrollToLandingIdx(2)
-                          }
-                        }}
+                      <Link
+                        href="/explore"
                         className="flex items-center justify-between w-full p-3 rounded-lg hover:bg-[#222222] group transition-all text-[#CCCCCC] hover:text-white text-xs cursor-pointer focus:outline-none"
                       >
-                        <span className="font-semibold">Creators list</span>
-                        <span className="text-[#666666] group-hover:text-white transition-colors text-sm">↓</span>
-                      </button>
+                        <span className="font-semibold">Explore Platform</span>
+                        <span className="text-[#666666] group-hover:text-white transition-colors text-sm">→</span>
+                      </Link>
                     </li>
                   </ul>
                 </div>
@@ -1009,6 +1005,13 @@ export default function MainLandingClient({ creators, userProfile }: Props) {
                     <span className="font-black text-base tracking-tighter text-white">BLOCKCANVAS<span className="text-[#FF424D]">.</span></span>
                   </div>
                   <p className="text-[#666666] text-[10px] font-medium">© 2026 BlockCanvas Studio. All rights reserved.</p>
+                  <div className="flex items-center gap-3 text-[10px] font-semibold text-[#888888] mt-2 select-none">
+                    <Link href="/privacy" className="text-white hover:underline font-black">
+                      개인정보처리방침
+                    </Link>
+                    <span>|</span>
+                    <span className="text-[#444444] cursor-not-allowed">이용약관</span>
+                  </div>
                   <p className="text-[#444444] text-[8px] mt-2 font-medium max-w-xl leading-relaxed text-center opacity-40">
                     Open Source Licenses: Next.js, React, Tailwind CSS, Framer Motion, GSAP, Prisma, Radix UI, Lucide, Lenis, Animate UI.
                   </p>

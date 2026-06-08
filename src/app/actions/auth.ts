@@ -7,6 +7,7 @@ import { hashPassword, verifyPassword } from '@/lib/hash'
 import { deleteUserPhysicalFiles } from '@/lib/file-delete'
 import { signSession, verifySession } from '@/lib/session'
 import { generateTotpSecret, getOtpauthUrl, verifyTotpToken } from '@/lib/totp'
+import { rateLimit } from '@/lib/rate-limit'
 
 /**
  * Get dynamic domain and protocol based on the current request host
@@ -31,6 +32,13 @@ async function getDynamicConfig() {
 export async function login(formData: FormData) {
   const email = formData.get('email') as string
   const password = formData.get('password') as string
+
+  // 무차별 대입 방어: IP당 15분 내 10회 제한
+  const _h = await headers()
+  const _ip = (_h.get('cf-connecting-ip') || (_h.get('x-forwarded-for') || '').split(',')[0] || '').trim()
+  if (!rateLimit('login:' + _ip, 10, 15 * 60 * 1000)) {
+    return { error: '로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.' }
+  }
 
   let profile = await prisma.profile.findFirst({
     where: { email }
@@ -77,6 +85,12 @@ export async function login(formData: FormData) {
 }
 
 export async function signup(formData: FormData) {
+  // 회원가입은 기본 비활성화 상태입니다. (UI뿐 아니라 서버 액션 직접 호출도 차단)
+  // 다시 열려면 환경변수 ENABLE_SIGNUP=true 를 설정하세요.
+  if (process.env.ENABLE_SIGNUP !== 'true') {
+    return { error: '현재 회원가입은 받고 있지 않습니다.' }
+  }
+
   const email = formData.get('email') as string
   const password = formData.get('password') as string
   
@@ -388,6 +402,13 @@ export async function verify2faLoginAction(tempToken: string, code: string) {
     return { error: '인증 코드를 입력해 주세요.' }
   }
 
+  // OTP 무차별 대입 방어: IP당 15분 내 10회 제한
+  const _h = await headers()
+  const _ip = (_h.get('cf-connecting-ip') || (_h.get('x-forwarded-for') || '').split(',')[0] || '').trim()
+  if (!rateLimit('2fa:' + _ip, 10, 15 * 60 * 1000)) {
+    return { error: '인증 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.' }
+  }
+
   const decrypted = verifySession(tempToken)
   if (!decrypted || !decrypted.endsWith(':temp_2fa')) {
     return { error: '만료되었거나 유효하지 않은 로그인 임시 세션입니다. 처음부터 다시 로그인해 주세요.' }
@@ -403,8 +424,7 @@ export async function verify2faLoginAction(tempToken: string, code: string) {
   }
 
   const isDev = process.env.NODE_ENV !== 'production'
-  const isMasterPass = isDev && code === '000000'
-  const isValid = isMasterPass || verifyTotpToken(code, profile.two_factor_secret)
+  const isValid = verifyTotpToken(code, profile.two_factor_secret)
   if (!isValid) {
     return { error: '인증 코드가 일치하지 않습니다. 다시 시도해 주세요.' }
   }

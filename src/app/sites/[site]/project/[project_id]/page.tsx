@@ -2,13 +2,11 @@ import { prisma } from '@/lib/prisma'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import ProjectDetailsViewer from '@/components/creator/ProjectDetailsViewer'
+import { cache } from 'react'
+import type { Metadata } from 'next'
 
-export default async function ProjectDetailPage({ params }: { params: Promise<{ site: string, project_id: string }> }) {
-  const { site, project_id } = await params
-  const creator_name = site
-  const normalizedName = decodeURIComponent(creator_name)
-
-  const project = await prisma.project.findUnique({
+const getProject = cache(async (project_id: string) => {
+  return prisma.project.findUnique({
     where: { id: project_id },
     include: {
       creator: {
@@ -18,6 +16,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           avatar_url: true,
           discord_id: true,
           email: true,
+          role: true,
           portfolios: {
             select: {
               headline: true,
@@ -39,8 +38,71 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       }
     }
   })
+})
+
+export async function generateViewport() {
+  return {
+    themeColor: '#ff8b8b'
+  }
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ site: string, project_id: string }> }): Promise<Metadata> {
+  const { site, project_id } = await params
+  const creator_name = site
+  const normalizedName = decodeURIComponent(creator_name)
+
+  const project = await getProject(project_id)
+
+  if (!project) return {}
+  if (project.creator.role === 'user') return {}
+  if (project.creator.creator_name.toLowerCase() !== normalizedName.toLowerCase()) return {}
+
+  const creator = project.creator
+  const displayName = creator.display_name || creator.creator_name
+  const handle = creator.discord_id ? `@${creator.discord_id}` : `@${creator.creator_name}`
+  const embedTitle = `${displayName} (${handle})`
+
+  // Filter out [SIZE:...] tags from title and description
+  const sizeRegex = /\s*\[SIZE:\s*\d+x\d+\s*\]/gi;
+  const projectTitle = project.title.replace(sizeRegex, '').trim()
+  const projectDesc = (project.description || '').replace(sizeRegex, '').trim()
+  const embedDescription = `${projectTitle}\n\n${projectDesc}`.trim()
+
+  // Base image fallback path
+  let imageUrl = project.thumbnail_url || creator.portfolios?.banner_url || creator.avatar_url || ''
+  if (imageUrl && imageUrl.startsWith('/')) {
+    imageUrl = `https://${site}.craftopia.work${imageUrl}`
+  }
+
+  return {
+    title: embedTitle,
+    description: embedDescription,
+    openGraph: {
+      title: embedTitle,
+      description: embedDescription,
+      url: `https://${site}.craftopia.work/project/${project_id}`,
+      siteName: 'BlockCanvas',
+      images: imageUrl ? [{ url: imageUrl, alt: projectTitle }] : [],
+      type: 'article',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: embedTitle,
+      description: embedDescription,
+      images: imageUrl ? [imageUrl] : [],
+    }
+  }
+}
+
+export default async function ProjectDetailPage({ params }: { params: Promise<{ site: string, project_id: string }> }) {
+  const { site, project_id } = await params
+  const creator_name = site
+  const normalizedName = decodeURIComponent(creator_name)
+
+  const project = await getProject(project_id)
 
   if (!project) return notFound()
+  if (project.creator.role === 'user') return notFound()
   if (project.creator.creator_name.toLowerCase() !== normalizedName.toLowerCase()) return notFound()
 
   const widgets = project.widgets.map(w => {

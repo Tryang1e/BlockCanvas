@@ -15,6 +15,7 @@ interface CreatorFooterProps {
 
 export default function CreatorFooter({ profileData, creatorName, recommendedCreators = [] }: CreatorFooterProps) {
   const [formData, setFormData] = useState({ name: '', email: '', message: '' })
+  const [agreeContactPrivacy, setAgreeContactPrivacy] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState('')
@@ -43,6 +44,11 @@ export default function CreatorFooter({ profileData, creatorName, recommendedCre
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!agreeContactPrivacy) {
+      setSubmitStatus('error')
+      setErrorMessage('개인정보 수집 및 이용에 동의하셔야 메시지를 보낼 수 있습니다.')
+      return
+    }
     setIsSubmitting(true)
     setSubmitStatus('idle')
     setErrorMessage('')
@@ -51,6 +57,7 @@ export default function CreatorFooter({ profileData, creatorName, recommendedCre
     if (res.success) {
       setSubmitStatus('success')
       setFormData({ name: '', email: '', message: '' })
+      setAgreeContactPrivacy(false)
     } else {
       setSubmitStatus('error')
       setErrorMessage(res.error || '오류가 발생했습니다. 다시 시도해주세요.')
@@ -107,6 +114,12 @@ export default function CreatorFooter({ profileData, creatorName, recommendedCre
                 <a href={platformMainUrl} className="flex items-center justify-between w-full p-3 rounded-lg hover:bg-[#222222] group transition-all text-[#CCCCCC] hover:text-white">
                   <span className="font-semibold text-[15px]">BlockCanvas Home</span>
                   <span className="text-[#666666] group-hover:text-white transition-colors text-lg">⌂</span>
+                </a>
+              </li>
+              <li>
+                <a href={`${platformMainUrl}/explore`} className="flex items-center justify-between w-full p-3 rounded-lg hover:bg-[#222222] group transition-all text-[#CCCCCC] hover:text-white">
+                  <span className="font-semibold text-[15px]">Explore Platform</span>
+                  <span className="text-[#666666] group-hover:text-white transition-colors text-lg">→</span>
                 </a>
               </li>
               <li>
@@ -190,7 +203,20 @@ export default function CreatorFooter({ profileData, creatorName, recommendedCre
               </div>
               <span className="font-black text-xl tracking-tighter text-white">BLOCKCANVAS<span className="text-[#FF424D]">.</span></span>
             </div>
-            <p className="text-[#666666] text-sm font-medium">© 2026 BlockCanvas. All rights reserved.</p>
+            <div className="flex items-center gap-4 text-xs font-semibold text-[#888888]">
+              <p className="text-[#666666] font-medium">© 2026 BlockCanvas. All rights reserved.</p>
+              <span>|</span>
+              <a 
+                href={`${platformMainUrl}/privacy`} 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-white hover:underline font-black tracking-tight"
+              >
+                개인정보처리방침
+              </a>
+              <span>|</span>
+              <span className="text-[#444444] cursor-not-allowed select-none">이용약관</span>
+            </div>
             <p className="text-[#444444] text-[10px] mt-1 font-medium max-w-md leading-relaxed">
               Open Source Licenses: Next.js (MIT), React (MIT), Tailwind CSS (MIT), Framer Motion (MIT), GSAP (Standard), Prisma (Apache-2.0), Radix UI (MIT), Lucide (ISC), Lenis (MIT), Animate UI (MIT).
             </p>
@@ -204,7 +230,7 @@ export default function CreatorFooter({ profileData, creatorName, recommendedCre
                 메시지가 성공적으로 전송되었습니다!
               </div>
             ) : (
-              <form className="flex flex-col w-full gap-2" onSubmit={handleSubmit}>
+              <form className="flex flex-col w-full gap-2.5" onSubmit={handleSubmit}>
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -223,6 +249,25 @@ export default function CreatorFooter({ profileData, creatorName, recommendedCre
                     required
                   />
                 </div>
+
+                {/* Privacy Consent Checkbox */}
+                <div className="flex items-center gap-2 py-0.5 select-none">
+                  <input
+                    type="checkbox"
+                    id="agreeContactPrivacy"
+                    checked={agreeContactPrivacy}
+                    onChange={(e) => setAgreeContactPrivacy(e.target.checked)}
+                    className="accent-white h-3.5 w-3.5 rounded bg-[#2A2A2A] border border-[#333333] cursor-pointer"
+                    required
+                  />
+                  <label 
+                    htmlFor="agreeContactPrivacy" 
+                    className="text-[9px] text-[#888888] hover:text-[#CCCCCC] cursor-pointer font-bold leading-none"
+                  >
+                    개인정보 수집 및 이용에 동의합니다. (필수)
+                  </label>
+                </div>
+
                 <div className="flex gap-2">
                   <textarea
                     placeholder="Message"

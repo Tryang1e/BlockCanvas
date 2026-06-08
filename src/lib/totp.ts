@@ -29,11 +29,12 @@ export function verifyTotpToken(token: string, secret: string): boolean {
   if (!token || !secret) return false;
   try {
     const cleanToken = token.trim();
-    // 시간 불일치(Clock Skew / Time Drift) 방지: epochTolerance를 300초(앞뒤로 최대 5분 시간 차이 허용)로 설정하여 시간 동기화 오차 문제를 원천 방어합니다.
+    // 시간 불일치(Clock Skew / Time Drift) 완화: epochTolerance를 60초(±1분)로 설정.
+    // 과거 300초(±5분)는 동시에 유효한 OTP 창이 너무 넓어 무차별 대입에 취약했기에 축소함.
     const result = verifySync({
       token: cleanToken,
       secret,
-      epochTolerance: 300
+      epochTolerance: 60
     });
     return result.valid;
   } catch (error) {

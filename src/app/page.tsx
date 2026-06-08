@@ -13,7 +13,9 @@ export default async function Home() {
   let userProfile = null
   if (session) {
     userProfile = await prisma.profile.findUnique({
-      where: { creator_name: session }
+      where: { creator_name: session },
+      // 클라이언트 컴포넌트로 전달되므로 비밀번호 해시·2FA 시크릿은 제외한다.
+      omit: { password: true, two_factor_secret: true }
     })
   }
 

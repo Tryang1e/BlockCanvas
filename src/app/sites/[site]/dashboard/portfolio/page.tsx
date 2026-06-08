@@ -15,7 +15,7 @@ export default async function DashboardPortfolioPage({
     include: { portfolios: true }
   })
 
-  if (!profile) {
+  if (!profile || profile.role === 'user') {
     notFound()
   }
 

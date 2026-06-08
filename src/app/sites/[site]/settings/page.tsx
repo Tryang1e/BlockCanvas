@@ -27,7 +27,7 @@ export default async function SettingsPage({
     include: { portfolios: true }
   })
 
-  if (!profile) {
+  if (!profile || profile.role === 'user') {
     notFound()
   }
 
@@ -60,7 +60,11 @@ export default async function SettingsPage({
 
   const otherProfiles = await prisma.profile.findMany({
     where: {
-      NOT: { creator_name: creator_name.toLowerCase() }
+      NOT: [
+        { creator_name: creator_name.toLowerCase() },
+        { creator_name: 'root' },
+        { role: 'user' }
+      ]
     },
     select: {
       creator_name: true,

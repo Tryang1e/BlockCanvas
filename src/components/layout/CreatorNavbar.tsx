@@ -14,6 +14,7 @@ interface CreatorNavbarProps {
   viewerSession?: string
   viewerName?: string
   viewerAvatarUrl?: string
+  viewerRole?: string
 }
 
 export default function CreatorNavbar({ 
@@ -22,7 +23,8 @@ export default function CreatorNavbar({
   avatarUrl, 
   viewerSession,
   viewerName,
-  viewerAvatarUrl 
+  viewerAvatarUrl,
+  viewerRole
 }: CreatorNavbarProps) {
   const [bannerBottom, setBannerBottom] = useState(600)
 
@@ -121,6 +123,7 @@ export default function CreatorNavbar({
             userHandle={viewerSession}
             avatarUrl={viewerSession === userHandle ? avatarUrl : (viewerAvatarUrl || '')}
             isOwner={viewerSession === userHandle}
+            userRole={viewerRole}
           />
         ) : (
           <div className="flex items-center gap-2">

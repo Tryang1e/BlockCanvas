@@ -112,12 +112,7 @@ export default function AdminTable({ profiles }: { profiles: any[] }) {
 
     try {
       setLoading(selectedUserProfile?.id || 'impersonate')
-      const response = await fetch('/api/admin/impersonate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ creatorName })
-      })
-      const res = await response.json()
+      const res = await impersonateUserAction(creatorName)
       if (res.error) {
         alert(`대리 로그인 실패: ${res.error}`)
       } else {
@@ -168,9 +163,29 @@ export default function AdminTable({ profiles }: { profiles: any[] }) {
                     <div className="text-xs text-neutral-400">{profile.email}</div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-2.5 py-1 bg-opacity-20 rounded-md text-[11px] font-bold tracking-wide uppercase ${profile.role?.toLowerCase() === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}`}>
-                      {profile.role}
-                    </span>
+                    {(() => {
+                      const r = profile.role?.toLowerCase()
+                      let badgeClass = 'bg-neutral-100 text-neutral-600'
+                      let label = profile.role
+                      if (r === 'admin') {
+                        badgeClass = 'bg-purple-100 text-purple-700'
+                        label = 'ADMIN'
+                      } else if (r === 'pro') {
+                        badgeClass = 'bg-blue-100 text-blue-700'
+                        label = 'PREMIUM'
+                      } else if (r === 'creator') {
+                        badgeClass = 'bg-green-100 text-green-700'
+                        label = 'OFFICIAL'
+                      } else if (r === 'user') {
+                        badgeClass = 'bg-neutral-100 text-neutral-600 border border-neutral-200'
+                        label = 'USER'
+                      }
+                      return (
+                        <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wide uppercase ${badgeClass}`}>
+                          {label}
+                        </span>
+                      )
+                    })()}
                   </td>
                   <td className="px-6 py-4">
                     {profile.two_factor_enabled ? (
@@ -269,10 +284,10 @@ export default function AdminTable({ profiles }: { profiles: any[] }) {
                       onChange={(e) => setModalConfig({ ...modalConfig, selectedRole: e.target.value })}
                       className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                      <option value="creator">Creator (일반 크리에이터)</option>
+                      <option value="creator">Creator (공식 크리에이터)</option>
+                      <option value="pro">Premium (유료 크리에이터)</option>
+                      <option value="user">User (일반 사용자)</option>
                       <option value="admin">Admin (관리자)</option>
-                      <option value="moderator">Moderator (게시물 관리자)</option>
-                      <option value="viewer">Viewer (일반 열람자)</option>
                     </select>
                   </div>
                 </div>
@@ -353,9 +368,29 @@ export default function AdminTable({ profiles }: { profiles: any[] }) {
                     <span className="text-lg font-black text-neutral-900 dark:text-white leading-tight">
                       {selectedUserProfile.creator_name}
                     </span>
-                    <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 rounded-md text-[10px] font-bold tracking-wide uppercase border border-blue-100 dark:border-blue-900/40">
-                      {selectedUserProfile.role}
-                    </span>
+                    {(() => {
+                      const r = selectedUserProfile.role?.toLowerCase()
+                      let badgeClass = 'bg-neutral-50 dark:bg-neutral-950/20 text-neutral-600 dark:text-neutral-400 border-neutral-200 dark:border-neutral-800'
+                      let label = selectedUserProfile.role
+                      if (r === 'admin') {
+                        badgeClass = 'bg-purple-50 dark:bg-purple-950/20 text-purple-600 dark:text-purple-400 border-purple-100 dark:border-purple-900/40'
+                        label = 'ADMIN'
+                      } else if (r === 'pro') {
+                        badgeClass = 'bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-900/40'
+                        label = 'PREMIUM'
+                      } else if (r === 'creator') {
+                        badgeClass = 'bg-green-50 dark:bg-green-950/20 text-green-600 dark:text-green-400 border-green-100 dark:border-green-900/40'
+                        label = 'OFFICIAL'
+                      } else if (r === 'user') {
+                        badgeClass = 'bg-neutral-50 dark:bg-neutral-950/20 text-neutral-600 dark:text-neutral-400 border-neutral-200 dark:border-neutral-800'
+                        label = 'USER'
+                      }
+                      return (
+                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide uppercase border ${badgeClass}`}>
+                          {label}
+                        </span>
+                      )
+                    })()}
                   </div>
                   <p className="text-xs text-neutral-400 dark:text-neutral-500 mt-1 font-medium">
                     닉네임: {selectedUserProfile.display_name || '-'}

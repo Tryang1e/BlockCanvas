@@ -107,6 +107,8 @@ export default function AddUserModal() {
                   className="w-full border border-neutral-300 rounded p-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white"
                 >
                   <option value="creator">일반 크리에이터 (Creator)</option>
+                  <option value="pro">유료 크리에이터 (Premium)</option>
+                  <option value="user">일반 사용자 (User)</option>
                   <option value="admin">최고 관리자 (Admin)</option>
                 </select>
               </div>

@@ -1,12 +1,22 @@
 'use client'
 
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { gsap } from 'gsap'
 
 export default function CustomCursor() {
   const cursorRef = useRef<HTMLDivElement>(null)
+  const [enabled, setEnabled] = useState(false)
+
+  // 터치/coarse 포인터(모바일·태블릿) 기기에서는 커스텀 커서를 비활성화한다.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (window.matchMedia('(pointer: coarse)').matches) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    setEnabled(true)
+  }, [])
 
   useEffect(() => {
+    if (!enabled) return
     const cursor = cursorRef.current
     if (!cursor) return
 
@@ -67,13 +77,15 @@ export default function CustomCursor() {
       document.documentElement.removeEventListener('mouseleave', handleMouseLeave)
       document.documentElement.removeEventListener('mouseenter', handleMouseEnter)
     }
-  }, [])
+  }, [enabled])
+
+  if (!enabled) return null
 
   return (
     <div
       ref={cursorRef}
       className="fixed top-0 left-0 w-3.5 h-3.5 bg-white mix-blend-difference rounded-full pointer-events-none z-[99999] -translate-x-1/2 -translate-y-1/2 shadow-[0_0_10px_rgba(255,255,255,0.2)]"
-      style={{ willChange: 'transform, opacity' }}
+      style={{ willChange: 'transform, opacity', opacity: 0 }}
     />
   )
 }

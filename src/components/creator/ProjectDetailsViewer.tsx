@@ -3,6 +3,8 @@
 import React, { useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { incrementProjectViewCount } from '@/app/actions/project'
+import { sanitizeRichHtml } from '@/lib/sanitize-html'
+import Lightbox from '@/components/ui/Lightbox'
 import { Tweet } from 'react-tweet'
 import ReactPlayer from 'react-player'
 
@@ -26,11 +28,28 @@ interface ProjectDetailsViewerProps {
 // [SIZE:WxH] 또는 [SIZE:W] 메타 지시어를 제거하여 렌더링용 순수 타이틀만 추출하는 헬퍼
 const cleanProjectTitle = (title: string) => {
   if (!title) return ''
-  return title.replace(/\[SIZE:[1-3](?:x[1-3])?\]/, '').trim()
+  return title.replace(/\[\s*SIZE\s*:\s*[1-3]\s*(?:[xX]\s*[1-3])?\s*\]/gi, '').trim()
 }
 
 export default function ProjectDetailsViewer({ project, widgets, creatorName, isModal = false, otherProjects = [], relatedType = 'creator', profileData }: ProjectDetailsViewerProps) {
   const [isMounted, setIsMounted] = React.useState(false)
+  const [copied, setCopied] = React.useState(false)
+
+  const handleShare = () => {
+    if (typeof window !== 'undefined') {
+      navigator.clipboard.writeText(window.location.href)
+        .then(() => {
+          setCopied(true)
+          setTimeout(() => setCopied(false), 2000)
+        })
+        .catch((err) => {
+          console.error('Failed to copy link:', err)
+        })
+    }
+  }
+
+  // 라이트박스(이미지 확대뷰) 상태
+  const [lightbox, setLightbox] = React.useState<{ images: string[]; index: number } | null>(null)
 
   // Track View Count invisibly
   useEffect(() => {
@@ -163,9 +182,9 @@ export default function ProjectDetailsViewer({ project, widgets, creatorName, is
                          style={{ flexBasis: getFlexBasis(idx, urls.length) }}
                        >
                          {urls.length === 1 ? (
-                           <img src={url} alt={`media-${idx}`} className="w-full h-auto block mx-auto" />
+                           <img src={url} alt={`media-${idx}`} onClick={() => setLightbox({ images: urls, index: idx })} className="w-full h-auto block mx-auto cursor-zoom-in" />
                          ) : (
-                           <img src={url} alt={`media-${idx}`} className="w-full h-full aspect-video object-cover block mx-auto transition-transform duration-700 ease-out group-hover:scale-[1.03]" />
+                           <img src={url} alt={`media-${idx}`} onClick={() => setLightbox({ images: urls, index: idx })} className="w-full h-full aspect-video object-cover block mx-auto transition-transform duration-700 ease-out group-hover:scale-[1.03] cursor-zoom-in" />
                          )}
                        </div>
                      );
@@ -214,7 +233,7 @@ export default function ProjectDetailsViewer({ project, widgets, creatorName, is
                     ) : code.includes('<iframe') ? (
                       <div
                         className="w-full relative aspect-video bg-black [&>iframe]:w-full [&>iframe]:h-full [&>iframe]:absolute [&>iframe]:inset-0 [&>iframe]:border-none"
-                        dangerouslySetInnerHTML={{ __html: isMounted ? (typeof window !== 'undefined' ? require('isomorphic-dompurify').sanitize(code, { ADD_TAGS: ['iframe'] }) : code) : '' }}
+                        dangerouslySetInnerHTML={{ __html: isMounted ? (typeof window !== 'undefined' ? sanitizeRichHtml(code) : code) : '' }}
                       />
                     ) : (isMounted && isVideoUrl) ? (
                       <div className="w-full aspect-video relative bg-black animate-in fade-in duration-1000">
@@ -224,7 +243,7 @@ export default function ProjectDetailsViewer({ project, widgets, creatorName, is
                     ) : (
                       <div
                         className="w-full relative aspect-video bg-black [&>iframe]:w-full [&>iframe]:h-full [&>iframe]:absolute [&>iframe]:inset-0 [&>iframe]:border-none"
-                        dangerouslySetInnerHTML={{ __html: isMounted ? (typeof window !== 'undefined' ? require('isomorphic-dompurify').sanitize(code, { ADD_TAGS: ['iframe'] }) : code) : '' }}
+                        dangerouslySetInnerHTML={{ __html: isMounted ? (typeof window !== 'undefined' ? sanitizeRichHtml(code) : code) : '' }}
                       />
                     )}
                   </div>
@@ -252,9 +271,24 @@ export default function ProjectDetailsViewer({ project, widgets, creatorName, is
 
           <h2 className="text-3xl font-bold tracking-widest uppercase mb-2 text-white/90">{project.creator.display_name}</h2>
 
-          <p className="text-neutral-500 text-sm tracking-widest uppercase mb-10">
+          <p className="text-neutral-500 text-sm tracking-widest uppercase mb-6">
             게시: {new Date(project.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}
           </p>
+
+          {/* Share Button */}
+          <button
+            onClick={handleShare}
+            className="mb-10 bg-transparent border border-neutral-700 hover:border-white hover:text-white text-neutral-400 hover:scale-[1.02] active:scale-[0.98] py-3 px-8 transition-all text-xs tracking-widest uppercase flex items-center gap-3"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+              <circle cx="18" cy="5" r="3"/>
+              <circle cx="6" cy="12" r="3"/>
+              <circle cx="18" cy="19" r="3"/>
+              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+            </svg>
+            {copied ? '링크 복사 완료!' : '게시글 공유하기'}
+          </button>
 
           {project.creator.portfolios && (
             <div className="flex flex-wrap items-center justify-center gap-4">
@@ -313,18 +347,21 @@ export default function ProjectDetailsViewer({ project, widgets, creatorName, is
               </div>
             </div>
             <div ref={sliderRef} className="flex overflow-x-auto gap-6 pb-8 px-4 snap-x snap-mandatory scroll-smooth [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
-              {otherProjects.map((p) => (
-                <a href={`/creator/${creatorName}/project/${p.id}`} key={p.id} className="group block relative shrink-0 w-[85vw] sm:w-[500px] md:w-[600px] aspect-video bg-neutral-800 snap-center overflow-hidden">
-                  {p.thumbnail_url ? (
-                    <img src={p.thumbnail_url} alt={p.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-neutral-600">No Image</div>
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-6">
-                    <h4 className="text-white font-bold text-xl truncate drop-shadow-md">{p.title}</h4>
-                  </div>
-                </a>
-              ))}
+              {otherProjects.map((p) => {
+                const displayTitle = cleanProjectTitle(p.title)
+                return (
+                  <a href={`/creator/${creatorName}/project/${p.id}`} key={p.id} className="group block relative shrink-0 w-[85vw] sm:w-[500px] md:w-[600px] aspect-video bg-neutral-800 snap-center overflow-hidden">
+                    {p.thumbnail_url ? (
+                      <img src={p.thumbnail_url} alt={displayTitle} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-neutral-600">No Image</div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-6">
+                      <h4 className="text-white font-bold text-xl truncate drop-shadow-md">{displayTitle}</h4>
+                    </div>
+                  </a>
+                )
+              })}
             </div>
           </div>
         )}
@@ -347,6 +384,13 @@ export default function ProjectDetailsViewer({ project, widgets, creatorName, is
       ) : (
         content
       )}
+      <Lightbox
+        open={!!lightbox}
+        images={lightbox?.images || []}
+        index={lightbox?.index || 0}
+        onClose={() => setLightbox(null)}
+        onIndexChange={(i) => setLightbox((lb) => (lb ? { ...lb, index: i } : lb))}
+      />
     </ScrollProgressProvider>
   )
 }

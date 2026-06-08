@@ -18,6 +18,8 @@ const EFFECTS = [
     { value: 'moving_grid', label: '은은한 모눈종이 (Moving Grid)' },
     { value: 'css_stars', label: '반짝이는 별빛 (Twinkling Stars)' },
     { value: 'aurora', label: '오로라 그라데이션 (Aurora Glow)' },
+    { value: 'mesh_gradient', label: '메시 그라데이션 (Mesh Gradient)' },
+    { value: 'grain', label: '필름 그레인 (Film Grain)' },
   ]},
   { group: '고사양 버전 (화려함)', items: [
     { value: 'flickering_grid', label: '깜빡이는 그리드 (Flickering Grid)' },

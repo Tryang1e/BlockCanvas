@@ -16,7 +16,7 @@ export default async function DashboardSettingsPage({
     include: { portfolios: true }
   })
 
-  if (!profile) {
+  if (!profile || profile.role === 'user') {
     notFound()
   }
 
@@ -40,12 +40,20 @@ export default async function DashboardSettingsPage({
     twitter_url: portfolio?.twitter_url || '',
     instagram_url: portfolio?.instagram_url || '',
     patreon_url: portfolio?.patreon_url || '',
-    sns_settings: snsSettings
+    sns_settings: snsSettings,
+    footer_title: portfolio?.footer_title || '',
+    footer_subtitle: portfolio?.footer_subtitle || '',
+    theme_bg_color: portfolio?.theme_bg_color || '#222222',
+    theme_bg_effect: portfolio?.theme_bg_effect || 'none'
   }
 
   const otherProfiles = await prisma.profile.findMany({
     where: {
-      NOT: { creator_name: creator_name.toLowerCase() }
+      NOT: [
+        { creator_name: creator_name.toLowerCase() },
+        { creator_name: 'root' },
+        { role: 'user' }
+      ]
     },
     select: {
       creator_name: true,

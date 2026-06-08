@@ -24,6 +24,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import RichTextEditor from './RichTextEditor'
 import { getProfileForPreviewAction } from '@/app/actions/profile'
+import { sanitizeRichHtml } from '@/lib/sanitize-html'
 import { Tweet } from 'react-tweet'
 import ReactPlayer from 'react-player'
 
@@ -583,7 +584,7 @@ function EmbedWidget({ code, onChange }: { code: string, onChange: (code: string
                 <ReactPlayer url={safeCode} width="100%" height="100%" controls />
               </div>
             ) : (
-              <div className="w-full flex justify-center pointer-events-none" dangerouslySetInnerHTML={{ __html: typeof window !== 'undefined' ? require('isomorphic-dompurify').sanitize(safeCode, { ADD_TAGS: ['iframe'] }) : safeCode }} />
+              <div className="w-full flex justify-center pointer-events-none" dangerouslySetInnerHTML={{ __html: typeof window !== 'undefined' ? sanitizeRichHtml(safeCode) : safeCode }} />
             )}
           </div>
 

@@ -11,14 +11,43 @@ export default function ProjectModal({ children, onClose, title, description, cr
   const wrapperRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const lenis = useLenis()
-  
+
   const [mounted, setMounted] = useState(false)
+  // 닫기 전환(#7): @modal 병렬 라우트는 router.back() 시 슬롯이 즉시 언마운트되어
+  // 그냥 사라진다. 닫기 요청을 가로채 exit 애니메이션을 재생한 뒤 네비게이션해 부드럽게 닫는다.
+  const [isClosing, setIsClosing] = useState(false)
+  const isClosingRef = useRef(false)
+
+  const EXIT_MS = 220
 
   const handleClose = () => {
+    if (isClosingRef.current) return
+    isClosingRef.current = true
     if (lenis) lenis.start()
-    if (onClose) onClose()
-    else router.back()
+
+    // 모션 최소화 사용자는 지연 없이 즉시 닫는다(빈 화면 대기 방지).
+    const prefersReduced =
+      typeof window !== 'undefined' &&
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+    const navigate = () => {
+      if (onClose) onClose()
+      else router.back()
+    }
+
+    if (prefersReduced) {
+      navigate()
+      return
+    }
+
+    setIsClosing(true)
+    window.setTimeout(navigate, EXIT_MS)
   }
+
+  // 최신 handleClose를 가리키는 ref (Escape 핸들러의 stale closure 방지)
+  const handleCloseRef = useRef(handleClose)
+  handleCloseRef.current = handleClose
 
   useEffect(() => {
     setMounted(true)
@@ -35,11 +64,11 @@ export default function ProjectModal({ children, onClose, title, description, cr
   // Handle escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') handleClose()
+      if (e.key === 'Escape') handleCloseRef.current()
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onClose])
+  }, [])
 
   // Handle click outside
   const handleOverlayClick = (e: React.MouseEvent) => {
@@ -55,13 +84,13 @@ export default function ProjectModal({ children, onClose, title, description, cr
   // [SIZE:WxH] 또는 [SIZE:W] 메타 지시어 제거용 클렌저
   const cleanTitle = (rawTitle?: string) => {
     if (!rawTitle) return ''
-    return rawTitle.replace(/\[SIZE:[1-3](?:x[1-3])?\]/, '').trim()
+    return rawTitle.replace(/\[\s*SIZE\s*:\s*[1-3]\s*(?:[xX]\s*[1-3])?\s*\]/gi, '').trim()
   }
 
   return createPortal(
-    <div 
+    <div
       data-lenis-prevent
-      className="fixed inset-0 z-[10000] bg-black/90 animate-in fade-in duration-200 ease-out"
+      className={`fixed inset-0 z-[10000] bg-black/90 ${isClosing ? 'animate-out fade-out duration-200 fill-mode-forwards' : 'animate-in fade-in duration-200 ease-out'}`}
     >
       <SmoothScroll isRoot={false} className="h-full w-full overflow-y-auto overscroll-contain">
         <div 
@@ -91,8 +120,8 @@ export default function ProjectModal({ children, onClose, title, description, cr
             </div>
           )}
 
-          <div 
-            className="w-full max-w-[1440px] bg-white shadow-[0_30px_100px_rgba(0,0,0,0.3)] ring-1 ring-black/5 relative overflow-hidden animate-in fade-in zoom-in-[0.98] slide-in-from-bottom-4 duration-300 ease-out pointer-events-auto min-h-screen sm:min-h-0"
+          <div
+            className={`w-full max-w-[1440px] bg-white shadow-[0_30px_100px_rgba(0,0,0,0.3)] ring-1 ring-black/5 relative overflow-hidden pointer-events-auto min-h-screen sm:min-h-0 ${isClosing ? 'animate-out fade-out zoom-out-[0.98] slide-out-to-bottom-4 duration-200 fill-mode-forwards' : 'animate-in fade-in zoom-in-[0.98] slide-in-from-bottom-4 duration-300 ease-out'}`}
             onClick={(e) => e.stopPropagation()}
           >
             {children}

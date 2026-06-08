@@ -60,6 +60,11 @@ export default async function AdminLayout({
               </Link>
             </li>
             <li>
+              <Link href="/adminpage/inquiries" className="block px-3 py-2 text-sm font-medium hover:bg-neutral-50 rounded-md transition-colors font-semibold text-neutral-800">
+                고객 문의 및 피드백
+              </Link>
+            </li>
+            <li>
               <Link href="/adminpage/settings" className="block px-3 py-2 text-sm font-medium hover:bg-neutral-50 rounded-md transition-colors">
                 사이트 설정
               </Link>

@@ -60,18 +60,33 @@ export function TextMorph({ texts, rotationInterval = 3000, className = '' }: { 
 }
 
 export function TypingText({ text, className = '' }: { text: string, className?: string }) {
-  const chars = text.split('');
+  const [count, setCount] = useState(0);
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    // 타이핑 → 잠시 멈춤 → 삭제 → 재타이핑 루프
+    let timeout: ReturnType<typeof setTimeout>;
+    if (!deleting && count < text.length) {
+      timeout = setTimeout(() => setCount(count + 1), 90);
+    } else if (!deleting && count === text.length) {
+      timeout = setTimeout(() => setDeleting(true), 1600);
+    } else if (deleting && count > 0) {
+      timeout = setTimeout(() => setCount(count - 1), 45);
+    } else if (deleting && count === 0) {
+      timeout = setTimeout(() => setDeleting(false), 400);
+    }
+    return () => clearTimeout(timeout);
+  }, [count, deleting, text]);
+
   return (
-    <motion.span className={`inline-block ${className}`} initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.05 } } }}>
-      {chars.map((char, i) => (
-        <motion.span key={i} variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }}>{char}</motion.span>
-      ))}
-      <motion.span 
-        animate={{ opacity: [1, 0] }} 
+    <span className={`inline-block ${className}`}>
+      {text.slice(0, count)}
+      <motion.span
+        animate={{ opacity: [1, 0] }}
         transition={{ repeat: Infinity, duration: 0.8, ease: "linear" }}
         className="inline-block w-[2px] h-[1em] bg-black dark:bg-white ml-[1px] align-middle -mt-[0.2em]"
       />
-    </motion.span>
+    </span>
   );
 }
 
@@ -146,6 +161,65 @@ export function GradientText({ text, className = '' }: { text: string, className
   );
 }
 
+export function ScrambleText({ text, className = '' }: { text: string, className?: string }) {
+  const [display, setDisplay] = useState(text);
+  useEffect(() => {
+    const glyphs = '!<>-_\\/[]{}=+*^?#________';
+    let frame = 0;
+    const id = setInterval(() => {
+      frame++;
+      const revealed = Math.floor(frame / 2);
+      let out = '';
+      for (let i = 0; i < text.length; i++) {
+        if (text[i] === ' ') out += ' ';
+        else if (i < revealed) out += text[i];
+        else out += glyphs[Math.floor(Math.random() * glyphs.length)];
+      }
+      setDisplay(out);
+      if (revealed >= text.length) clearInterval(id);
+    }, 45);
+    return () => clearInterval(id);
+  }, [text]);
+  return <span className={`inline-block ${className}`}>{display}</span>;
+}
+
+export function WaveText({ text, className = '' }: { text: string, className?: string }) {
+  const chars = text.split('');
+  return (
+    <span className={`inline-block ${className}`}>
+      {chars.map((char, i) => (
+        <motion.span
+          key={i}
+          className="inline-block"
+          animate={{ y: ['0%', '-32%', '0%'] }}
+          transition={{ repeat: Infinity, duration: 1.4, ease: 'easeInOut', delay: i * 0.07 }}
+        >
+          {char === ' ' ? ' ' : char}
+        </motion.span>
+      ))}
+    </span>
+  );
+}
+
+export function NeonText({ text, className = '' }: { text: string, className?: string }) {
+  return (
+    <motion.span
+      className={`inline-block font-bold ${className}`}
+      style={{ color: '#ffffff' }}
+      animate={{
+        textShadow: [
+          '0 0 4px #fff, 0 0 11px #fff, 0 0 19px #ff2bd6, 0 0 40px #ff2bd6',
+          '0 0 4px #fff, 0 0 10px #fff, 0 0 16px #ff2bd6, 0 0 28px #ff2bd6',
+          '0 0 4px #fff, 0 0 11px #fff, 0 0 19px #ff2bd6, 0 0 40px #ff2bd6',
+        ],
+      }}
+      transition={{ repeat: Infinity, duration: 2.2, ease: 'easeInOut' }}
+    >
+      {text}
+    </motion.span>
+  );
+}
+
 // --- Button Components ---
 
 export const DefaultButton = React.forwardRef<HTMLAnchorElement, any>(({ href, children, className, style, ...props }, ref) => {
@@ -154,6 +228,7 @@ export const DefaultButton = React.forwardRef<HTMLAnchorElement, any>(({ href, c
       ref={ref}
       href={href}
       target="_blank"
+      rel="noopener noreferrer"
       className={`inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium transition-all shadow-xs hover:opacity-90 !no-underline cursor-pointer ${className}`}
       style={style}
       {...props}
@@ -181,6 +256,7 @@ export const FlipButton = React.forwardRef<HTMLAnchorElement, any>(({ href, chil
       ref={ref as any}
       href={href}
       target="_blank"
+      rel="noopener noreferrer"
       initial="initial"
       whileHover="hover"
       whileTap={{ scale: 0.95 }}
@@ -236,6 +312,7 @@ export const RippleButton = React.forwardRef<HTMLAnchorElement, any>(({ href, ch
       ref={ref as any}
       href={href}
       target="_blank"
+      rel="noopener noreferrer"
       whileTap={{ scale: 0.95 }}
       whileHover={{ scale: 1.05 }}
       className={`relative inline-flex items-center justify-center overflow-hidden whitespace-nowrap rounded-md font-medium shadow-xs !no-underline cursor-pointer ${className}`}
@@ -268,6 +345,7 @@ export const LiquidButton = React.forwardRef<HTMLAnchorElement, any>(({ href, ch
       ref={ref as any}
       href={href}
       target="_blank"
+      rel="noopener noreferrer"
       whileTap={{ scale: 0.95 }}
       whileHover={{
         scale: 1.05,
@@ -297,3 +375,50 @@ export const LiquidButton = React.forwardRef<HTMLAnchorElement, any>(({ href, ch
   );
 });
 LiquidButton.displayName = "LiquidButton";
+
+export const GlowButton = React.forwardRef<HTMLAnchorElement, any>(({ href, children, className, style, ...props }, ref) => {
+  const glow = (style && style.backgroundColor) || '#3b82f6';
+  return (
+    <motion.a
+      ref={ref as any}
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      whileHover={{ scale: 1.05, boxShadow: `0 0 18px ${glow}, 0 0 36px ${glow}` }}
+      whileTap={{ scale: 0.96 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+      className={`inline-flex items-center justify-center whitespace-nowrap rounded-md font-medium !no-underline cursor-pointer ${className}`}
+      style={style}
+      {...props}
+    >
+      {children}
+    </motion.a>
+  );
+});
+GlowButton.displayName = "GlowButton";
+
+export const ShineButton = React.forwardRef<HTMLAnchorElement, any>(({ href, children, className, style, ...props }, ref) => {
+  return (
+    <motion.a
+      ref={ref as any}
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      initial="initial"
+      whileHover="hover"
+      whileTap={{ scale: 0.96 }}
+      className={`relative inline-flex items-center justify-center overflow-hidden whitespace-nowrap rounded-md font-medium shadow-xs !no-underline cursor-pointer ${className}`}
+      style={style}
+      {...props}
+    >
+      <span className="relative z-10">{children}</span>
+      <motion.span
+        className="absolute inset-0 block pointer-events-none"
+        style={{ background: 'linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.45) 50%, transparent 70%)' }}
+        variants={{ initial: { x: '-120%' }, hover: { x: '120%' } }}
+        transition={{ duration: 0.7, ease: 'easeInOut' }}
+      />
+    </motion.a>
+  );
+});
+ShineButton.displayName = "ShineButton";

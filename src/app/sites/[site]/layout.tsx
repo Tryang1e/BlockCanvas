@@ -22,10 +22,18 @@ export default async function CreatorLayout({
   const session = verifySession(sessionToken)
   const isOwner = session === siteLower
 
-  // 2. 포트폴리오 및 활성화 상태 확인
-  const portfolio = await prisma.portfolio.findFirst({
-    where: { creator: { creator_name: siteLower } }
+  // 2. 프로필 및 포트폴리오 상태 확인
+  const profile = await prisma.profile.findUnique({
+    where: { creator_name: siteLower },
+    include: { portfolios: true }
   })
+
+  // 프로필이 없는 경우 포트폴리오 접근 자체를 404 차단
+  if (!profile) {
+    return notFound()
+  }
+
+  const portfolio = profile.portfolios
 
   // 포트폴리오가 생성되어 있지 않은 경우, 소유자가 아니라면 404 에러를 반환합니다.
   if (!portfolio) {

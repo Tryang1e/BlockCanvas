@@ -24,6 +24,9 @@ declare module '@tiptap/core' {
       insertColumns: (ratio: '50-50' | '30-70' | '70-30' | '40-60' | '60-40' | '33-33-33') => ReturnType,
       setColumnsLayout: (ratio: '50-50' | '30-70' | '70-30' | '40-60' | '60-40' | '33-33-33') => ReturnType,
     }
+    marquee: {
+      insertMarquee: (options?: any) => ReturnType,
+    }
   }
 }
 
@@ -51,8 +54,9 @@ import { createPortal } from 'react-dom'
 import Image from '@tiptap/extension-image'
 import { Node, mergeAttributes } from '@tiptap/core'
 import { motion, AnimatePresence } from 'framer-motion'
-import { TextRotate, TextMorph, TypingText, SplittingText, SlidingText, ShimmeringText, RollingText, HighlightText, GradientText } from '@/components/ui/animate-ui'
-import { DefaultButton, FlipButton, RippleButton, LiquidButton } from '@/components/ui/animate-ui'
+import { TextRotate, TextMorph, TypingText, SplittingText, SlidingText, ShimmeringText, RollingText, HighlightText, GradientText, ScrambleText, WaveText, NeonText } from '@/components/ui/animate-ui'
+import { DefaultButton, FlipButton, RippleButton, LiquidButton, GlowButton, ShineButton } from '@/components/ui/animate-ui'
+import MarqueeBlock from '@/components/ui/MarqueeBlock'
 import Tooltip from '@/components/ui/Tooltip'
 
 const ImageSizeInputs = ({ editor }: { editor: Editor }) => {
@@ -581,6 +585,10 @@ export const ButtonLinkNodeView = (props: NodeViewProps) => {
         return <RippleButton href={href} style={styleObj} onClick={preventClick}>{text}</RippleButton>;
       case 'liquid':
         return <LiquidButton href={href} style={styleObj} onClick={preventClick}>{text}</LiquidButton>;
+      case 'glow':
+        return <GlowButton href={href} style={styleObj} onClick={preventClick}>{text}</GlowButton>;
+      case 'shine':
+        return <ShineButton href={href} style={styleObj} onClick={preventClick}>{text}</ShineButton>;
 
       default:
         return <DefaultButton href={href} style={styleObj} onClick={preventClick}>{text}</DefaultButton>;
@@ -680,6 +688,8 @@ export const ButtonLinkNodeView = (props: NodeViewProps) => {
                 <option value="flip">플립</option>
                 <option value="ripple">물결</option>
                 <option value="liquid">액체</option>
+                <option value="glow">글로우</option>
+                <option value="shine">샤인</option>
               </select>
 
               <div className="flex items-center gap-0.5 border border-neutral-700/60 bg-[#1e1e1e] rounded px-1 shrink-0 h-[22px]">
@@ -1020,6 +1030,9 @@ const AnimatedTextGroupNodeView = ({ node, updateAttributes, selected, deleteNod
                 <option value="rolling">롤링 (Rolling)</option>
                 <option value="highlight">강조 (Highlight)</option>
                 <option value="gradient">그라데이션 (Gradient)</option>
+                <option value="scramble">해킹체 (Scramble)</option>
+                <option value="wave">물결 (Wave)</option>
+                <option value="neon">네온 (Neon)</option>
               </select>
             </div>
           </div>
@@ -1107,6 +1120,9 @@ const AnimatedTextGroupNodeView = ({ node, updateAttributes, selected, deleteNod
       {animationType === 'rolling' && <span className={`${appliedClass}`}><RollingText text={parsedTexts[0]} /></span>}
       {animationType === 'highlight' && <span className={`${appliedClass}`}><HighlightText text={parsedTexts[0]} /></span>}
       {animationType === 'gradient' && <span className={`${appliedClass}`}><GradientText text={parsedTexts[0]} /></span>}
+      {animationType === 'scramble' && <span className={`${appliedClass}`}><ScrambleText text={parsedTexts[0]} /></span>}
+      {animationType === 'wave' && <span className={`${appliedClass}`}><WaveText text={parsedTexts[0]} /></span>}
+      {animationType === 'neon' && <span className={`${appliedClass}`}><NeonText text={parsedTexts[0]} /></span>}
     </NodeViewWrapper>
   )
 }
@@ -1862,6 +1878,345 @@ export const FaqBlock = Node.create({
   }
 })
 
+// --- Custom Marquee (흐르는 텍스트) Extension (#6) ---
+const MARQUEE_SIZE_OPTIONS = [
+  { v: '0.875rem', l: '14' },
+  { v: '1rem', l: '16' },
+  { v: '1.25rem', l: '20' },
+  { v: '1.5rem', l: '24' },
+  { v: '1.875rem', l: '30' },
+  { v: '2.25rem', l: '36' },
+  { v: '3rem', l: '48' },
+]
+
+const parseMarqueeItems = (raw: any): string[] => {
+  if (Array.isArray(raw)) return raw.map((s) => (s ?? '').toString())
+  try {
+    const p = JSON.parse(raw || '[]')
+    return Array.isArray(p) ? p.map((s: any) => (s ?? '').toString()) : []
+  } catch {
+    return []
+  }
+}
+
+const MarqueeNodeView = (props: NodeViewProps) => {
+  const { node, updateAttributes, selected, deleteNode } = props
+  const { selectNode } = props as any
+
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+
+  const [isEditing, setIsEditing] = useState(false)
+  const [editItems, setEditItems] = useState<string[]>(parseMarqueeItems(node.attrs.items))
+  const [editSpeed, setEditSpeed] = useState<number>(Number(node.attrs.speed) || 25)
+  const [editReverse, setEditReverse] = useState<boolean>(!!node.attrs.reverse)
+  const [editSize, setEditSize] = useState<string>(node.attrs.textSize || '1.25rem')
+  const [editBold, setEditBold] = useState<boolean>(node.attrs.isBold !== false)
+  const [editFont, setEditFont] = useState<string>(node.attrs.fontFamily || 'inherit')
+  const [editColor, setEditColor] = useState<string>(node.attrs.textColor || '')
+  const [editVariant, setEditVariant] = useState<string>(node.attrs.variant || 'plain')
+
+  // node.attrs 변경 시 로컬 폼 상태 동기화
+  useEffect(() => {
+    setEditItems(parseMarqueeItems(node.attrs.items))
+    setEditSpeed(Number(node.attrs.speed) || 25)
+    setEditReverse(!!node.attrs.reverse)
+    setEditSize(node.attrs.textSize || '1.25rem')
+    setEditBold(node.attrs.isBold !== false)
+    setEditFont(node.attrs.fontFamily || 'inherit')
+    setEditColor(node.attrs.textColor || '')
+    setEditVariant(node.attrs.variant || 'plain')
+  }, [node.attrs])
+
+  const handleSave = () => {
+    const cleaned = editItems.map((s) => s.trim()).filter(Boolean)
+    updateAttributes({
+      items: JSON.stringify(cleaned.length ? cleaned : ['']),
+      speed: editSpeed,
+      reverse: editReverse,
+      textSize: editSize,
+      isBold: editBold,
+      fontFamily: editFont,
+      textColor: editColor,
+      variant: editVariant,
+    })
+    setIsEditing(false)
+  }
+
+  const previewItems = parseMarqueeItems(node.attrs.items).filter((s) => s.trim())
+
+  return (
+    <NodeViewWrapper
+      onClick={(e: any) => {
+        if (e.target === e.currentTarget && typeof selectNode === 'function') {
+          e.preventDefault()
+          selectNode()
+        }
+      }}
+      className={`my-6 rounded-xl border block relative group transition-colors ${
+        isEditing
+          ? 'border-blue-500 bg-blue-50/20 z-30 shadow-md'
+          : selected
+            ? 'border-blue-400 bg-blue-50/10 z-20'
+            : 'border-neutral-200 bg-neutral-50/60'
+      }`}
+    >
+      {/* Premium Floating Block Toolbar */}
+      <div
+        className="absolute -top-10 left-2 flex items-center gap-1.5 bg-[#252525] border border-neutral-700/60 rounded-lg p-1.5 shadow-xl opacity-0 group-hover:opacity-100 transition-all z-40 select-none w-max whitespace-nowrap"
+        contentEditable={false}
+      >
+        <div className="w-5 h-5 flex items-center justify-center cursor-grab text-neutral-400 hover:text-white" data-drag-handle>
+          <GripVertical size={14} />
+        </div>
+        <span className="text-[10px] text-neutral-200 font-bold px-1 select-none">흐르는 텍스트 (Marquee)</span>
+        <button
+          onClick={() => setIsEditing(true)}
+          type="button"
+          className="text-[10px] text-blue-400 hover:text-blue-350 bg-blue-950/40 hover:bg-blue-900/60 border border-blue-900/30 px-2.5 py-1 rounded cursor-pointer transition-colors"
+        >
+          수정
+        </button>
+        <button
+          onClick={deleteNode}
+          type="button"
+          className="text-[10px] text-red-400 hover:text-red-300 bg-red-950/40 hover:bg-red-900/60 border border-red-900/30 px-2.5 py-1 rounded cursor-pointer transition-colors"
+        >
+          삭제
+        </button>
+      </div>
+
+      {/* Live preview (발행 결과와 동일) */}
+      <div contentEditable={false} className="py-1">
+        {previewItems.length > 0 ? (
+          <MarqueeBlock
+            items={previewItems}
+            speed={Number(node.attrs.speed) || 25}
+            reverse={!!node.attrs.reverse}
+            textSize={node.attrs.textSize || '1.25rem'}
+            isBold={node.attrs.isBold !== false}
+            fontFamily={node.attrs.fontFamily || 'inherit'}
+            textColor={node.attrs.textColor || ''}
+            variant={node.attrs.variant === 'pill' ? 'pill' : 'plain'}
+          />
+        ) : (
+          <div className="text-center text-xs text-neutral-400 py-8 select-none">
+            표시할 문구가 없습니다. 우측 상단 ‘수정’을 눌러 입력하세요.
+          </div>
+        )}
+      </div>
+
+      {/* Configure modal */}
+      {isEditing && mounted && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[9999] flex items-center justify-center p-4"
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+          onKeyUp={(e) => e.stopPropagation()}
+          data-lenis-prevent="true"
+          contentEditable={false}
+        >
+          <div
+            className="w-full max-w-md bg-[#181818] border border-neutral-800 rounded-xl shadow-2xl p-5 flex flex-col gap-4 text-left animate-in fade-in zoom-in-95 duration-200 max-h-[85vh] overflow-y-auto font-sans text-neutral-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
+              <h3 className="text-xs font-bold text-neutral-300 uppercase tracking-widest font-mono">흐르는 텍스트 설정</h3>
+              <button type="button" onClick={() => setIsEditing(false)} className="text-neutral-500 hover:text-neutral-300 transition-colors">
+                <X size={15} />
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-bold text-neutral-400">표시할 문구 (한 줄에 하나씩)</label>
+              <textarea
+                value={editItems.join('\n')}
+                onChange={(e) => setEditItems(e.target.value.split('\n'))}
+                className="w-full h-28 p-2.5 text-xs bg-[#1e1e1e] border border-neutral-700/60 rounded text-neutral-200 focus:outline-none focus:border-neutral-500 resize-none"
+                placeholder={'공지사항\n환영합니다\nWelcome'}
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-bold text-neutral-400">흐름 속도</label>
+                <span className="text-[10px] text-neutral-500 font-mono">{editSpeed}s{editSpeed <= 12 ? ' (빠름)' : editSpeed >= 45 ? ' (느림)' : ''}</span>
+              </div>
+              <input
+                type="range" min={5} max={60} step={1}
+                value={editSpeed}
+                onChange={(e) => setEditSpeed(parseInt(e.target.value, 10))}
+                className="w-full accent-blue-500 cursor-pointer"
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setEditReverse((v) => !v)}
+                className="px-2.5 py-1.5 text-[11px] font-bold rounded border border-neutral-700/60 bg-[#1e1e1e] text-neutral-300 hover:text-white transition-colors"
+                title="흐름 방향 전환"
+              >
+                방향: {editReverse ? '오른쪽 →' : '← 왼쪽'}
+              </button>
+              <select
+                value={editSize}
+                onChange={(e) => setEditSize(e.target.value)}
+                className="px-1.5 py-1.5 text-[11px] font-bold border border-neutral-700/60 bg-[#1e1e1e] text-neutral-300 rounded outline-none cursor-pointer"
+                title="글자 크기"
+              >
+                {MARQUEE_SIZE_OPTIONS.map((o) => <option key={o.v} value={o.v}>{o.l}px</option>)}
+              </select>
+              <select
+                value={editFont}
+                onChange={(e) => setEditFont(e.target.value)}
+                className="px-1.5 py-1.5 text-[11px] font-bold border border-neutral-700/60 bg-[#1e1e1e] text-neutral-300 rounded outline-none cursor-pointer max-w-[100px] truncate"
+                title="폰트"
+              >
+                <option value="inherit">기본 폰트</option>
+                <option value='"Noto Sans KR", sans-serif'>고딕</option>
+                <option value='"Nanum Myeongjo", serif'>명조</option>
+                <option value='"Nanum Pen Script", cursive'>손글씨</option>
+                <option value='"Jua", sans-serif'>주아</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => setEditBold((v) => !v)}
+                className={`p-1.5 rounded flex items-center justify-center border transition-colors ${editBold ? 'bg-blue-600 text-white border-blue-600' : 'bg-[#1e1e1e] text-neutral-400 hover:text-white border-neutral-700/60'}`}
+                title="굵게"
+              >
+                <Bold size={12} />
+              </button>
+              <select
+                value={editVariant}
+                onChange={(e) => setEditVariant(e.target.value)}
+                className="px-1.5 py-1.5 text-[11px] font-bold border border-neutral-700/60 bg-[#1e1e1e] text-neutral-300 rounded outline-none cursor-pointer"
+                title="표시 스타일"
+              >
+                <option value="plain">기본 (점 구분)</option>
+                <option value="pill">알약 (Pill)</option>
+              </select>
+              <div className="flex items-center gap-1">
+                <input
+                  type="color"
+                  value={editColor || '#888888'}
+                  onChange={(e) => setEditColor(e.target.value)}
+                  className="w-7 h-7 rounded cursor-pointer bg-transparent border border-neutral-700/60 p-0"
+                  title="글자 색상"
+                />
+                {editColor && (
+                  <button type="button" onClick={() => setEditColor('')} className="text-[10px] text-neutral-500 hover:text-neutral-300" title="기본 색상으로">기본</button>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 border-t border-neutral-800 pt-3">
+              <button type="button" onClick={deleteNode} className="px-3 py-1.5 text-[11px] font-bold text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded transition-colors">삭제</button>
+              <button type="button" onClick={() => setIsEditing(false)} className="px-3 py-1.5 text-[11px] font-bold text-neutral-400 hover:text-white transition-colors">취소</button>
+              <button type="button" onClick={handleSave} className="px-4 py-1.5 text-[11px] font-bold text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors shadow-sm">적용</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </NodeViewWrapper>
+  )
+}
+
+export const Marquee = Node.create({
+  name: 'marquee',
+  group: 'block',
+  atom: true,
+  draggable: true,
+
+  addNodeView() {
+    return ReactNodeViewRenderer(MarqueeNodeView)
+  },
+
+  addAttributes() {
+    return {
+      items: {
+        default: '["공지사항을 입력하세요","환영합니다","Welcome"]',
+        parseHTML: (element) => element.getAttribute('data-items') || '[]',
+      },
+      speed: {
+        default: 25,
+        parseHTML: (element) => {
+          const v = parseInt(element.getAttribute('data-speed') || '25', 10)
+          return isNaN(v) ? 25 : v
+        },
+      },
+      reverse: {
+        default: false,
+        parseHTML: (element) => element.getAttribute('data-reverse') === 'true',
+      },
+      textSize: {
+        default: '1.25rem',
+        parseHTML: (element) => element.getAttribute('data-text-size') || '1.25rem',
+      },
+      isBold: {
+        default: true,
+        parseHTML: (element) => element.getAttribute('data-is-bold') !== 'false',
+      },
+      fontFamily: {
+        default: 'inherit',
+        parseHTML: (element) => element.getAttribute('data-font-family') || 'inherit',
+      },
+      textColor: {
+        default: '',
+        parseHTML: (element) => element.getAttribute('data-text-color') || '',
+      },
+      variant: {
+        default: 'plain',
+        parseHTML: (element) => element.getAttribute('data-variant') || 'plain',
+      },
+    }
+  },
+
+  parseHTML() {
+    return [{ tag: 'div[data-type="marquee"]' }]
+  },
+
+  renderHTML({ node }) {
+    const { items, speed, reverse, textSize, isBold, fontFamily, textColor, variant } = node.attrs
+    let parsed: string[] = []
+    if (Array.isArray(items)) parsed = items
+    else {
+      try { parsed = JSON.parse(items || '[]') } catch { parsed = [] }
+    }
+    parsed = parsed.map((s: any) => (s ?? '').toString()).filter((s: string) => s.trim())
+
+    const attrs = {
+      'data-type': 'marquee',
+      'data-items': JSON.stringify(parsed),
+      'data-speed': String(speed ?? 25),
+      'data-reverse': reverse ? 'true' : 'false',
+      'data-text-size': textSize || '1.25rem',
+      'data-is-bold': isBold !== false ? 'true' : 'false',
+      'data-font-family': fontFamily || 'inherit',
+      'data-text-color': textColor || '',
+      'data-variant': variant || 'plain',
+      class: 'bc-marquee my-4',
+    }
+
+    // 스크립트 미동작/SEO용 정적 텍스트 폴백 (HTMLRenderer가 실제로는 React 컴포넌트로 교체)
+    const children = parsed.map((t: string) => ['span', { class: 'inline-block mr-6' }, t])
+    return ['div', mergeAttributes(attrs), ...children]
+  },
+
+  addCommands() {
+    return {
+      insertMarquee: (options?: any) => ({ commands }: any) => {
+        return commands.insertContent({
+          type: this.name,
+          attrs: options || {},
+        })
+      },
+    } as any
+  },
+})
+
 const FocusOutlineExtension = Extension.create({
   name: 'focusOutline',
   addProseMirrorPlugins() {
@@ -2043,30 +2398,31 @@ export default function RichTextEditor({ content, onChange, blueprintMode = true
   const [lasso, setLasso] = useState<{ active: boolean; startX: number; startY: number; currentX: number; currentY: number } | null>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
 
+  // 번들에 @tiptap/pm/state 가 중복 적재되면 instanceof TextSelection 이 실제 텍스트 선택에도 false 가 되어
+  // (클래스 식별자 불일치) 버블 메뉴의 굵게/기울임/밑줄이 동작하지 않는다. 파일 내 다른 곳(shouldShow 등)과 동일하게
+  // "노드 단독 선택이 아님" 덕타이핑으로 판별한다. 버블 메뉴는 비어있지 않은 텍스트 선택에서만 노출되므로 충분하다.
+  const isTextSelectionActive = () => {
+    if (!editor || editor.isDestroyed) return false
+    const sel = editor.state.selection as any
+    const isNodeSel = 'node' in sel && sel.node
+    return !isNodeSel
+  }
+
   const toggleBoldSafe = () => {
-    if (editor && !editor.isDestroyed) {
-      const { selection } = editor.state
-      if (selection instanceof TextSelection) {
-        editor.chain().focus().toggleBold().run()
-      }
+    if (editor && isTextSelectionActive()) {
+      editor.chain().focus().toggleBold().run()
     }
   }
 
   const toggleItalicSafe = () => {
-    if (editor && !editor.isDestroyed) {
-      const { selection } = editor.state
-      if (selection instanceof TextSelection) {
-        editor.chain().focus().toggleItalic().run()
-      }
+    if (editor && isTextSelectionActive()) {
+      editor.chain().focus().toggleItalic().run()
     }
   }
 
   const toggleUnderlineSafe = () => {
-    if (editor && !editor.isDestroyed) {
-      const { selection } = editor.state
-      if (selection instanceof TextSelection) {
-        editor.chain().focus().toggleUnderline().run()
-      }
+    if (editor && isTextSelectionActive()) {
+      editor.chain().focus().toggleUnderline().run()
     }
   }
 
@@ -2091,6 +2447,7 @@ export default function RichTextEditor({ content, onChange, blueprintMode = true
       ColumnBlock,
       Column,
       FaqBlock,
+      Marquee,
       FocusOutlineExtension,
       CtrlAOverride,
     ],
@@ -2359,9 +2716,20 @@ export default function RichTextEditor({ content, onChange, blueprintMode = true
 
         if (firstIntersected && lastIntersected) {
           try {
-            const fromPos = editor.view.posAtDOM(firstIntersected, 0);
-            const toPos = editor.view.posAtDOM(lastIntersected, lastIntersected.childNodes.length);
-            editor.commands.setTextSelection({ from: fromPos, to: toPos });
+            // Notion 방식: 드래그된 박스 "영역 안의 텍스트만" 선택한다.
+            // 박스 좌상단/우하단 좌표를 실제 텍스트 위치로 변환해 그 범위만 선택.
+            const startCoords = editor.view.posAtCoords({ left: lassoRect.left, top: lassoRect.top });
+            const endCoords = editor.view.posAtCoords({ left: lassoRect.right, top: lassoRect.bottom });
+            if (startCoords && endCoords) {
+              const from = Math.min(startCoords.pos, endCoords.pos);
+              const to = Math.max(startCoords.pos, endCoords.pos);
+              editor.commands.setTextSelection({ from, to });
+            } else {
+              // 좌표 변환 실패 시에만 기존 블록 단위 선택으로 폴백
+              const fromPos = editor.view.posAtDOM(firstIntersected, 0);
+              const toPos = editor.view.posAtDOM(lastIntersected, lastIntersected.childNodes.length);
+              editor.commands.setTextSelection({ from: fromPos, to: toPos });
+            }
             editor.view.focus();
           } catch (err) {
             console.error('Lasso selection error:', err);
@@ -2390,7 +2758,20 @@ export default function RichTextEditor({ content, onChange, blueprintMode = true
     // Lasso if clicking on left/right margins (60px) or main container background
     const isMargin = editorRect && (e.clientX < editorRect.left + 60 || e.clientX > editorRect.right - 60);
 
-    if (isMargin || target === editorContainerRef.current) {
+    // 좌측 정렬 짧은 줄의 "오른쪽 빈 공간"에서 시작하는 드래그도 (방향과 무관하게) lasso로 인식한다.
+    // 클릭 지점이 해당 줄의 실제 글자 끝보다 오른쪽이면 빈 영역으로 간주. (글자 위 클릭은 영향 없음)
+    let isEmptyAreaClick = false;
+    if (editor && (target.classList.contains('ProseMirror') || target.closest('.ProseMirror'))) {
+      const pos = editor.view.posAtCoords({ left: e.clientX, top: e.clientY });
+      if (pos) {
+        try {
+          const c = editor.view.coordsAtPos(pos.pos);
+          if (e.clientX > c.right + 4) isEmptyAreaClick = true;
+        } catch {}
+      }
+    }
+
+    if (isMargin || target === editorContainerRef.current || isEmptyAreaClick) {
       setLasso({
         active: true,
         startX: e.clientX,
@@ -2560,6 +2941,15 @@ export default function RichTextEditor({ content, onChange, blueprintMode = true
             </span>
           </ToolbarButton>
 
+          <ToolbarButton
+            onClick={() => editor.chain().focus().insertMarquee({}).run()}
+            title="흐르는 텍스트 (Marquee) 추가"
+          >
+            <span className="flex items-center gap-1 text-[11px] font-bold text-neutral-300 hover:text-white px-1">
+              마퀴
+            </span>
+          </ToolbarButton>
+
           <div className="relative flex items-center">
             <button
               onMouseDown={e => e.preventDefault()}
@@ -2586,6 +2976,9 @@ export default function RichTextEditor({ content, onChange, blueprintMode = true
                   { label: 'Highlight Text', value: 'highlight' },
                   { label: 'Morphing Text', value: 'morphing' },
                   { label: 'Gradient Text', value: 'gradient' },
+                  { label: 'Scramble Text', value: 'scramble' },
+                  { label: 'Wave Text', value: 'wave' },
+                  { label: 'Neon Text', value: 'neon' },
                 ].map((opt) => (
                   <button
                     key={opt.value}
@@ -2651,9 +3044,12 @@ export default function RichTextEditor({ content, onChange, blueprintMode = true
           onMouseMove={resetIdleTimer}
           onMouseEnter={resetIdleTimer}
           style={{
-            opacity: showToolbar ? 1 : 0,
-            visibility: showToolbar ? 'visible' : 'hidden',
-            pointerEvents: showToolbar ? 'auto' : 'none',
+            // 텍스트 선택 시 BubbleMenu의 shouldShow가 이미 노출 여부를 판단하므로,
+            // 7초 idle 타이머(showToolbar)와 무관하게 렌더되는 동안엔 항상 보이도록 안정화.
+            // (타이핑 중 숨김은 shouldShow의 isTyping 체크가 담당)
+            opacity: 1,
+            visibility: 'visible',
+            pointerEvents: 'auto',
             transition: 'opacity 0.28s ease, visibility 0.28s ease, transform 0.28s ease'
           }}
           className="flex flex-col bg-[#252525] border border-neutral-700/60 rounded-xl shadow-2xl min-w-[280px] transition-all duration-200 transform ease-out animate-in fade-in zoom-in-95"

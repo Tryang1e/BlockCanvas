@@ -15,6 +15,7 @@ export default function SmoothScroll({ children, isRoot = true, className }: { c
   const lenis = useLenis()
   const prevPathnameRef = useRef<string>('')
   const [isMounted, setIsMounted] = React.useState(false)
+  const [reducedMotion, setReducedMotion] = React.useState(false)
 
   // 1. 관리자 대시보드(/adminpage) 라우트에서는 스무스 스크롤러를 완벽 배제하여
   // 내부 오버플로우 스크롤(overflow-auto)이 브라우저 순정 그대로 가장 자연스럽고 신속하게 동작 보장!
@@ -23,6 +24,9 @@ export default function SmoothScroll({ children, isRoot = true, className }: { c
 
   useEffect(() => {
     setIsMounted(true)
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      setReducedMotion(window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+    }
     if (!isRoot || isAdminPage || isLandingPage) return
     
     if (typeof window !== 'undefined') {
@@ -50,17 +54,8 @@ export default function SmoothScroll({ children, isRoot = true, className }: { c
         prevPath.includes('/project/') || 
         currentRealLocation.includes('/project/')
       
-      console.log('--- [DEBUG] SMOOTH SCROLL ROUTE CHANGE ---')
-      console.log('pathname (Next.js):', pathname)
-      console.log('prevPath (Stored):', prevPath)
-      console.log('currentRealLocation (Real window):', currentRealLocation)
-      console.log('isProjectModalTransition (Is Modal Active/Toggle):', isProjectModalTransition)
-      
       if (!isProjectModalTransition) {
-        console.log('🚨 SCROLLING TO TOP TRIGGERED!')
         lenis.scrollTo(0, { immediate: true })
-      } else {
-        console.log('🛡️ SCROLLING TO TOP BLOCKED!')
       }
 
       // 페이지 전환에 의한 바디 높이 변화 캐시 미갱신 스크롤락 예방용 리사이즈 콤보!
@@ -94,7 +89,7 @@ export default function SmoothScroll({ children, isRoot = true, className }: { c
     }
   }, [])
 
-  if (!isMounted || isAdminPage) {
+  if (!isMounted || isAdminPage || reducedMotion) {
     return <div className={className}>{children}</div>
   }
 

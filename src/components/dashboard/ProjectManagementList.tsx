@@ -34,6 +34,11 @@ import {
 } from '@/app/actions/section'
 import SectionReorderModal from '@/components/creator/SectionReorderModal'
 
+const cleanProjectTitle = (title: string) => {
+  if (!title) return ''
+  return title.replace(/\[\s*SIZE\s*:\s*[1-3]\s*(?:[xX]\s*[1-3])?\s*\]/gi, '').trim()
+}
+
 interface ProjectManagementListProps {
   initialProjects: any[]
   sections: any[]
@@ -115,7 +120,7 @@ function SortableProjectRow({
             // eslint-disable-next-line @next/next/no-img-element
             <img 
               src={project.thumbnail_url} 
-              alt={project.title} 
+              alt={cleanProjectTitle(project.title)} 
               className="w-12 h-8 rounded object-cover shadow-sm border border-neutral-200 shrink-0 pointer-events-none" 
               draggable={false}
             />
@@ -124,7 +129,7 @@ function SortableProjectRow({
               <span className="text-[8px] text-neutral-400 font-bold uppercase">No Img</span>
             </div>
           )}
-          <div className="font-bold text-neutral-900 truncate pr-4">{project.title}</div>
+          <div className="font-bold text-neutral-900 truncate pr-4">{cleanProjectTitle(project.title)}</div>
         </div>
 
         {/* Type */}

@@ -30,10 +30,11 @@ export async function publishProjectAction(formData: FormData) {
   const projectId = formData.get('project_id') as string | null
   const categoryId = formData.get('category_id') as string | null
   const customDateStr = formData.get('created_at') as string | null
-  const createdAtDate = customDateStr ? new Date(customDateStr) : undefined
+  const createdAtDate = (customDateStr && customDateStr.trim() !== '') ? new Date(customDateStr) : undefined
   
   // URL to dummy thumbnail for MVP (typically acquired via storage bucket upload)
-  const thumbnailUrl = formData.get('thumbnail_url')?.toString() || "https://images.unsplash.com/photo-1616423640778-28d1b53229bd?auto=format&fit=crop&q=80&w=1000"
+  let thumbnailUrl = formData.get('thumbnail_url')?.toString() || null
+  if (thumbnailUrl === '') thumbnailUrl = null
   
   const widgets = JSON.parse(widgetsStr || '[]')
 
