@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "BlockCanvas | 블록을 쌓아 만드는 나만의 포트폴리오",
     description: "BlockCanvas는 드래그 앤 드롭으로 블록을 자유롭게 배치하여 만드는 크리에이터 전용 매직 캔버스 포트폴리오 플랫폼입니다.",
-    url: "https://blockcanvas.work",
+    url: "https://craftopia.work",
     siteName: "BlockCanvas",
     images: [
       {
