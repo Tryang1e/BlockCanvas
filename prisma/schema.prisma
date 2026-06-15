@@ -33,6 +33,7 @@ model Profile {
   minecraft_username  String?
   verification        MinecraftVerification?
   minecraft_plots     MinecraftPlot[]
+  minecraft_worlds    MinecraftWorld[]
   pending_transfers   PendingTransfer[]
 
   // --- Discord 연동 ---
@@ -250,4 +251,28 @@ model LinkedAccount {
   profile            Profile? @relation(fields: [profile_id], references: [id], onDelete: SetNull)
   created_at         DateTime @default(now())
   updated_at         DateTime @updatedAt
+}
+
+// 인게임 개인 월드(클라우드). Multiverse-Core 로 호스팅. MyIdea §2(클라우드 제공) — Builder's Refuge 스타일.
+// 웹은 메타데이터/권한을 관리하고, 실제 생성·백업 등은 BlockCanvasLink 플러그인이 수행(추후 연동).
+model MinecraftWorld {
+  id              String    @id @default(uuid())
+  owner_id        String
+  name            String    // 표시 이름
+  mv_world        String?   // 서버상의 Multiverse 월드 폴더명(프로비저닝 완료 후 채워짐)
+  generator       String    @default("flat") // flat | wild | (커스텀 generator 문자열)
+  version         String?   // MC 버전 (예: "1.21")
+  size_bytes      BigInt    @default(0) // 디스크 사용량(바이트). 쿼터 계산용. 액션 경계에서 Number 로 변환.
+  border          Int       @default(3000) // 월드 보더 (청크 과확장 방지, MyIdea §2-6)
+  flags           String?   // JSON: 게임룰/플래그 (mobSpawning, weather, time, blockPhysics, fluidSpread …)
+  trusted_players String?   // JSON 배열 [{uuid,name}] — 초대 멤버 (MyIdea §2-5/2-10)
+  status          String    @default("provisioning") // provisioning | active | archived
+  last_saved      DateTime?
+  last_backup_at  DateTime? // 백업 24h 1회 제한 (MyIdea §2-5)
+  archived_at     DateTime? // 보관함(30일 후 삭제 예정)
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  owner           Profile   @relation(fields: [owner_id], references: [id], onDelete: Cascade)
+
+  @@index([owner_id, status]) // 소유자별 월드 조회
 }

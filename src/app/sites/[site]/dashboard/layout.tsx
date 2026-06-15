@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { LayoutDashboard, FolderKanban, Settings, UserCircle, Link as LinkIcon, Globe, Activity, Mail } from 'lucide-react'
+import { LayoutDashboard, FolderKanban, Settings, UserCircle, Link as LinkIcon, Globe, Activity, Mail, Boxes } from 'lucide-react'
 import Image from 'next/image'
 
 import UserSidebar from '@/components/layout/UserSidebar'
@@ -194,11 +194,20 @@ export default async function DashboardLayout({
           )}
           <div className="pt-4 mt-4 border-t border-neutral-200">
             <div className="px-3 mb-2 text-xs font-bold text-neutral-400 uppercase tracking-wider">외부 연동</div>
-            <button className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-neutral-400 cursor-not-allowed font-medium text-sm">
+            <Link
+              href={`/dashboard/connections`}
+              className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-neutral-600 hover:text-black hover:bg-neutral-100 font-medium text-sm transition-colors"
+            >
               <LinkIcon size={18} />
-              <span className="flex-1 text-left">마인크래프트 계정</span>
-              <span className="text-[10px] bg-neutral-100 px-1.5 py-0.5 rounded text-neutral-500">예정</span>
-            </button>
+              <span className="flex-1 text-left">외부 계정 연동</span>
+            </Link>
+            <Link
+              href={`/dashboard/minecraft`}
+              className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-neutral-600 hover:text-black hover:bg-neutral-100 font-medium text-sm transition-colors"
+            >
+              <Boxes size={18} />
+              <span className="flex-1 text-left">건축 서버 대시보드</span>
+            </Link>
           </div>
         </nav>
 
