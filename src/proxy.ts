@@ -46,6 +46,13 @@ export function proxy(request: NextRequest) {
     return NextResponse.next()
   }
 
+  // 4b. auth.craftopia.work → 연동 허브(/auth). (/api/* 는 위에서 이미 통과 처리됨)
+  if (subdomain.toLowerCase() === 'auth') {
+    const rewriteUrl = request.nextUrl.clone()
+    rewriteUrl.pathname = '/auth'
+    return NextResponse.rewrite(rewriteUrl)
+  }
+
   // Define excluded subdomains
   const excludedSubdomains = ['www', 'api', 'admin', 'dashboard']
 

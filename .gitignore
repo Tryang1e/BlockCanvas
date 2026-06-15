@@ -68,5 +68,9 @@ next-env.d.ts
 # Minecraft server (separate project, ~800MB world/jar data — never commit)
 /MC_SER/
 
+# Discord 봇 (독립 패키지) — 의존성/시크릿 제외
+/bot/node_modules/
+/bot/.env
+
 # 외부 참고용 UI 라이브러리 사본 (자체 .git 보유 — 추적/린트 제외)
 /temp_animate_ui/

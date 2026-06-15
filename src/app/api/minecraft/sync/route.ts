@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = JSON.parse(rawBody);
-    const { plot_id, world, owner_uuid, alias, members, trusted, transfer_resolved } = body ?? {};
+    const { plot_id, world, owner_uuid, alias, members, trusted, x, z, transfer_resolved } = body ?? {};
 
     if (!plot_id) {
       return NextResponse.json({ error: "Bad Request: Missing plot_id." }, { status: 400 });
@@ -44,6 +44,8 @@ export async function POST(req: NextRequest) {
         owner_id: ownerProfile.id,
         world: typeof world === "string" ? world : "world",
         alias: typeof alias === "string" && alias ? alias : null,
+        center_x: typeof x === "number" ? x : null,
+        center_z: typeof z === "number" ? z : null,
         members: JSON.stringify(Array.isArray(members) ? members : []),
         trusted_players: JSON.stringify(Array.isArray(trusted) ? trusted : []),
       };

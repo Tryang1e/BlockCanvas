@@ -29,7 +29,8 @@ function generateSignature(timestamp: string, body: string): string {
 export function verifyInboundSignature(
   rawBody: string,
   timestamp: string | null,
-  signature: string | null
+  signature: string | null,
+  secret: string = API_SECRET
 ): boolean {
   if (!signature || !timestamp) return false;
 
@@ -41,7 +42,7 @@ export function verifyInboundSignature(
   }
 
   const computed = crypto
-    .createHmac("sha256", API_SECRET)
+    .createHmac("sha256", secret)
     .update(`${timestamp}.${rawBody}`)
     .digest("hex");
 
@@ -121,6 +122,8 @@ export interface MinecraftPlotDto {
   id: string;
   world: string;
   alias: string;
+  x: number | null;
+  z: number | null;
   members: PlotMember[];
   trusted: PlotMember[];
 }
@@ -154,6 +157,8 @@ export async function getPlayerPlots(
       id: String(p.id ?? ""),
       world: String(p.world ?? "world"),
       alias: String(p.alias ?? ""),
+      x: typeof p.x === "number" ? p.x : null,
+      z: typeof p.z === "number" ? p.z : null,
       members: normalizeMembers(p.members),
       trusted: normalizeMembers(p.trusted),
     }));

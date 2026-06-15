@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Gamepad2, RefreshCw, UserCheck, UserMinus, ShieldAlert, CheckCircle2, UserPlus, Key } from "lucide-react";
+import { Gamepad2, RefreshCw, UserCheck, UserMinus, ShieldAlert, CheckCircle2, UserPlus, Key, LogIn } from "lucide-react";
 import {
   getMinecraftStatus,
   generateVerificationCode,
@@ -13,6 +13,21 @@ interface MinecraftStatus {
   minecraftUuid: string | null;
   minecraftUsername: string | null;
   verificationCode: string | null;
+}
+
+function mcErrorText(code: string): string {
+  switch (code) {
+    case "already_linked":
+      return "이 마인크래프트 계정은 이미 다른 웹 계정에 연동되어 있습니다.";
+    case "oauth_not_configured":
+      return "Microsoft 로그인이 아직 설정되지 않았습니다. (관리자 설정 필요)";
+    case "invalid_state":
+      return "보안 검증에 실패했습니다. 다시 시도해주세요.";
+    case "oauth_failed":
+      return "Microsoft 인증에 실패했습니다. 정품 Java 계정인지 확인 후 다시 시도해주세요.";
+    default:
+      return "연동 중 오류가 발생했습니다.";
+  }
 }
 
 export default function MinecraftIntegration() {
@@ -42,6 +57,17 @@ export default function MinecraftIntegration() {
 
   useEffect(() => {
     fetchStatus();
+    // Microsoft OAuth 콜백 결과 메시지 처리
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("mc_linked") === "1") {
+        setMessage({ type: "success", text: "마인크래프트 계정이 연동되었습니다!" });
+        window.history.replaceState({}, "", window.location.pathname);
+      } else if (params.get("mc_error")) {
+        setMessage({ type: "error", text: mcErrorText(params.get("mc_error") as string) });
+        window.history.replaceState({}, "", window.location.pathname);
+      }
+    }
   }, []);
 
   const handleGenerateCode = async () => {
@@ -149,22 +175,38 @@ export default function MinecraftIntegration() {
       ) : (
         // Unlinked State
         <div className="space-y-4">
+          {/* 1순위: Microsoft 정품 로그인 */}
           <div className="bg-neutral-50 border border-neutral-100 rounded-2xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
             <div className="space-y-1">
-              <span className="font-bold text-neutral-800 text-sm">연동 코드를 발급하여 인게임 계정을 연결하세요</span>
+              <span className="font-bold text-neutral-800 text-sm">Microsoft 계정으로 즉시 연동 (권장)</span>
               <p className="text-xs text-neutral-500 font-medium">
-                연동 버튼을 누르면 6자리 인증 번호가 생성됩니다. 인증 번호를 마인크래프트 인게임에서 입력하여 연동을 마칩니다.
+                Microsoft(정품 Java) 계정으로 로그인하면 인게임 접속 없이 바로 연동됩니다.
               </p>
             </div>
-            <button
-              onClick={handleGenerateCode}
-              disabled={actionLoading}
-              className="flex items-center gap-1.5 px-4 py-2.5 bg-black hover:bg-neutral-800 text-white text-xs font-bold rounded-lg transition-all shadow-sm disabled:opacity-50 whitespace-nowrap"
+            <a
+              href="/api/auth/minecraft/start"
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-black hover:bg-neutral-800 text-white text-xs font-bold rounded-lg transition-all shadow-sm whitespace-nowrap"
             >
-              <UserPlus size={15} />
-              연동 코드 발급하기
-            </button>
+              <LogIn size={15} />
+              Microsoft로 로그인
+            </a>
           </div>
+
+          {/* 2순위(폴백): 인게임 6자리 코드 */}
+          <details className="group bg-neutral-50/60 border border-neutral-100 rounded-2xl">
+            <summary className="cursor-pointer list-none p-4 text-xs font-semibold text-neutral-600 flex items-center justify-between">
+              <span>또는 인게임 6자리 코드로 연동</span>
+              <span className="text-neutral-400 transition-transform group-open:rotate-180">▾</span>
+            </summary>
+            <div className="px-4 pb-4 space-y-3">
+              <button
+                onClick={handleGenerateCode}
+                disabled={actionLoading}
+                className="flex items-center gap-1.5 px-4 py-2.5 bg-neutral-900 hover:bg-neutral-700 text-white text-xs font-bold rounded-lg transition-all shadow-sm disabled:opacity-50 whitespace-nowrap"
+              >
+                <UserPlus size={15} />
+                연동 코드 발급하기
+              </button>
 
           {status.verificationCode && (
             <div className="bg-neutral-900 text-white rounded-2xl p-8 flex flex-col items-center text-center space-y-4 shadow-md border border-neutral-800 animate-in zoom-in-95 duration-300">
@@ -188,6 +230,8 @@ export default function MinecraftIntegration() {
               </p>
             </div>
           )}
+            </div>
+          </details>
         </div>
       )}
     </section>

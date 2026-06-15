@@ -13,6 +13,7 @@ import {
   Globe,
   CheckCircle2,
   ShieldAlert,
+  Map as MapIcon,
 } from "lucide-react";
 import {
   getMyPlots,
@@ -23,6 +24,13 @@ import {
   getMyPendingTransfers,
 } from "@/app/actions/minecraft";
 
+// Dynmap 임베드 설정(빌드 시 인라인). 미설정 시 지도 버튼이 숨겨진다.
+const MAP_URL = (process.env.NEXT_PUBLIC_MINECRAFT_MAP_URL || "").replace(/\/$/, "");
+const MAP_NAME = process.env.NEXT_PUBLIC_MINECRAFT_MAP_NAME || "flat";
+function buildMapSrc(world: string, x: number, z: number) {
+  return `${MAP_URL}/?worldname=${encodeURIComponent(world)}&mapname=${encodeURIComponent(MAP_NAME)}&zoom=6&x=${x}&y=64&z=${z}`;
+}
+
 interface PlotMember {
   uuid: string;
   name: string;
@@ -31,6 +39,8 @@ interface Plot {
   id: string;
   world: string;
   alias: string | null;
+  centerX: number | null;
+  centerZ: number | null;
   members: PlotMember[];
   trusted: PlotMember[];
 }
@@ -50,6 +60,7 @@ export default function MinecraftPlots() {
   const [trustInputs, setTrustInputs] = useState<Record<string, string>>({});
   const [transferInputs, setTransferInputs] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [mapOpen, setMapOpen] = useState<Record<string, boolean>>({});
 
   const loadAll = useCallback(async () => {
     const [plotRes, pendRes] = await Promise.all([getMyPlots(), getMyPendingTransfers()]);
@@ -201,10 +212,34 @@ export default function MinecraftPlots() {
                   <span className="font-bold text-neutral-900">{plot.alias || `영토 ${plot.id}`}</span>
                   <span className="text-[10px] font-mono px-1.5 py-0.5 bg-neutral-100 text-neutral-500 rounded">{plot.id}</span>
                 </div>
-                <span className="text-[11px] text-neutral-400 font-medium flex items-center gap-1">
-                  <Globe size={12} /> {plot.world}
-                </span>
+                <div className="flex items-center gap-3">
+                  {MAP_URL && plot.centerX !== null && plot.centerZ !== null && (
+                    <button
+                      onClick={() => setMapOpen((m) => ({ ...m, [plot.id]: !m[plot.id] }))}
+                      className="flex items-center gap-1 text-[11px] font-semibold text-neutral-600 hover:text-neutral-900 transition-colors"
+                    >
+                      <MapIcon size={13} /> {mapOpen[plot.id] ? "지도 닫기" : "지도 보기"}
+                    </button>
+                  )}
+                  <span className="text-[11px] text-neutral-400 font-medium flex items-center gap-1">
+                    <Globe size={12} /> {plot.world}
+                  </span>
+                </div>
               </div>
+
+              {MAP_URL && mapOpen[plot.id] && plot.centerX !== null && plot.centerZ !== null && (
+                <div className="mb-4 rounded-xl overflow-hidden border border-neutral-200">
+                  <iframe
+                    title={`Dynmap ${plot.id}`}
+                    src={buildMapSrc(plot.world, plot.centerX, plot.centerZ)}
+                    className="w-full h-72"
+                    loading="lazy"
+                  />
+                  <div className="px-3 py-1.5 bg-neutral-50 text-[10px] text-neutral-400 font-medium border-t border-neutral-100">
+                    Dynmap 실시간 뷰 · 좌표 {plot.centerX}, {plot.centerZ}
+                  </div>
+                </div>
+              )}
 
               <div className="mb-4">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-neutral-600 mb-2">
