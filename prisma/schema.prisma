@@ -9,7 +9,7 @@ datasource db {
 
 model Profile {
   id              String             @id @default(uuid())
-  role            String             @default("creator")
+  role            String             @default("user")
   creator_name    String             @unique
   display_name    String?
   email           String?
