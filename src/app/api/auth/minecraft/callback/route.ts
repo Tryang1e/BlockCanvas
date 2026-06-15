@@ -5,7 +5,7 @@ import { verifySession } from "@/lib/session";
 import { exchangeCodeForIdentity } from "@/lib/minecraftOAuth";
 import { linkProviderToHub } from "@/lib/hub";
 import { signHubSession, verifyHubSession, HUB_COOKIE } from "@/lib/hubSession";
-import { oauthRedirectUri, publicUrl } from "@/lib/publicUrl";
+import { oauthRedirectUri, publicUrl, cookieDomain } from "@/lib/publicUrl";
 
 /**
  * GET /api/auth/minecraft/callback
@@ -54,6 +54,7 @@ export async function GET(req: NextRequest) {
         secure: process.env.NODE_ENV === "production",
         maxAge: 60 * 60 * 24 * 30,
         path: "/",
+        domain: cookieDomain(req),
       });
       return res;
     } catch (error: unknown) {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { verifyHubSession, HUB_COOKIE } from "@/lib/hubSession";
+import { cookieDomain } from "@/lib/publicUrl";
 
 /** POST /api/auth/hub/disconnect { provider } — 허브에서 한 제공자 연결 해제. */
 export async function POST(req: NextRequest) {
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
   if (!updated.discord_id && !updated.minecraft_uuid) {
     await prisma.linkedAccount.delete({ where: { id: accountId } });
     const res = NextResponse.json({ success: true, loggedOut: true });
-    res.cookies.set(HUB_COOKIE, "", { maxAge: 0, path: "/" });
+    res.cookies.set(HUB_COOKIE, "", { maxAge: 0, path: "/", domain: cookieDomain(req) });
     return res;
   }
   return NextResponse.json({ success: true });
