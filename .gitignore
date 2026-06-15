@@ -49,6 +49,7 @@ next-env.d.ts
 /prisma/dev.db-journal
 *.db-wal
 *.db-shm
+/dev.db.pre-mc-*.bak
 /public/uploads/
 *.mp4
 *.zip

@@ -27,6 +27,13 @@ model Profile {
   two_factor_enabled  Boolean            @default(false)
   privacy_consented   Boolean            @default(false)
   privacy_consented_at DateTime?
+
+  // --- Minecraft 연동 (MC_SER) ---
+  minecraft_uuid      String?                @unique
+  minecraft_username  String?
+  verification        MinecraftVerification?
+  minecraft_plots     MinecraftPlot[]
+  pending_transfers   PendingTransfer[]
 }
 
 model Portfolio {
@@ -171,4 +178,47 @@ model WipLog {
   @@index([creator_id])
   @@index([project_id]) // 프로젝트별 WIP 로그 조회
   @@index([created_at]) // explore: 전체 WIP 로그 최신순
+}
+
+// ============================================================
+//  Minecraft 연동 (MC_SER) — 웹↔마인크래프트 서버 영토 연동
+// ============================================================
+
+// 웹 대시보드에서 발급한 1회용 6자리 인증코드. 인게임 /웹연동 <코드> 로 소비된다.
+model MinecraftVerification {
+  id          String   @id @default(uuid())
+  profile_id  String   @unique
+  code        String   @unique // 6자리 난수. @unique 로 코드 충돌(엉뚱한 계정 연동) 차단.
+  created_at  DateTime @default(now())
+  profile     Profile  @relation(fields: [profile_id], references: [id], onDelete: Cascade)
+}
+
+// 인게임 플롯의 웹측 캐시. syncMyPlots() 가 Spigot /api/plot/list 응답으로 upsert 한다.
+// NOTE: id 는 PlotSquared 플롯 ID 문자열(예: "1;2"). 현재 단일 월드 가정.
+//       멀티 월드로 확장 시 (world, id) 복합키로 바꾸고 Java/액션도 함께 수정해야 한다.
+model MinecraftPlot {
+  id              String   @id
+  owner_id        String
+  world           String   @default("world")
+  alias           String?
+  members         String?  // JSON 배열(임시 add 권한 UUID들)
+  trusted_players String?  // JSON 배열(영구 trust 권한 UUID들)
+  updated_at      DateTime @updatedAt
+  owner           Profile  @relation(fields: [owner_id], references: [id], onDelete: Cascade)
+
+  @@index([owner_id]) // 소유자별 플롯 조회
+}
+
+// 웹에서 신청한 소유권 양도 요청 기록. 실제 권한 변경은 인게임 /웹연동 수락 으로 완료된다(2FA).
+// 인게임 수락 결과는 Phase 2 역방향 webhook 으로 status 가 갱신된다.
+model PendingTransfer {
+  id          String   @id @default(uuid())
+  plot_id     String
+  from_id     String   // 양도를 신청한 프로필
+  target_name String   // 인게임 대상 닉네임
+  status      String   @default("pending") // pending | accepted | rejected | expired
+  created_at  DateTime @default(now())
+  from        Profile  @relation(fields: [from_id], references: [id], onDelete: Cascade)
+
+  @@index([from_id, status]) // 내 양도 신청 현황 조회
 }
