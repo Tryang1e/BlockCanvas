@@ -167,3 +167,68 @@ export async function getPlayerPlots(
     return { success: false, status: 502, plots: [], message: "Invalid JSON from Minecraft server." };
   }
 }
+
+/**
+ * 서버에 개인 월드 생성을 요청한다. (BlockCanvasLink /api/world/create)
+ * 서버가 Bukkit WorldCreator 로 생성 후 { success, folder, size_bytes } 를 반환.
+ */
+export async function createMinecraftWorld(
+  worldName: string,
+  generator: string,
+  border: number = 3000
+): Promise<{ success: boolean; status: number; folder?: string; sizeBytes?: number; error?: string }> {
+  const res = await sendToMinecraft("/api/world/create", {
+    world_name: worldName,
+    generator: generator === "wild" ? "wild" : "flat",
+    border,
+  });
+  if (!res.success) {
+    let error = res.message;
+    try {
+      const p = JSON.parse(res.message);
+      if (p?.error) error = p.error;
+    } catch { /* plain text body */ }
+    return { success: false, status: res.status, error };
+  }
+  try {
+    const p = JSON.parse(res.message);
+    return {
+      success: true,
+      status: res.status,
+      folder: typeof p.folder === "string" ? p.folder : worldName,
+      sizeBytes: typeof p.size_bytes === "number" ? p.size_bytes : 0,
+    };
+  } catch {
+    return { success: false, status: 502, error: "Invalid JSON from Minecraft server." };
+  }
+}
+
+/** 서버에서 월드 런타임 정보를 조회한다. (BlockCanvasLink /api/world/info) */
+export async function getMinecraftWorldInfo(
+  worldName: string
+): Promise<{
+  success: boolean;
+  status: number;
+  exists?: boolean;
+  loaded?: boolean;
+  sizeBytes?: number;
+  border?: number;
+  gamerules?: Record<string, boolean>;
+}> {
+  const res = await sendToMinecraft("/api/world/info", { world_name: worldName });
+  if (!res.success) return { success: false, status: res.status };
+  try {
+    const p = JSON.parse(res.message);
+    return {
+      success: true,
+      status: res.status,
+      exists: !!p.exists,
+      loaded: !!p.loaded,
+      sizeBytes: typeof p.size_bytes === "number" ? p.size_bytes : 0,
+      border: typeof p.border === "number" ? p.border : undefined,
+      gamerules: p.gamerules && typeof p.gamerules === "object" ? p.gamerules : undefined,
+    };
+  } catch {
+    return { success: false, status: 502 };
+  }
+}

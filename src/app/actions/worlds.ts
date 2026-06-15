@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { verifySession } from "@/lib/session";
 import { getWorldQuotaBytes } from "@/lib/worldQuota";
+import { createMinecraftWorld } from "@/lib/minecraft";
 
 // 인게임 개인 월드(클라우드)의 웹측 관리 액션 (MyIdea §2 / Builder's Refuge 스타일).
 // 현재는 웹/DB 골격: 메타데이터를 DB 에 저장·조회한다. 실제 서버 프로비저닝(Multiverse 생성/백업 등)은
@@ -114,6 +115,17 @@ export async function createWorld(name: string, generator: string) {
       data: { owner_id: profile.id, name: cleanName, generator: gen, status: "provisioning" },
     });
 
+    // 서버 프로비저닝(베스트 에포트): uuid 기반 폴더명을 예약하고 BlockCanvasLink 로 실제 생성 요청.
+    // 서버 미연결(503)이면 provisioning 으로 남겨 두고, 추후 서버 가동 시 동기화로 활성화한다.
+    const folder = "bcw_" + world.id.replace(/-/g, "").slice(0, 12);
+    const provision = await createMinecraftWorld(folder, gen, 3000);
+    await prisma.minecraftWorld.update({
+      where: { id: world.id },
+      data: provision.success
+        ? { mv_world: provision.folder || folder, size_bytes: BigInt(provision.sizeBytes ?? 0), status: "active" }
+        : { mv_world: folder },
+    });
+
     try {
       await prisma.creatorLog.create({
         data: {
@@ -124,7 +136,7 @@ export async function createWorld(name: string, generator: string) {
       });
     } catch { /* 로그 실패는 무시 */ }
 
-    return { success: true as const, worldId: world.id };
+    return { success: true as const, worldId: world.id, provisioned: provision.success };
   } catch (e: unknown) {
     return { success: false as const, error: e instanceof Error ? e.message : String(e) };
   }
