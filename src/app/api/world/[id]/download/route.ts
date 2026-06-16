@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { verifySession } from "@/lib/session";
 import { backupWorld } from "@/app/actions/worlds";
 import { parseBackupList } from "@/lib/worldLifecycle";
+import { hasCapability } from "@/lib/worldPerms";
 
 export const runtime = "nodejs";
 
@@ -23,8 +24,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (!profile) return NextResponse.json({ error: "프로필을 찾을 수 없습니다." }, { status: 403 });
 
   const world = await prisma.minecraftWorld.findUnique({ where: { id } });
-  if (!world || world.owner_id !== profile.id) {
+  if (!world) {
     return NextResponse.json({ error: "월드를 찾을 수 없습니다." }, { status: 404 });
+  }
+  if (!hasCapability(world, profile, "download")) {
+    return NextResponse.json({ error: "다운로드 권한이 없습니다." }, { status: 403 });
   }
 
   const backups = parseBackupList(world.backups);

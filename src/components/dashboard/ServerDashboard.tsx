@@ -23,15 +23,17 @@ import {
   Pencil,
   Check,
   X,
+  UserPlus,
 } from "lucide-react";
-import { getMyWorlds, getInvitedWorlds, getWorldLive, setWorldGamerule, setWorldSetting, backupWorld, deleteWorld, restoreWorld, renameWorld, deactivateWorld } from "@/app/actions/worlds";
+import { getMyWorlds, getInvitedWorlds, getWorldLive, setWorldGamerule, setWorldSetting, backupWorld, deleteWorld, restoreWorld, renameWorld, deactivateWorld, inviteWorldMember, kickWorldMember, setMemberPermission } from "@/app/actions/worlds";
 import { getMyPlots, getInvitedPlots } from "@/app/actions/minecraft";
 import { formatBytes } from "@/lib/worldQuota";
 import { worldIconSrc } from "@/lib/worldIcons";
+import { PERM_KEYS, type MemberPerms } from "@/lib/worldPerms";
 import UserSidebar from "@/components/layout/UserSidebar";
 import PlotsView from "./PlotsView";
 import WorldCreateModal from "./WorldCreateModal";
-import { McMemberChip } from "./McAvatar";
+import McAvatar, { McMemberChip } from "./McAvatar";
 import { ConfirmModal, DownloadModal, type ConfirmType } from "./WorldActionModals";
 
 // Dynmap 임베드(PlotsView 와 동일한 /dynmap-proxy 규약). 월드는 보더 중심이 (0,0) 이라 0,0 기준.
@@ -45,7 +47,9 @@ function buildWorldMapSrc(world: string) {
 interface Member {
   uuid?: string;
   name: string;
+  perms?: MemberPerms;
 }
+const PERM_LABELS: Record<string, string> = { edit: "편집", gamerule: "게임룰", backup: "백업", download: "다운로드", invite: "초대", kick: "추방" };
 interface World {
   id: string;
   name: string;
@@ -59,6 +63,7 @@ interface World {
   border: number;
   flags: Record<string, unknown>;
   trusted: Member[];
+  myPerms?: MemberPerms;
   status: string;
   lastSaved: string | null;
   lastBackupAt: string | null;
@@ -171,6 +176,7 @@ export default function ServerDashboard({
           border: 3000,
           flags: {},
           trusted: (w.trusted as Member[]) ?? [],
+          myPerms: w.myPerms,
           status: w.status,
           lastSaved: null,
           lastBackupAt: null,
@@ -302,6 +308,43 @@ export default function ServerDashboard({
     }
     setMessage({ type: "error", text: res.error || "이름 변경에 실패했습니다." });
     return false;
+  };
+
+  const handleInvite = async (world: World, name: string) => {
+    setBusy(true);
+    setMessage(null);
+    const res = await inviteWorldMember(world.id, name);
+    setBusy(false);
+    if (res.success) {
+      patchWorld(world.id, (w) => ({ ...w, trusted: res.trusted }));
+      setMessage({ type: "success", text: `${name} 님을 초대했습니다.` });
+    } else {
+      setMessage({ type: "error", text: res.error || "초대에 실패했습니다." });
+    }
+  };
+
+  const handleKick = async (world: World, name: string) => {
+    setBusy(true);
+    setMessage(null);
+    const res = await kickWorldMember(world.id, name);
+    setBusy(false);
+    if (res.success) {
+      patchWorld(world.id, (w) => ({ ...w, trusted: res.trusted }));
+    } else {
+      setMessage({ type: "error", text: res.error || "제외에 실패했습니다." });
+    }
+  };
+
+  const handleSetMemberPerm = async (world: World, name: string, perm: string, value: boolean) => {
+    setBusy(true);
+    setMessage(null);
+    const res = await setMemberPermission(world.id, name, perm, value);
+    setBusy(false);
+    if (res.success) {
+      patchWorld(world.id, (w) => ({ ...w, trusted: res.trusted }));
+    } else {
+      setMessage({ type: "error", text: res.error || "권한 변경에 실패했습니다." });
+    }
   };
 
   const pct = quota && quota.totalBytes ? Math.min(100, (quota.usedBytes / quota.totalBytes) * 100) : 0;
@@ -474,6 +517,9 @@ export default function ServerDashboard({
               onDelete={() => setConfirmType("delete")}
               onRestore={() => handleRestore(selected)}
               onRename={(newName) => handleRename(selected, newName)}
+              onInvite={(name) => handleInvite(selected, name)}
+              onKick={(name) => handleKick(selected, name)}
+              onSetMemberPerm={(name, perm, value) => handleSetMemberPerm(selected, name, perm, value)}
             />
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-neutral-300 p-10">
@@ -569,6 +615,9 @@ function WorldDetail({
   onDelete,
   onRestore,
   onRename,
+  onInvite,
+  onKick,
+  onSetMemberPerm,
 }: {
   world: World;
   busy: boolean;
@@ -583,11 +632,19 @@ function WorldDetail({
   onDelete: () => void;
   onRestore: () => void;
   onRename: (newName: string) => Promise<boolean>;
+  onInvite: (name: string) => void;
+  onKick: (name: string) => void;
+  onSetMemberPerm: (name: string, perm: string, value: boolean) => void;
 }) {
   const flagEntries = FLAGS.map((f) => ({ ...f, v: world.flags?.[f.key] }));
   const archived = world.status === "archived";
   const active = world.status === "active";
-  const editable = world.owned && active && !locked;
+  const canGamerule = world.owned || !!world.myPerms?.gamerule;
+  const editable = canGamerule && active && !locked; // 게임룰/설정 편집 가능
+  const canBackup = world.owned || !!world.myPerms?.backup;
+  const canDownload = world.owned || !!world.myPerms?.download;
+  const canInvite = world.owned || !!world.myPerms?.invite; // 부반장: 멤버 초대
+  const canKick = world.owned || !!world.myPerms?.kick; // 부반장: 멤버 추방
   const difficulty = typeof world.flags?.difficulty === "string" ? (world.flags.difficulty as string) : "";
   const gamemode = typeof world.flags?.gamemode === "string" ? (world.flags.gamemode as string) : "";
   const tick = typeof world.flags?.randomTickSpeed === "number" ? (world.flags.randomTickSpeed as number) : 3;
@@ -596,12 +653,21 @@ function WorldDetail({
 
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(world.name);
+  const [inviteInput, setInviteInput] = useState("");
   useEffect(() => {
     setEditingName(false);
     setNameDraft(world.name);
+    setInviteInput("");
   }, [world.id]);
   const saveName = async () => {
     if (await onRename(nameDraft)) setEditingName(false);
+  };
+  const doInvite = () => {
+    const n = inviteInput.trim();
+    if (n) {
+      onInvite(n);
+      setInviteInput("");
+    }
   };
 
   return (
@@ -670,35 +736,39 @@ function WorldDetail({
           </div>
         </div>
 
-        {/* 소유자만 관리 가능. 공유된 월드는 삭제/백업/변경 불가(읽기 전용). */}
-        {world.owned && (
+        {/* 소유자 = 전체 관리. 초대 멤버 = 부여된 권한(백업/다운로드)만 노출. */}
+        {(world.owned || canBackup || canDownload) && (
           <div className="flex items-center gap-1 flex-wrap justify-end">
             {archived ? (
               <>
-                <ActionBtn onClick={onDownload} disabled={busy} icon={<Download size={15} />} label="다운로드" />
-                <button
-                  onClick={onRestore}
-                  disabled={busy || locked}
-                  title={locked ? "용량 초과 잠금 중에는 활성화할 수 없습니다." : ""}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-emerald-700 hover:bg-emerald-50 border border-transparent hover:border-emerald-200 transition-colors disabled:opacity-40"
-                >
-                  {busy ? <Loader2 size={15} className="animate-spin" /> : <Power size={15} />} 활성화
-                </button>
+                {canDownload && <ActionBtn onClick={onDownload} disabled={busy} icon={<Download size={15} />} label="다운로드" />}
+                {world.owned && (
+                  <button
+                    onClick={onRestore}
+                    disabled={busy || locked}
+                    title={locked ? "용량 초과 잠금 중에는 활성화할 수 없습니다." : ""}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-emerald-700 hover:bg-emerald-50 border border-transparent hover:border-emerald-200 transition-colors disabled:opacity-40"
+                  >
+                    {busy ? <Loader2 size={15} className="animate-spin" /> : <Power size={15} />} 활성화
+                  </button>
+                )}
               </>
             ) : (
               <>
-                <ActionBtn onClick={onBackup} disabled={busy || !active || locked} icon={<Archive size={15} />} label="백업" />
-                <ActionBtn onClick={onDownload} disabled={busy || !active} icon={<Download size={15} />} label="다운로드" />
-                <ActionBtn onClick={onDeactivate} disabled={busy || !active || locked} icon={<PowerOff size={15} />} label="비활성화" />
+                {canBackup && <ActionBtn onClick={onBackup} disabled={busy || !active || locked} icon={<Archive size={15} />} label="백업" />}
+                {canDownload && <ActionBtn onClick={onDownload} disabled={busy || !active} icon={<Download size={15} />} label="다운로드" />}
+                {world.owned && <ActionBtn onClick={onDeactivate} disabled={busy || !active || locked} icon={<PowerOff size={15} />} label="비활성화" />}
               </>
             )}
-            <button
-              onClick={onDelete}
-              disabled={busy}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-colors disabled:opacity-40"
-            >
-              <Trash2 size={15} /> 삭제
-            </button>
+            {world.owned && (
+              <button
+                onClick={onDelete}
+                disabled={busy}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-colors disabled:opacity-40"
+              >
+                <Trash2 size={15} /> 삭제
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -732,14 +802,75 @@ function WorldDetail({
             <SectionLabel>초대된 멤버</SectionLabel>
             {world.trusted.length === 0 ? (
               <p className="text-xs text-neutral-400">아직 초대된 멤버가 없습니다.</p>
+            ) : world.owned ? (
+              <div className="space-y-1.5">
+                {world.trusted.map((m) => (
+                  <div key={m.uuid || m.name} className="flex items-center gap-2 flex-wrap">
+                    <McAvatar id={m.uuid} name={m.name} size={22} />
+                    <span className="text-xs font-medium text-neutral-700 truncate max-w-[96px]">{m.name}</span>
+                    <div className="flex gap-1 flex-wrap">
+                      {PERM_KEYS.map((pk) => {
+                        const on = !!m.perms?.[pk];
+                        return (
+                          <button
+                            key={pk}
+                            onClick={() => onSetMemberPerm(m.name, pk, !on)}
+                            disabled={busy || locked}
+                            title={PERM_LABELS[pk] + (pk === "edit" ? " (인게임 빌드)" : "")}
+                            className={`text-[10px] font-bold px-1.5 py-1 rounded-md transition-colors disabled:opacity-50 ${
+                              on ? "bg-emerald-500 text-white" : "bg-neutral-100 text-neutral-400 hover:bg-neutral-200"
+                            }`}
+                          >
+                            {PERM_LABELS[pk]}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <button onClick={() => onKick(m.name)} disabled={busy} className="ml-auto text-neutral-300 hover:text-rose-600 disabled:opacity-40" title="제외">
+                      <X size={13} />
+                    </button>
+                  </div>
+                ))}
+              </div>
             ) : (
               <div className="flex flex-wrap gap-1.5">
                 {world.trusted.map((m) => (
-                  <McMemberChip key={m.uuid || m.name} id={m.uuid} name={m.name} />
+                  <McMemberChip
+                    key={m.uuid || m.name}
+                    id={m.uuid}
+                    name={m.name}
+                    onRemove={canKick ? () => onKick(m.name) : undefined}
+                    disabled={busy}
+                  />
                 ))}
               </div>
             )}
-            <p className="text-[11px] text-neutral-400 mt-2">멤버 초대/강퇴는 서버 연동 후 제공됩니다.</p>
+            {canInvite && (
+              <div className="flex gap-1.5 mt-2">
+                <input
+                  value={inviteInput}
+                  onChange={(e) => setInviteInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") doInvite();
+                  }}
+                  placeholder="초대할 닉네임"
+                  maxLength={16}
+                  className="flex-1 border border-neutral-200 px-2.5 py-1.5 rounded-lg text-xs focus:outline-none focus:border-black"
+                />
+                <button
+                  onClick={doInvite}
+                  disabled={busy || inviteInput.trim().length < 2}
+                  className="flex items-center gap-1 px-2.5 py-1.5 bg-neutral-900 hover:bg-neutral-700 text-white text-[11px] font-bold rounded-lg disabled:opacity-50"
+                >
+                  <UserPlus size={12} /> 초대
+                </button>
+              </div>
+            )}
+            <p className="text-[11px] text-neutral-400 mt-2">
+              {world.owned
+                ? "권한 버튼으로 멤버별 기능을 켜고 끕니다. 편집=인게임 빌드, 게임룰/백업/다운로드=웹 기능."
+                : "내게 부여된 권한만 사용할 수 있습니다."}
+            </p>
           </div>
         </div>
 
@@ -863,11 +994,13 @@ function WorldDetail({
             </div>
           </div>
           <p className="text-[11px] text-neutral-400 mt-2">
-            {world.owned
-              ? active
-                ? "변경은 서버에 즉시 적용됩니다. 게임모드는 Multiverse 가 입장 시 적용합니다."
-                : "활성 상태에서만 변경할 수 있습니다."
-              : "초대된 월드는 읽기 전용입니다."}
+            {editable
+              ? "변경은 서버에 즉시 적용됩니다. 게임모드는 Multiverse 가 입장 시 적용합니다."
+              : !active
+              ? "활성 상태에서만 변경할 수 있습니다."
+              : canGamerule
+              ? "변경할 수 있습니다."
+              : "게임룰 권한이 없어 읽기 전용입니다."}
           </p>
         </div>
       </div>

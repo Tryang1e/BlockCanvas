@@ -294,6 +294,15 @@ export async function notifyMinecraftPlayer(
   }
 }
 
+/** 월드 편집 권한(소유자+초대자 uuid 목록)을 플러그인에 동기화. (BlockCanvasLink /api/world/access) 인게임 빌드 보호가 참조. */
+export async function setMinecraftWorldAccess(
+  folder: string,
+  editors: string[]
+): Promise<{ success: boolean; status: number }> {
+  const res = await sendToMinecraft("/api/world/access", { folder, editors });
+  return { success: res.success, status: res.status };
+}
+
 /** 서버에서 월드 런타임 정보를 조회한다. (BlockCanvasLink /api/world/info) */
 export async function getMinecraftWorldInfo(
   worldName: string

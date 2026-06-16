@@ -7,6 +7,7 @@ import { verifySession } from "@/lib/session";
 import { getWorldQuotaBytes } from "@/lib/worldQuota";
 import { WORLD_ICON_KEYS } from "@/lib/worldIcons";
 import { computeWorldKey, worldFolderFromKey } from "@/lib/worldNaming";
+import { parseTrusted, hasCapability, emptyPerms, permsFor, PERM_KEYS, type MemberPerms } from "@/lib/worldPerms";
 import { archiveWorld as archiveWorldLifecycle, recordBackup, unlinkAllBackups, parseBackupList } from "@/lib/worldLifecycle";
 import { evaluateQuota } from "@/lib/worldQuotaEnforcement";
 import {
@@ -14,6 +15,7 @@ import {
   getMinecraftWorldInfo,
   setMinecraftWorldGamerule,
   setMinecraftWorldSetting,
+  setMinecraftWorldAccess,
   importMinecraftWorld,
   backupMinecraftWorld,
   deleteMinecraftWorld,
@@ -33,15 +35,7 @@ async function getAuthenticatedProfile() {
   return profile;
 }
 
-function parseTrusted(value: string | null): { uuid?: string; name: string }[] {
-  if (!value) return [];
-  try {
-    const p = JSON.parse(value);
-    return Array.isArray(p) ? p : [];
-  } catch {
-    return [];
-  }
-}
+// 멤버 권한 모델(parseTrusted·hasCapability·PERM_KEYS·emptyPerms 등)은 @/lib/worldPerms 로 분리(라우트/클라이언트 공용).
 
 function parseFlags(value: string | null): Record<string, unknown> {
   if (!value) return {};
@@ -145,6 +139,7 @@ export async function getInvitedWorlds() {
       version: w.version,
       sizeBytes: Number(w.size_bytes),
       trusted: parseTrusted(w.trusted_players),
+      myPerms: permsFor(w.trusted_players, profile.minecraft_uuid), // 내 권한(초대된 월드에서 보이는 기능 결정)
       status: w.status,
       createdAt: w.created_at.toISOString(),
     }));
@@ -189,6 +184,42 @@ async function displayNameTaken(profileId: string, name: string, exceptId?: stri
     where: { owner_id: profileId, name, status: { not: "archived" }, ...(exceptId ? { id: { not: exceptId } } : {}) },
   });
   return !!dup;
+}
+
+/** 닉네임 → 마인크래프트 UUID 해석(등록/연동된 유저, 대소문자 무시). 못 찾으면 null — 이름만 기록되고 추후 연동 시 매칭. */
+async function resolveMinecraftUuid(name: string): Promise<string | null> {
+  const n = name.trim().toLowerCase();
+  if (!n) return null;
+  const profs = await prisma.profile.findMany({
+    where: { minecraft_username: { not: null }, minecraft_uuid: { not: null } },
+    select: { minecraft_username: true, minecraft_uuid: true },
+  });
+  const pm = profs.find((p) => (p.minecraft_username || "").toLowerCase() === n);
+  if (pm?.minecraft_uuid) return pm.minecraft_uuid;
+  const las = await prisma.linkedAccount.findMany({
+    where: { minecraft_username: { not: null }, minecraft_uuid: { not: null } },
+    select: { minecraft_username: true, minecraft_uuid: true },
+  });
+  const lm = las.find((l) => (l.minecraft_username || "").toLowerCase() === n);
+  return lm?.minecraft_uuid ?? null;
+}
+
+/** 월드 편집 권한(소유자 + 초대자 uuid)을 플러그인에 동기화(베스트에포트). 인게임 빌드 보호가 이걸 참조. */
+async function pushWorldAccess(mvWorld: string | null, ownerUuid: string | null, trustedJson: string | null) {
+  if (!mvWorld) return;
+  const editors: string[] = [];
+  if (ownerUuid) editors.push(ownerUuid);
+  for (const t of parseTrusted(trustedJson)) if (t.uuid && t.perms.edit) editors.push(t.uuid); // 편집 권한 멤버만
+  try {
+    await setMinecraftWorldAccess(mvWorld, editors);
+  } catch { /* best-effort */ }
+}
+
+/** 월드 소유자의 마크 uuid. 부반장(위임 멤버)이 invite/kick 할 때 소유자 기준으로 access 동기화하기 위함. */
+async function ownerUuidOf(world: { owner_id: string }, profile: { id: string; minecraft_uuid: string | null }): Promise<string | null> {
+  if (world.owner_id === profile.id) return profile.minecraft_uuid;
+  const o = await prisma.profile.findUnique({ where: { id: world.owner_id }, select: { minecraft_uuid: true } });
+  return o?.minecraft_uuid ?? null;
 }
 
 /** 기본 월드 생성(평지/야생). DB 레코드 + 서버 프로비저닝(베스트에포트). 폴더명은 {닉}_{이름} 해시. */
@@ -244,6 +275,7 @@ export async function createWorld(name: string, generator: string, icon?: string
         data: { size_bytes: BigInt(provision.sizeBytes ?? 0), version: provision.version ?? null, status: "active", flags: JSON.stringify({ gamemode: "creative" }) },
       });
     }
+    await pushWorldAccess(folder, profile.minecraft_uuid, null); // 소유자 빌드 권한 등록
 
     await logWorld(profile.creator_name, "WORLD_CREATE", `월드 생성: ${cleanName} (${gen})`);
     try { await evaluateQuota(profile.id); } catch { /* 평가 실패는 무시 */ }
@@ -323,6 +355,7 @@ export async function importWorld(name: string, icon: string | undefined, stagin
         return { success: false as const, error: "압축 해제 후 용량이 클라우드 쿼터를 초과합니다. 월드가 등록되지 않았습니다." };
       }
     }
+    await pushWorldAccess(folder, profile.minecraft_uuid, null); // 소유자 빌드 권한 등록
     await logWorld(profile.creator_name, "WORLD_IMPORT", `월드 삽입: ${cleanName}`);
     try { await evaluateQuota(profile.id); } catch { /* 평가 실패는 무시 */ }
     return { success: true as const, worldId: world.id };
@@ -375,6 +408,7 @@ export async function getWorldLive(worldId: string) {
         },
       });
       try { await evaluateQuota(world.owner_id); } catch { /* 평가 실패는 무시 */ } // 크기 갱신 → 경고/잠금 반영
+      try { await pushWorldAccess(world.mv_world, profile.minecraft_uuid, world.trusted_players); } catch { /* best-effort */ } // 빌드 권한 재동기화
     }
 
     return { success: true as const, live: { loaded: !!info.loaded, sizeBytes, border, gamerules: settings, version } };
@@ -393,8 +427,11 @@ export async function setWorldGamerule(worldId: string, rule: string, value: boo
       return { success: false as const, error: "지원하지 않는 게임룰입니다." };
     }
     const world = await prisma.minecraftWorld.findUnique({ where: { id: worldId } });
-    if (!world || world.owner_id !== profile.id) {
+    if (!world) {
       return { success: false as const, error: "월드를 찾을 수 없습니다." };
+    }
+    if (!hasCapability(world, profile, "gamerule")) {
+      return { success: false as const, error: "게임룰 권한이 없습니다." };
     }
     if (!world.mv_world) {
       return { success: false as const, error: "아직 서버에 프로비저닝되지 않았습니다." };
@@ -420,7 +457,8 @@ export async function setWorldSetting(worldId: string, key: string, value: strin
     const locked = lockedResponse(profile);
     if (locked) return locked;
     const world = await prisma.minecraftWorld.findUnique({ where: { id: worldId } });
-    if (!world || world.owner_id !== profile.id) return { success: false as const, error: "월드를 찾을 수 없습니다." };
+    if (!world) return { success: false as const, error: "월드를 찾을 수 없습니다." };
+    if (!hasCapability(world, profile, "gamerule")) return { success: false as const, error: "게임룰/설정 권한이 없습니다." };
     if (!world.mv_world) return { success: false as const, error: "아직 서버에 프로비저닝되지 않았습니다." };
 
     let v: string | number | boolean = value;
@@ -458,13 +496,14 @@ export async function setWorldSetting(worldId: string, key: string, value: strin
 export async function backupWorld(worldId: string, opts?: { force?: boolean }) {
   try {
     const profile = await getAuthenticatedProfile();
-    // 다운로드(force)는 잠금 중에도 허용. 수동 백업은 잠금 시 차단.
+    const world = await prisma.minecraftWorld.findUnique({ where: { id: worldId } });
+    if (!world) return { success: false as const, error: "월드를 찾을 수 없습니다." };
+    // 다운로드(force)는 잠금/권한 검사 우회(다운로드 라우트가 자체 검사). 수동 백업은 잠금·권한 검사.
     if (!opts?.force) {
       const locked = lockedResponse(profile);
       if (locked) return locked;
+      if (!hasCapability(world, profile, "backup")) return { success: false as const, error: "백업 권한이 없습니다." };
     }
-    const world = await prisma.minecraftWorld.findUnique({ where: { id: worldId } });
-    if (!world || world.owner_id !== profile.id) return { success: false as const, error: "월드를 찾을 수 없습니다." };
     if (!world.mv_world || world.status !== "active") return { success: false as const, error: "활성 월드만 백업할 수 있습니다." };
 
     if (!opts?.force && world.last_backup_at && Date.now() - world.last_backup_at.getTime() < 24 * 60 * 60 * 1000) {
@@ -520,6 +559,84 @@ export async function deactivateWorld(worldId: string) {
     if (!ok) return { success: false as const, error: "비활성화에 실패했습니다. (백업/서버 연결 확인)" };
     await logWorld(profile.creator_name, "WORLD_DEACTIVATE", `월드 비활성화: ${world.name}`);
     return { success: true as const };
+  } catch (e: unknown) {
+    return { success: false as const, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/**
+ * 월드에 멤버 초대(소유자 전용). trusted_players 에 {uuid,name} 추가.
+ * 등록된 유저면 uuid 를 채워(상대 "초대된 월드" 목록에 노출), 아니면 이름만 기록.
+ * (인게임 입장/빌드 권한 enforcement 는 플러그인 연동 후 — 현재는 목록 관리만.)
+ */
+export async function inviteWorldMember(worldId: string, playerName: string) {
+  try {
+    const profile = await getAuthenticatedProfile();
+    const name = (playerName || "").trim();
+    if (name.length < 2 || name.length > 16) return { success: false as const, error: "올바른 닉네임을 입력하세요." };
+
+    const world = await prisma.minecraftWorld.findUnique({ where: { id: worldId } });
+    if (!world) return { success: false as const, error: "월드를 찾을 수 없습니다." };
+    if (!hasCapability(world, profile, "invite")) return { success: false as const, error: "초대 권한이 없습니다." };
+
+    const trusted = parseTrusted(world.trusted_players);
+    if (trusted.some((t) => (t.name || "").toLowerCase() === name.toLowerCase())) {
+      return { success: false as const, error: "이미 초대된 멤버입니다." };
+    }
+    if (profile.minecraft_username && profile.minecraft_username.toLowerCase() === name.toLowerCase()) {
+      return { success: false as const, error: "본인은 초대할 수 없습니다." };
+    }
+
+    const uuid = await resolveMinecraftUuid(name);
+    trusted.push({ uuid: uuid || "", name, perms: emptyPerms() }); // 기본 권한 없음 — 소유자가 개별 부여
+    await prisma.minecraftWorld.update({ where: { id: world.id }, data: { trusted_players: JSON.stringify(trusted) } });
+    await pushWorldAccess(world.mv_world, await ownerUuidOf(world, profile), JSON.stringify(trusted)); // 빌드 권한 동기화(소유자 기준)
+    await logWorld(profile.creator_name, "WORLD_INVITE", `월드 초대: ${world.name} ← ${name}`);
+    return { success: true as const, trusted };
+  } catch (e: unknown) {
+    return { success: false as const, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** 월드 멤버 제외(소유자 전용). 이름으로 trusted_players 에서 제거. */
+export async function kickWorldMember(worldId: string, memberName: string) {
+  try {
+    const profile = await getAuthenticatedProfile();
+    const world = await prisma.minecraftWorld.findUnique({ where: { id: worldId } });
+    if (!world) return { success: false as const, error: "월드를 찾을 수 없습니다." };
+    if (!hasCapability(world, profile, "kick")) return { success: false as const, error: "추방 권한이 없습니다." };
+
+    const target = (memberName || "").trim().toLowerCase();
+    const trusted = parseTrusted(world.trusted_players).filter((t) => (t.name || "").toLowerCase() !== target);
+    await prisma.minecraftWorld.update({ where: { id: world.id }, data: { trusted_players: JSON.stringify(trusted) } });
+    await pushWorldAccess(world.mv_world, await ownerUuidOf(world, profile), JSON.stringify(trusted)); // 빌드 권한 동기화(소유자 기준)
+    await logWorld(profile.creator_name, "WORLD_KICK", `월드 제외: ${world.name} → ${memberName}`);
+    return { success: true as const, trusted };
+  } catch (e: unknown) {
+    return { success: false as const, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** 초대 멤버의 권한(edit/gamerule/backup/download) on/off (소유자 전용). edit 변경 시 인게임 빌드 권한 재동기화. */
+export async function setMemberPermission(worldId: string, memberName: string, perm: string, value: boolean) {
+  try {
+    const profile = await getAuthenticatedProfile();
+    if (!PERM_KEYS.includes(perm as keyof MemberPerms)) return { success: false as const, error: "지원하지 않는 권한입니다." };
+    const world = await prisma.minecraftWorld.findUnique({ where: { id: worldId } });
+    if (!world || world.owner_id !== profile.id) return { success: false as const, error: "월드를 찾을 수 없습니다." };
+
+    const target = (memberName || "").trim().toLowerCase();
+    const trusted = parseTrusted(world.trusted_players);
+    const member = trusted.find((t) => (t.name || "").toLowerCase() === target);
+    if (!member) return { success: false as const, error: "해당 멤버를 찾을 수 없습니다." };
+    member.perms[perm as keyof MemberPerms] = !!value;
+
+    await prisma.minecraftWorld.update({ where: { id: world.id }, data: { trusted_players: JSON.stringify(trusted) } });
+    if (perm === "edit") {
+      await pushWorldAccess(world.mv_world, profile.minecraft_uuid, JSON.stringify(trusted)); // 인게임 편집 권한 반영
+    }
+    await logWorld(profile.creator_name, "WORLD_PERM", `권한 변경: ${world.name} / ${memberName} / ${perm}=${value}`);
+    return { success: true as const, trusted };
   } catch (e: unknown) {
     return { success: false as const, error: e instanceof Error ? e.message : String(e) };
   }
