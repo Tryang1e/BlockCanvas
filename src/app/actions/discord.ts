@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { verifySession } from "@/lib/session";
+import { syncBridgeFromProfile } from "@/lib/hub";
 
 async function getAuthenticatedProfile() {
   const cookieStore = await cookies();
@@ -69,6 +70,7 @@ export async function unlinkDiscord() {
       prisma.profile.update({ where: { id: profile.id }, data: { discord_id: null, discord_username: null } }),
       prisma.discordVerification.deleteMany({ where: { profile_id: profile.id } }),
     ]);
+    await syncBridgeFromProfile(profile.id); // 브리지된 허브 계정에서도 연동 해제 반영
     return { success: true, message: "Discord account unlinked successfully." };
   } catch (error: unknown) {
     return { success: false, error: error instanceof Error ? error.message : String(error) };

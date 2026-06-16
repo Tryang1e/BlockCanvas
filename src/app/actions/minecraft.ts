@@ -10,6 +10,7 @@ import {
   transferPlotOwnership,
   getPlayerPlots,
 } from "@/lib/minecraft";
+import { syncBridgeFromProfile } from "@/lib/hub";
 
 /**
  * 로그인된 크리에이터 프로필을 가져온다. 미인증 시 throw.
@@ -123,6 +124,7 @@ export async function unlinkMinecraftAccount() {
       prisma.minecraftPlot.deleteMany({ where: { owner_id: profile.id } }),
       prisma.pendingTransfer.deleteMany({ where: { from_id: profile.id } }),
     ]);
+    await syncBridgeFromProfile(profile.id); // 브리지된 허브 계정에서도 연동 해제 반영
 
     return { success: true, message: "Minecraft account unlinked successfully." };
   } catch (error: unknown) {

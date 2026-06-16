@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { verifyHubSession, HUB_COOKIE } from "@/lib/hubSession";
 import { cookieDomain } from "@/lib/publicUrl";
+import { syncBridgeToProfile } from "@/lib/hub";
 
 /** POST /api/auth/hub/disconnect { provider } — 허브에서 한 제공자 연결 해제. */
 export async function POST(req: NextRequest) {
@@ -28,6 +29,7 @@ export async function POST(req: NextRequest) {
       : { minecraft_uuid: null, minecraft_username: null };
 
   const updated = await prisma.linkedAccount.update({ where: { id: accountId }, data });
+  await syncBridgeToProfile(accountId); // 브리지된 크리에이터 Profile 에서도 연동 해제 반영
 
   // 둘 다 비면 계정 삭제 + 세션 종료
   if (!updated.discord_id && !updated.minecraft_uuid) {

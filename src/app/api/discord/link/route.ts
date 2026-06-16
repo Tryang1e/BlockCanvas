@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyInboundSignature } from "@/lib/minecraft";
+import { syncBridgeFromProfile } from "@/lib/hub";
 
 const DISCORD_API_SECRET = process.env.DISCORD_API_SECRET || "blockcanvas-discord-secret";
 
@@ -79,6 +80,7 @@ export async function POST(req: NextRequest) {
       }),
       prisma.discordVerification.delete({ where: { id: verification.id } }),
     ]);
+    await syncBridgeFromProfile(verification.profile_id); // 브리지된 허브 계정에 미러링
 
     clearFailures(discordId);
     return NextResponse.json({

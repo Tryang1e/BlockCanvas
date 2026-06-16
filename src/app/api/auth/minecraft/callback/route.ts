@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { verifySession } from "@/lib/session";
 import { exchangeCodeForIdentity } from "@/lib/minecraftOAuth";
-import { linkProviderToHub } from "@/lib/hub";
+import { linkProviderToHub, syncBridgeFromProfile } from "@/lib/hub";
 import { signHubSession, verifyHubSession, HUB_COOKIE } from "@/lib/hubSession";
 import { oauthRedirectUri, publicUrl, cookieDomain } from "@/lib/publicUrl";
 
@@ -93,6 +93,7 @@ export async function GET(req: NextRequest) {
       where: { id: profile.id },
       data: { minecraft_uuid: identity.uuid, minecraft_username: identity.username },
     });
+    await syncBridgeFromProfile(profile.id); // 브리지된 허브 계정에 미러링
     return clear(NextResponse.redirect(accountUrl({ mc_linked: "1" })));
   } catch (error: unknown) {
     console.error("Minecraft OAuth callback error:", error instanceof Error ? error.message : String(error));

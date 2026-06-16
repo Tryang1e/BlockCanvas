@@ -35,7 +35,7 @@ export default async function ConnectionsPage({
       {/* 연동 완료 시 건축 서버 대시보드 바로가기 */}
       {profile.minecraft_uuid && (
         <Link
-          href="/dashboard/minecraft"
+          href="/minecraft"
           className="mt-6 flex items-center justify-between gap-4 p-5 rounded-2xl border border-neutral-200 bg-white hover:border-neutral-300 hover:shadow-sm transition-all group"
         >
           <div className="flex items-center gap-3">

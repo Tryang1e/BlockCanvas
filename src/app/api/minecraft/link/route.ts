@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyInboundSignature } from "@/lib/minecraft";
+import { syncBridgeFromProfile } from "@/lib/hub";
 
 // --- 인증코드 brute-force 방지 (단일 인스턴스 인메모리 카운터) ---
 // 요청은 MC 서버가 HMAC 서명해 보내므로 외부 위조는 불가하나, 악의적 플레이어가
@@ -99,6 +100,7 @@ export async function POST(req: NextRequest) {
       }),
       prisma.minecraftVerification.delete({ where: { id: verification.id } }),
     ]);
+    await syncBridgeFromProfile(verification.profile_id); // 브리지된 허브 계정에 미러링
 
     clearFailures(uuid);
     console.log(
