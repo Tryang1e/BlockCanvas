@@ -55,9 +55,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     zipPath = backup.backupPath;
   }
 
+  // zipPath 는 DB 에서 온 동적 절대경로(MC 서버 backups 폴더). Turbopack 의 정적 파일추적이
+  // 프로젝트 전체를 번들에 끌어오지 않도록 동적 fs 인자를 추적 제외 처리한다.
   let size = 0;
   try {
-    const st = await fs.stat(zipPath);
+    const st = await fs.stat(/* turbopackIgnore: true */ zipPath);
     size = st.size;
   } catch {
     return NextResponse.json({ error: "백업 파일을 찾을 수 없습니다." }, { status: 502 });
@@ -66,7 +68,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const safeName = (world.name || "world").replace(/[^\w가-힣 .-]/g, "_");
   const dateSuffix = chosenTs ? "_" + new Date(chosenTs).toISOString().slice(0, 10) : "";
   const filename = `${safeName}${dateSuffix}.zip`;
-  const nodeStream = createReadStream(zipPath);
+  const nodeStream = createReadStream(/* turbopackIgnore: true */ zipPath);
   const webStream = Readable.toWeb(nodeStream) as unknown as ReadableStream<Uint8Array>;
 
   return new NextResponse(webStream, {
