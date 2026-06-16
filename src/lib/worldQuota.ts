@@ -19,6 +19,17 @@ export function getWorldQuotaBytes(role: string | null | undefined): number {
   }
 }
 
+// 쿼터 경고 임계치(90% 사용 = 10% 남음).
+export const QUOTA_WARN_RATIO = 0.9;
+
+/** 사용량/총량으로 쿼터 상태를 판정. admin(무제한)은 항상 ok. */
+export function desiredQuotaState(usedBytes: number, totalBytes: number): "ok" | "warned" | "locked" {
+  if (!Number.isFinite(totalBytes)) return "ok"; // 무제한
+  if (usedBytes >= totalBytes) return "locked";
+  if (usedBytes >= totalBytes * QUOTA_WARN_RATIO) return "warned";
+  return "ok";
+}
+
 /** 바이트를 사람이 읽는 단위로 변환. */
 export function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes)) return "∞";

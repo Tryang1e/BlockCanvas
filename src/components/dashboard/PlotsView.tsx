@@ -6,7 +6,6 @@ import {
   Loader2,
   Users,
   UserPlus,
-  X,
   Globe,
   Clock,
   CheckCircle2,
@@ -24,6 +23,7 @@ import {
   transferPlotOwnerAction,
   getMyPendingTransfers,
 } from "@/app/actions/minecraft";
+import { McMemberChip } from "./McAvatar";
 
 const MAP_URL = (process.env.NEXT_PUBLIC_MINECRAFT_MAP_URL || "").replace(/\/$/, "");
 const MAP_NAME = process.env.NEXT_PUBLIC_MINECRAFT_MAP_NAME || "flat";
@@ -295,19 +295,13 @@ export default function PlotsView({ focusPlotId }: { focusPlotId?: string | null
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
                     {selected.trusted.map((m) => (
-                      <span key={m.uuid || m.name} className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 bg-neutral-100 rounded-full text-[11px] font-medium text-neutral-700">
-                        {m.name}
-                        {selected.owned && (
-                          <button
-                            onClick={() => handleUntrust(selected.id, m)}
-                            disabled={busy === selected.id}
-                            className="w-3.5 h-3.5 flex items-center justify-center rounded-full hover:bg-rose-100 hover:text-rose-600 disabled:opacity-40"
-                            title="제외"
-                          >
-                            <X size={10} />
-                          </button>
-                        )}
-                      </span>
+                      <McMemberChip
+                        key={m.uuid || m.name}
+                        id={m.uuid}
+                        name={m.name}
+                        onRemove={selected.owned ? () => handleUntrust(selected.id, m) : undefined}
+                        disabled={busy === selected.id}
+                      />
                     ))}
                   </div>
                 )}

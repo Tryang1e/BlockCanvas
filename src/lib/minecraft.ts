@@ -176,7 +176,7 @@ export async function createMinecraftWorld(
   worldName: string,
   generator: string,
   border: number = 3000
-): Promise<{ success: boolean; status: number; folder?: string; sizeBytes?: number; error?: string }> {
+): Promise<{ success: boolean; status: number; folder?: string; sizeBytes?: number; version?: string; error?: string }> {
   const res = await sendToMinecraft("/api/world/create", {
     world_name: worldName,
     generator: generator === "wild" ? "wild" : "flat",
@@ -197,9 +197,100 @@ export async function createMinecraftWorld(
       status: res.status,
       folder: typeof p.folder === "string" ? p.folder : worldName,
       sizeBytes: typeof p.size_bytes === "number" ? p.size_bytes : 0,
+      version: typeof p.version === "string" ? p.version : undefined,
     };
   } catch {
     return { success: false, status: 502, error: "Invalid JSON from Minecraft server." };
+  }
+}
+
+/**
+ * 업로드된 .zip 월드를 서버에 삽입한다. (BlockCanvasLink /api/world/import)
+ * zipPath 는 웹이 디스크에 저장한 절대경로(동일 머신). border 는 보더 크기.
+ */
+/** 플러그인의 기술적 import 에러 코드를 사용자 친화 메시지로 변환. */
+function friendlyImportError(raw: string): string {
+  const s = raw || "";
+  if (/level\.dat|invalid_world/i.test(s)) return "올바른 마인크래프트 월드가 아닙니다. (level.dat 이 포함된 월드 폴더를 압축한 .zip 이어야 합니다)";
+  if (/unzip_failed/i.test(s)) return "압축 해제에 실패했습니다. 손상되지 않은 .zip 월드 파일인지 확인해 주세요.";
+  if (/world_exists/i.test(s)) return "같은 이름의 월드가 서버에 이미 있습니다.";
+  if (/zip not found/i.test(s)) return "업로드 파일을 찾을 수 없습니다. 다시 시도해 주세요.";
+  if (/load_failed|move_failed/i.test(s)) return "월드를 서버에 올리지 못했습니다. 잠시 후 다시 시도해 주세요.";
+  return s;
+}
+
+export async function importMinecraftWorld(
+  folder: string,
+  zipPath: string,
+  border: number = 3000
+): Promise<{ success: boolean; status: number; sizeBytes?: number; version?: string; error?: string }> {
+  const res = await sendToMinecraft("/api/world/import", { folder, zip_path: zipPath, border });
+  if (!res.success) {
+    let error = res.message;
+    try { const p = JSON.parse(res.message); if (p?.error) error = p.error; } catch { /* plain */ }
+    return { success: false, status: res.status, error: friendlyImportError(error) };
+  }
+  try {
+    const p = JSON.parse(res.message);
+    return {
+      success: true,
+      status: res.status,
+      sizeBytes: typeof p.size_bytes === "number" ? p.size_bytes : 0,
+      version: typeof p.version === "string" ? p.version : undefined,
+    };
+  } catch {
+    return { success: false, status: 502, error: "Invalid JSON from Minecraft server." };
+  }
+}
+
+/** 월드를 백업 zip 으로 저장한다. (BlockCanvasLink /api/world/backup) → 절대경로 + zip 크기 반환. */
+export async function backupMinecraftWorld(
+  folder: string
+): Promise<{ success: boolean; status: number; backupPath?: string; zipBytes?: number; error?: string }> {
+  const res = await sendToMinecraft("/api/world/backup", { folder });
+  if (!res.success) {
+    let error = res.message;
+    try { const p = JSON.parse(res.message); if (p?.error) error = p.error; } catch { /* plain */ }
+    return { success: false, status: res.status, error };
+  }
+  try {
+    const p = JSON.parse(res.message);
+    return {
+      success: true,
+      status: res.status,
+      backupPath: typeof p.backup_path === "string" ? p.backup_path : undefined,
+      zipBytes: typeof p.zip_bytes === "number" ? p.zip_bytes : 0,
+    };
+  } catch {
+    return { success: false, status: 502, error: "Invalid JSON from Minecraft server." };
+  }
+}
+
+/** 월드를 서버에서 제거한다(언로드 + 폴더 삭제). (BlockCanvasLink /api/world/delete) */
+export async function deleteMinecraftWorld(
+  folder: string
+): Promise<{ success: boolean; status: number; error?: string }> {
+  const res = await sendToMinecraft("/api/world/delete", { folder });
+  if (!res.success) {
+    let error = res.message;
+    try { const p = JSON.parse(res.message); if (p?.error) error = p.error; } catch { /* plain */ }
+    return { success: false, status: res.status, error };
+  }
+  return { success: true, status: res.status };
+}
+
+/** 온라인 플레이어에게 인게임 알림 메시지를 보낸다. (BlockCanvasLink /api/world/notify) — 오프라인이면 online=false. */
+export async function notifyMinecraftPlayer(
+  uuid: string,
+  message: string
+): Promise<{ success: boolean; online?: boolean }> {
+  const res = await sendToMinecraft("/api/world/notify", { uuid, message });
+  if (!res.success) return { success: false };
+  try {
+    const p = JSON.parse(res.message);
+    return { success: true, online: !!p.online };
+  } catch {
+    return { success: true };
   }
 }
 
@@ -213,6 +304,10 @@ export async function getMinecraftWorldInfo(
   loaded?: boolean;
   sizeBytes?: number;
   border?: number;
+  version?: string;
+  difficulty?: string;
+  randomTickSpeed?: number;
+  explosionBlocked?: boolean;
   gamerules?: Record<string, boolean>;
 }> {
   const res = await sendToMinecraft("/api/world/info", { world_name: worldName });
@@ -226,9 +321,73 @@ export async function getMinecraftWorldInfo(
       loaded: !!p.loaded,
       sizeBytes: typeof p.size_bytes === "number" ? p.size_bytes : 0,
       border: typeof p.border === "number" ? p.border : undefined,
+      version: typeof p.version === "string" ? p.version : undefined,
+      difficulty: typeof p.difficulty === "string" ? p.difficulty : undefined,
+      randomTickSpeed: typeof p.randomTickSpeed === "number" ? p.randomTickSpeed : undefined,
+      explosionBlocked: typeof p.explosionBlocked === "boolean" ? p.explosionBlocked : undefined,
       gamerules: p.gamerules && typeof p.gamerules === "object" ? p.gamerules : undefined,
     };
   } catch {
     return { success: false, status: 502 };
+  }
+}
+
+/**
+ * 월드 게임룰을 변경한다. (BlockCanvasLink /api/world/gamerule)
+ * 성공 시 서버가 변경 후 전체 게임룰 스냅샷({ gamerules })을 돌려준다.
+ */
+export async function setMinecraftWorldGamerule(
+  worldName: string,
+  rule: string,
+  value: boolean
+): Promise<{ success: boolean; status: number; gamerules?: Record<string, boolean>; error?: string }> {
+  const res = await sendToMinecraft("/api/world/gamerule", { world_name: worldName, rule, value });
+  if (!res.success) {
+    let error = res.message;
+    try {
+      const p = JSON.parse(res.message);
+      if (p?.error) error = p.error;
+    } catch { /* plain text body */ }
+    return { success: false, status: res.status, error };
+  }
+  try {
+    const p = JSON.parse(res.message);
+    return {
+      success: true,
+      status: res.status,
+      gamerules: p.gamerules && typeof p.gamerules === "object" ? p.gamerules : undefined,
+    };
+  } catch {
+    return { success: false, status: 502, error: "Invalid JSON from Minecraft server." };
+  }
+}
+
+/**
+ * 게임룰이 아닌 월드 설정 변경. (BlockCanvasLink /api/world/setting)
+ * key: difficulty(string) | randomTickSpeed(number) | explosionBlocked(boolean). 변경 후 스냅샷 반환.
+ */
+export async function setMinecraftWorldSetting(
+  folder: string,
+  key: string,
+  value: string | number | boolean
+): Promise<{ success: boolean; status: number; difficulty?: string; randomTickSpeed?: number; explosionBlocked?: boolean; gamemode?: string; error?: string }> {
+  const res = await sendToMinecraft("/api/world/setting", { folder, key, value });
+  if (!res.success) {
+    let error = res.message;
+    try { const p = JSON.parse(res.message); if (p?.error) error = p.error; } catch { /* plain */ }
+    return { success: false, status: res.status, error };
+  }
+  try {
+    const p = JSON.parse(res.message);
+    return {
+      success: true,
+      status: res.status,
+      difficulty: typeof p.difficulty === "string" ? p.difficulty : undefined,
+      randomTickSpeed: typeof p.randomTickSpeed === "number" ? p.randomTickSpeed : undefined,
+      explosionBlocked: typeof p.explosionBlocked === "boolean" ? p.explosionBlocked : undefined,
+      gamemode: typeof p.gamemode === "string" ? p.gamemode : undefined,
+    };
+  } catch {
+    return { success: false, status: 502, error: "Invalid JSON from Minecraft server." };
   }
 }

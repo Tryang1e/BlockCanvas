@@ -31,6 +31,7 @@ model Profile {
   // --- Minecraft 연동 (MC_SER) ---
   minecraft_uuid      String?                @unique
   minecraft_username  String?
+  world_quota_state   String                 @default("ok") // 월드 클라우드 쿼터: ok | warned(90%+) | locked(초과→전 월드 비활성, 다운로드/삭제만)
   verification        MinecraftVerification?
   minecraft_plots     MinecraftPlot[]
   minecraft_worlds    MinecraftWorld[]
@@ -258,22 +259,27 @@ model LinkedAccount {
 model MinecraftWorld {
   id              String    @id @default(uuid())
   owner_id        String
-  name            String    // 표시 이름
-  mv_world        String?   // 서버상의 Multiverse 월드 폴더명(프로비저닝 완료 후 채워짐)
+  name            String    // 표시 이름(사용자가 정한 월드 이름)
+  world_key       String?   // {닉네임}_{월드이름} 의 sha256 해시(hex). mv_world(서버 폴더명)의 원본 — 폴더명에 닉/이름 노출 방지.
+  source          String    @default("basic") // basic(기본 생성: 평지/야생) | import(.zip 업로드)
+  mv_world        String?   // 서버상의 월드 폴더명(= w_<world_key 앞부분>). 프로비저닝 완료 후 채워짐.
   generator       String    @default("flat") // flat | wild | (커스텀 generator 문자열)
   icon            String?   // 월드 목록 아이콘 프리셋 키 (worldIcons.ts, 관리자 등록 블록 이미지)
-  version         String?   // MC 버전 (예: "1.21")
+  version         String?   // MC 버전 (예: "1.21.1")
   size_bytes      BigInt    @default(0) // 디스크 사용량(바이트). 쿼터 계산용. 액션 경계에서 Number 로 변환.
   border          Int       @default(3000) // 월드 보더 (청크 과확장 방지, MyIdea §2-6)
   flags           String?   // JSON: 게임룰/플래그 (mobSpawning, weather, time, blockPhysics, fluidSpread …)
   trusted_players String?   // JSON 배열 [{uuid,name}] — 초대 멤버 (MyIdea §2-5/2-10)
-  status          String    @default("provisioning") // provisioning | active | archived
+  status          String    @default("provisioning") // provisioning | active | archived(아카이브: 서버에서 내려감, Restore 가능)
   last_saved      DateTime?
+  last_active_at  DateTime? // 마지막 사용(접속/열람) 시각. +30일 미사용=아카이브, +90일=영구삭제 (수명주기).
   last_backup_at  DateTime? // 백업 24h 1회 제한 (MyIdea §2-5)
-  archived_at     DateTime? // 보관함(30일 후 삭제 예정)
+  backup_path     String?   // 최신 백업/아카이브 zip 절대경로(다운로드·복구용).
+  archived_at     DateTime? // 아카이브된 시각
   created_at      DateTime  @default(now())
   updated_at      DateTime  @updatedAt
   owner           Profile   @relation(fields: [owner_id], references: [id], onDelete: Cascade)
 
-  @@index([owner_id, status]) // 소유자별 월드 조회
+  @@index([owner_id, status])       // 소유자별 월드 조회
+  @@index([status, last_active_at]) // 수명주기 스윕(만료/삭제 대상 탐색)
 }
