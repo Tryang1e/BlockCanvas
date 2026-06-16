@@ -217,6 +217,41 @@ export async function getMyPlots() {
 }
 
 /**
+ * 내가 trust(초대)된 다른 사람의 플롯 목록(웹 캐시 기준 — 소유자가 sync 한 경우 노출).
+ */
+export async function getInvitedPlots() {
+  try {
+    const profile = await getAuthenticatedProfile();
+    if (!profile.minecraft_uuid) return { success: true, plots: [] };
+
+    const plots = await prisma.minecraftPlot.findMany({
+      where: {
+        owner_id: { not: profile.id },
+        trusted_players: { contains: profile.minecraft_uuid },
+      },
+      include: { owner: { select: { creator_name: true, minecraft_username: true } } },
+      orderBy: { id: "asc" },
+    });
+
+    return {
+      success: true,
+      plots: plots.map((p) => ({
+        id: p.id,
+        world: p.world,
+        alias: p.alias,
+        centerX: p.center_x,
+        centerZ: p.center_z,
+        members: safeParseJsonArray(p.members),
+        trusted: safeParseJsonArray(p.trusted_players),
+        ownerName: p.owner?.minecraft_username || p.owner?.creator_name || "?",
+      })),
+    };
+  } catch (error: unknown) {
+    return { success: false, error: error instanceof Error ? error.message : String(error), plots: [] };
+  }
+}
+
+/**
  * 소유한 플롯에 멤버 trust 추가.
  */
 export async function trustPlotMemberAction(plotId: string, playerName: string) {

@@ -40,6 +40,7 @@ export function proxy(request: NextRequest) {
     path.startsWith('/_next') ||
     path.startsWith('/sites') ||
     path.startsWith('/uploads') ||
+    path.startsWith('/dynmap-proxy') || // Dynmap 리버스 프록시(next.config rewrites)는 서브도메인 라우팅 우회
     path === '/favicon.ico' ||
     path.startsWith('/adminpage')
   ) {

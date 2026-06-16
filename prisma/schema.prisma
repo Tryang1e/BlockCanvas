@@ -261,6 +261,7 @@ model MinecraftWorld {
   name            String    // 표시 이름
   mv_world        String?   // 서버상의 Multiverse 월드 폴더명(프로비저닝 완료 후 채워짐)
   generator       String    @default("flat") // flat | wild | (커스텀 generator 문자열)
+  icon            String?   // 월드 목록 아이콘 프리셋 키 (worldIcons.ts, 관리자 등록 블록 이미지)
   version         String?   // MC 버전 (예: "1.21")
   size_bytes      BigInt    @default(0) // 디스크 사용량(바이트). 쿼터 계산용. 액션 경계에서 Number 로 변환.
   border          Int       @default(3000) // 월드 보더 (청크 과확장 방지, MyIdea §2-6)

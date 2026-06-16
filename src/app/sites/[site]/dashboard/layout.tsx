@@ -202,7 +202,7 @@ export default async function DashboardLayout({
               <span className="flex-1 text-left">외부 계정 연동</span>
             </Link>
             <Link
-              href={`/dashboard/minecraft`}
+              href={`/minecraft`}
               className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-neutral-600 hover:text-black hover:bg-neutral-100 font-medium text-sm transition-colors"
             >
               <Boxes size={18} />

@@ -4,11 +4,11 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { verifySession } from "@/lib/session";
 import { getWorldQuotaBytes } from "@/lib/worldQuota";
+import { WORLD_ICON_KEYS } from "@/lib/worldIcons";
 import { createMinecraftWorld } from "@/lib/minecraft";
 
 // 인게임 개인 월드(클라우드)의 웹측 관리 액션 (MyIdea §2 / Builder's Refuge 스타일).
-// 현재는 웹/DB 골격: 메타데이터를 DB 에 저장·조회한다. 실제 서버 프로비저닝(Multiverse 생성/백업 등)은
-// BlockCanvasLink 플러그인 연동 단계에서 status 를 갱신한다.
+// 메타데이터는 DB, 실제 프로비저닝(Multiverse 생성)은 BlockCanvasLink 플러그인이 수행.
 
 async function getAuthenticatedProfile() {
   const cookieStore = await cookies();
@@ -41,12 +41,13 @@ function parseFlags(value: string | null): Record<string, unknown> {
   }
 }
 
-const MAX_WORLDS = 20; // 골격 단계 남용 방지 (역할별 정교화는 추후)
+const MAX_WORLDS = 20; // 골격 단계 남용 방지
 
 /** 현재 사용자의 월드 목록 + 쿼터 사용량 조회. */
 export async function getMyWorlds() {
   try {
     const profile = await getAuthenticatedProfile();
+    const ownerName = profile.minecraft_username || profile.creator_name;
     const rows = await prisma.minecraftWorld.findMany({
       where: { owner_id: profile.id, status: { not: "archived" } },
       orderBy: { created_at: "desc" },
@@ -55,9 +56,11 @@ export async function getMyWorlds() {
     const worlds = rows.map((w) => ({
       id: w.id,
       name: w.name,
+      icon: w.icon,
+      ownerName,
       generator: w.generator,
       version: w.version,
-      sizeBytes: Number(w.size_bytes), // BigInt → Number (직렬화 안전; 10GB 도 안전범위 내)
+      sizeBytes: Number(w.size_bytes),
       border: w.border,
       flags: parseFlags(w.flags),
       trusted: parseTrusted(w.trusted_players),
@@ -84,8 +87,39 @@ export async function getMyWorlds() {
   }
 }
 
-/** 새 월드 생성 신청 (DB 레코드 생성, status=provisioning). 실제 생성은 서버 연동 후. */
-export async function createWorld(name: string, generator: string) {
+/** 내가 초대(trusted)된 다른 사람의 월드 목록. */
+export async function getInvitedWorlds() {
+  try {
+    const profile = await getAuthenticatedProfile();
+    if (!profile.minecraft_uuid) return { success: true as const, worlds: [] };
+
+    const rows = await prisma.minecraftWorld.findMany({
+      where: {
+        status: { not: "archived" },
+        owner_id: { not: profile.id },
+        trusted_players: { contains: profile.minecraft_uuid },
+      },
+      include: { owner: { select: { creator_name: true, minecraft_username: true } } },
+      orderBy: { created_at: "desc" },
+    });
+
+    const worlds = rows.map((w) => ({
+      id: w.id,
+      name: w.name,
+      icon: w.icon,
+      ownerName: w.owner?.minecraft_username || w.owner?.creator_name || "?",
+      generator: w.generator,
+      sizeBytes: Number(w.size_bytes),
+      status: w.status,
+    }));
+    return { success: true as const, worlds };
+  } catch (e: unknown) {
+    return { success: false as const, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** 새 월드 생성 신청 (DB 레코드 + 서버 프로비저닝 베스트에포트). */
+export async function createWorld(name: string, generator: string, icon?: string) {
   try {
     const profile = await getAuthenticatedProfile();
 
@@ -97,6 +131,7 @@ export async function createWorld(name: string, generator: string) {
       return { success: false as const, error: "월드 이름에 사용할 수 없는 문자가 있습니다." };
     }
     const gen = generator === "wild" ? "wild" : "flat";
+    const validIcon = icon && WORLD_ICON_KEYS.includes(icon) ? icon : null;
 
     const existingCount = await prisma.minecraftWorld.count({
       where: { owner_id: profile.id, status: { not: "archived" } },
@@ -112,11 +147,10 @@ export async function createWorld(name: string, generator: string) {
     }
 
     const world = await prisma.minecraftWorld.create({
-      data: { owner_id: profile.id, name: cleanName, generator: gen, status: "provisioning" },
+      data: { owner_id: profile.id, name: cleanName, generator: gen, icon: validIcon, status: "provisioning" },
     });
 
-    // 서버 프로비저닝(베스트 에포트): uuid 기반 폴더명을 예약하고 BlockCanvasLink 로 실제 생성 요청.
-    // 서버 미연결(503)이면 provisioning 으로 남겨 두고, 추후 서버 가동 시 동기화로 활성화한다.
+    // 서버 프로비저닝(베스트 에포트): 폴더명 예약 + BlockCanvasLink 로 실제 생성 요청.
     const folder = "bcw_" + world.id.replace(/-/g, "").slice(0, 12);
     const provision = await createMinecraftWorld(folder, gen, 3000);
     await prisma.minecraftWorld.update({
