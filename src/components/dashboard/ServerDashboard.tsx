@@ -749,18 +749,19 @@ function WorldDetail({
             Gamerule 및 월드 설정
             {liveBusy && <Loader2 size={11} className="inline ml-1.5 animate-spin text-neutral-400" />}
           </SectionLabel>
-          <div className="rounded-xl border border-neutral-200 divide-y divide-neutral-100">
+          {/* 토글류(게임룰 + 폭발방지) — 2열 그리드로 높이 절감 */}
+          <div className="grid grid-cols-2 gap-px bg-neutral-200 rounded-xl overflow-hidden border border-neutral-200">
             {flagEntries.map((f) => {
               const known = typeof f.v === "boolean";
               const on = f.v === true;
               return (
-                <div key={f.key} className="flex items-center justify-between px-4 py-2.5">
-                  <span className="text-sm text-neutral-700">{f.label}</span>
+                <div key={f.key} className="bg-white px-3 py-2 flex items-center justify-between gap-2">
+                  <span className="text-[13px] text-neutral-700 leading-tight">{f.label}</span>
                   {editable ? (
                     <Toggle on={on} busy={ruleBusy === f.key} disabled={settingBusy} onClick={() => onToggleRule(f.key, !on)} />
                   ) : (
                     <span
-                      className={`text-[11px] font-bold px-2 py-0.5 rounded ${
+                      className={`text-[11px] font-bold px-2 py-0.5 rounded shrink-0 ${
                         !known ? "bg-neutral-100 text-neutral-400" : on ? "bg-emerald-50 text-emerald-700" : "bg-neutral-100 text-neutral-500"
                       }`}
                     >
@@ -770,10 +771,24 @@ function WorldDetail({
                 </div>
               );
             })}
+            {/* 폭발 방지 (Explosion) — 토글 그리드의 8번째 칸 */}
+            <div className="bg-white px-3 py-2 flex items-center justify-between gap-2">
+              <span className="text-[13px] text-neutral-700 leading-tight">폭발 방지 (Explosion)</span>
+              {editable ? (
+                <Toggle on={explosionOn} busy={ruleBusy === "explosionBlocked"} disabled={settingBusy} onClick={() => onSetting("explosionBlocked", !explosionOn)} />
+              ) : (
+                <span className={`text-[11px] font-bold px-2 py-0.5 rounded shrink-0 ${explosionOn ? "bg-emerald-50 text-emerald-700" : "bg-neutral-100 text-neutral-500"}`}>
+                  {explosionOn ? "켜짐" : "꺼짐"}
+                </span>
+              )}
+            </div>
+          </div>
 
+          {/* 넓은 설정(게임모드/난이도/랜덤틱) — 풀폭 */}
+          <div className="mt-2 rounded-xl border border-neutral-200 divide-y divide-neutral-100">
             {/* 게임모드 (Game Mode) — Multiverse 가 월드별로 관리, 입장 시 적용 */}
-            <div className="flex items-center justify-between gap-3 px-4 py-2.5">
-              <span className="text-sm text-neutral-700 shrink-0">게임모드 (Game Mode)</span>
+            <div className="flex items-center justify-between gap-3 px-3 py-2">
+              <span className="text-[13px] text-neutral-700 shrink-0">게임모드 (Game Mode)</span>
               {editable ? (
                 <div className="flex flex-wrap gap-1 justify-end">
                   {GAMEMODES.map((g) => (
@@ -796,8 +811,8 @@ function WorldDetail({
             </div>
 
             {/* 난이도 (Difficulty) */}
-            <div className="flex items-center justify-between gap-3 px-4 py-2.5">
-              <span className="text-sm text-neutral-700 shrink-0">난이도 (Difficulty)</span>
+            <div className="flex items-center justify-between gap-3 px-3 py-2">
+              <span className="text-[13px] text-neutral-700 shrink-0">난이도 (Difficulty)</span>
               {editable ? (
                 <div className="flex flex-wrap gap-1 justify-end">
                   {DIFFICULTIES.map((d) => (
@@ -820,8 +835,8 @@ function WorldDetail({
             </div>
 
             {/* 랜덤 틱 속도 (Random Tick Speed) */}
-            <div className="flex items-center justify-between px-4 py-2.5">
-              <span className="text-sm text-neutral-700">랜덤 틱 속도 (Random Tick Speed)</span>
+            <div className="flex items-center justify-between px-3 py-2">
+              <span className="text-[13px] text-neutral-700">랜덤 틱 속도 (Random Tick Speed)</span>
               {editable ? (
                 <div className="flex items-center gap-2">
                   <button
@@ -844,18 +859,6 @@ function WorldDetail({
                 </div>
               ) : (
                 <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-neutral-100 text-neutral-500">{tick}</span>
-              )}
-            </div>
-
-            {/* 폭발 방지 (Explosion Protection) */}
-            <div className="flex items-center justify-between px-4 py-2.5">
-              <span className="text-sm text-neutral-700">폭발 방지 (Explosion Protection)</span>
-              {editable ? (
-                <Toggle on={explosionOn} busy={ruleBusy === "explosionBlocked"} disabled={settingBusy} onClick={() => onSetting("explosionBlocked", !explosionOn)} />
-              ) : (
-                <span className={`text-[11px] font-bold px-2 py-0.5 rounded ${explosionOn ? "bg-emerald-50 text-emerald-700" : "bg-neutral-100 text-neutral-500"}`}>
-                  {explosionOn ? "켜짐" : "꺼짐"}
-                </span>
               )}
             </div>
           </div>
