@@ -64,6 +64,7 @@ interface World {
   lastBackupAt: string | null;
   archivedAt: string | null;
   createdAt: string;
+  backups: { ts: number; bytes: number }[];
   owned: boolean;
 }
 interface Quota {
@@ -175,6 +176,7 @@ export default function ServerDashboard({
           lastBackupAt: null,
           archivedAt: null,
           createdAt: w.createdAt ?? "",
+          backups: [],
           owned: false,
         }))
       );
@@ -489,7 +491,17 @@ export default function ServerDashboard({
         quota={quota ? { usedBytes: quota.usedBytes, totalBytes: quota.totalBytes } : null}
       />
       <ConfirmModal type={confirmType} worldName={selected?.name || ""} busy={busy} onConfirm={runConfirm} onClose={() => !busy && setConfirmType(null)} />
-      {selected && <DownloadModal open={downloadOpen} worldId={selected.id} worldName={selected.name} onClose={() => setDownloadOpen(false)} />}
+      {selected && (
+        <DownloadModal
+          open={downloadOpen}
+          worldId={selected.id}
+          worldName={selected.name}
+          active={selected.status === "active"}
+          backups={selected.backups}
+          onClose={() => setDownloadOpen(false)}
+          onRefresh={load}
+        />
+      )}
     </div>
   );
 }
@@ -862,7 +874,7 @@ function WorldDetail({
         <SectionLabel>다이나믹맵 (Dynmap)</SectionLabel>
         {MAP_URL && world.mvWorld && active ? (
           <div className="rounded-xl overflow-hidden border border-neutral-200">
-            <iframe title={`Dynmap ${world.name}`} src={buildWorldMapSrc(world.mvWorld)} className="w-full h-80" loading="lazy" />
+            <iframe title={`Dynmap ${world.name}`} src={buildWorldMapSrc(world.mvWorld)} className="w-full h-[600px]" loading="lazy" />
           </div>
         ) : (
           <div className="rounded-xl border border-dashed border-neutral-200 bg-neutral-50 h-72 flex flex-col items-center justify-center text-neutral-400">

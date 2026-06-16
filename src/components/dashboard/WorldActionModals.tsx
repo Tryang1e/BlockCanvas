@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Archive, PowerOff, Trash2, Download, Loader2, CheckCircle2, ShieldAlert } from "lucide-react";
+import { Archive, PowerOff, Trash2, Download, Loader2, CheckCircle2, ShieldAlert, X } from "lucide-react";
+import { formatBytes } from "@/lib/worldQuota";
 
 export type ConfirmType = "backup" | "deactivate" | "delete";
 
@@ -82,55 +83,64 @@ export function ConfirmModal({
   );
 }
 
-/** 다운로드 모달: 확인 → (백업 후) zip fetch → 다운로드 애니메이션 → 완료. */
+/** 다운로드 모달: 백업 목록(날짜)에서 선택 또는 즉시 백업 → zip fetch → 다운로드 애니메이션 → 완료. */
 export function DownloadModal({
   open,
   worldId,
   worldName,
+  active,
+  backups,
   onClose,
+  onRefresh,
 }: {
   open: boolean;
   worldId: string;
   worldName: string;
+  active: boolean;
+  backups: { ts: number; bytes: number }[];
   onClose: () => void;
+  onRefresh?: () => void;
 }) {
-  const [phase, setPhase] = useState<"confirm" | "downloading" | "done" | "error">("confirm");
+  const [phase, setPhase] = useState<"list" | "downloading" | "done" | "error">("list");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
-      setPhase("confirm");
+      setPhase("list");
       setError(null);
     }
   }, [open]);
 
   useEffect(() => {
     if (phase === "done") {
-      const t = setTimeout(() => onClose(), 1800);
+      const t = setTimeout(() => onClose(), 1600);
       return () => clearTimeout(t);
     }
   }, [phase, onClose]);
 
   if (!open) return null;
 
-  const start = async () => {
+  // ts=null 이면 새 백업 후 다운로드(활성 월드), ts 지정 시 해당 날짜 백업 다운로드.
+  const start = async (ts: number | null) => {
     setPhase("downloading");
     setError(null);
     try {
-      const res = await fetch(`/api/world/${worldId}/download`);
+      const url = ts ? `/api/world/${worldId}/download?ts=${ts}` : `/api/world/${worldId}/download`;
+      const res = await fetch(url);
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
         throw new Error(j.error || "다운로드에 실패했습니다.");
       }
       const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
+      const objUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url;
+      a.href = objUrl;
       a.download = `${worldName}.zip`;
       document.body.appendChild(a);
       a.click();
       a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      setTimeout(() => URL.revokeObjectURL(objUrl), 10000);
+      if (!ts && onRefresh) onRefresh(); // 새 백업 생성됨 → 목록 갱신
       setPhase("done");
     } catch (e) {
       setError(e instanceof Error ? e.message : "다운로드 중 오류가 발생했습니다.");
@@ -139,33 +149,64 @@ export function DownloadModal({
   };
 
   const canClose = phase !== "downloading";
+  const fmtTs = (ts: number) =>
+    new Date(ts).toLocaleString("ko-KR", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => canClose && onClose()}>
       <style>{`@keyframes bcdlbar{0%{transform:translateX(-120%)}100%{transform:translateX(320%)}}@keyframes bcdlpop{0%{transform:scale(.4);opacity:0}60%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}`}</style>
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-        {phase === "confirm" && (
+        {phase === "list" && (
           <>
-            <div className="px-5 pt-5 pb-4">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-neutral-100 text-neutral-600 flex items-center justify-center shrink-0">
-                  <Download size={18} />
+            <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-100">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-neutral-100 text-neutral-600 flex items-center justify-center shrink-0">
+                  <Download size={17} />
                 </div>
                 <div className="min-w-0">
-                  <h2 className="text-base font-bold text-neutral-900">월드 다운로드</h2>
-                  <p className="text-xs text-neutral-400 mt-0.5 truncate">{worldName}</p>
+                  <h2 className="text-sm font-bold text-neutral-900">월드 다운로드</h2>
+                  <p className="text-[11px] text-neutral-400 truncate">{worldName}</p>
                 </div>
               </div>
-              <p className="text-sm text-neutral-600 mt-3 leading-relaxed">
-                백업본을 만든 뒤 <b>.zip</b> 파일로 다운로드합니다. 월드 크기에 따라 시간이 걸릴 수 있습니다.
-              </p>
+              <button onClick={onClose} className="text-neutral-400 hover:text-neutral-700" title="닫기">
+                <X size={18} />
+              </button>
             </div>
-            <div className="px-5 py-4 border-t border-neutral-100 flex justify-end gap-2">
-              <button onClick={onClose} className="px-3 py-2 rounded-lg text-sm font-bold text-neutral-500 hover:bg-neutral-100">
-                취소
-              </button>
-              <button onClick={start} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-black hover:bg-neutral-800 text-white text-sm font-bold">
-                <Download size={15} /> 다운로드
-              </button>
+            <div className="p-4 space-y-3">
+              {active && (
+                <button
+                  onClick={() => start(null)}
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-black hover:bg-neutral-800 text-white text-sm font-bold"
+                >
+                  <Archive size={15} /> 지금 백업 후 다운로드
+                </button>
+              )}
+              <div>
+                <div className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1.5">백업 목록 (최대 5개)</div>
+                {backups.length === 0 ? (
+                  <p className="text-xs text-neutral-400 py-3 text-center">
+                    {active ? "아직 백업이 없습니다. 위 버튼으로 새로 만드세요." : "다운로드할 백업이 없습니다."}
+                  </p>
+                ) : (
+                  <div className="space-y-1">
+                    {backups.map((b, i) => (
+                      <button
+                        key={b.ts}
+                        onClick={() => start(b.ts)}
+                        className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-neutral-200 hover:border-neutral-400 hover:bg-neutral-50 text-left"
+                      >
+                        <span className="min-w-0">
+                          <span className="block text-xs font-semibold text-neutral-800 truncate">
+                            {fmtTs(b.ts)} {i === 0 && <span className="text-[10px] text-emerald-600 font-bold">최신</span>}
+                          </span>
+                          <span className="block text-[11px] text-neutral-400">{formatBytes(b.bytes)}</span>
+                        </span>
+                        <Download size={14} className="text-neutral-400 shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </>
         )}
@@ -175,8 +216,8 @@ export function DownloadModal({
             <div className="w-14 h-14 rounded-2xl bg-neutral-900 text-white flex items-center justify-center mb-4">
               <Download size={26} className="animate-bounce" />
             </div>
-            <p className="text-sm font-bold text-neutral-900">백업 후 다운로드 중...</p>
-            <p className="text-xs text-neutral-400 mt-1">잠시만 기다려 주세요.</p>
+            <p className="text-sm font-bold text-neutral-900">다운로드 준비 중...</p>
+            <p className="text-xs text-neutral-400 mt-1">백업 압축/전송 중입니다. 잠시만 기다려 주세요.</p>
             <div className="mt-4 w-full h-1.5 rounded-full bg-neutral-200 overflow-hidden">
               <div className="h-full w-1/3 rounded-full bg-neutral-900" style={{ animation: "bcdlbar 1.1s ease-in-out infinite" }} />
             </div>
@@ -202,8 +243,8 @@ export function DownloadModal({
               <button onClick={onClose} className="px-3 py-2 rounded-lg text-sm font-bold text-neutral-500 hover:bg-neutral-100">
                 닫기
               </button>
-              <button onClick={start} className="px-4 py-2 rounded-lg bg-black hover:bg-neutral-800 text-white text-sm font-bold">
-                다시 시도
+              <button onClick={() => setPhase("list")} className="px-4 py-2 rounded-lg bg-black hover:bg-neutral-800 text-white text-sm font-bold">
+                목록으로
               </button>
             </div>
           </div>

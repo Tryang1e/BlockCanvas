@@ -274,7 +274,8 @@ model MinecraftWorld {
   last_saved      DateTime?
   last_active_at  DateTime? // 마지막 사용(접속/열람) 시각. +30일 미사용=아카이브, +90일=영구삭제 (수명주기).
   last_backup_at  DateTime? // 백업 24h 1회 제한 (MyIdea §2-5)
-  backup_path     String?   // 최신 백업/아카이브 zip 절대경로(다운로드·복구용).
+  backup_path     String?   // 최신 백업/아카이브 zip 절대경로(복구용 = backups[0]).
+  backups         String?   // JSON 배열 [{path,ts,bytes}] 최신순, 최대 5개(초과 시 가장 오래된 것 삭제). 날짜별 다운로드용.
   archived_at     DateTime? // 아카이브된 시각
   created_at      DateTime  @default(now())
   updated_at      DateTime  @updatedAt

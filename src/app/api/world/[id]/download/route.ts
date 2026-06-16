@@ -6,11 +6,14 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { verifySession } from "@/lib/session";
 import { backupWorld } from "@/app/actions/worlds";
+import { parseBackupList } from "@/lib/worldLifecycle";
 
 export const runtime = "nodejs";
 
-// 월드 다운로드: 먼저 서버에서 백업(zip)을 만든 뒤 그 zip 을 그대로 스트리밍한다.
-//   → 압축본을 보내 outbound 용량을 줄이고, 라이브 월드 폴더를 직접 노출하지 않는다(소유자 전용).
+// 월드 다운로드(소유자 전용):
+//   ?ts=<백업 timestamp> → 백업 리스트의 해당 날짜 zip 을 그대로 스트리밍.
+//   ts 없음 + 활성 → 새 백업 후 스트리밍. ts 없음 + 비활성 → 최신 백업 스트리밍.
+//   → 압축본을 보내 outbound 용량을 줄이고, 라이브 월드 폴더를 직접 노출하지 않는다.
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const session = verifySession((await cookies()).get("session")?.value);
@@ -24,11 +27,24 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: "월드를 찾을 수 없습니다." }, { status: 404 });
   }
 
-  // 활성 월드: 새 백업 후 스트리밍. 비활성(아카이브) 월드: 기존 백업 zip 을 그대로 스트리밍(잠금 중에도 다운로드 가능).
+  const backups = parseBackupList(world.backups);
+  const tsParam = new URL(request.url).searchParams.get("ts");
+
   let zipPath: string;
-  if (world.status === "archived" && world.backup_path) {
-    zipPath = world.backup_path;
+  let chosenTs: number | null = null;
+  if (tsParam) {
+    // 특정 날짜의 백업 다운로드
+    const found = backups.find((b) => String(b.ts) === tsParam);
+    if (!found) return NextResponse.json({ error: "해당 백업을 찾을 수 없습니다." }, { status: 404 });
+    zipPath = found.path;
+    chosenTs = found.ts;
+  } else if (world.status === "archived") {
+    // 비활성: 최신 백업 그대로(잠금 중에도 가능)
+    zipPath = backups[0]?.path || world.backup_path || "";
+    chosenTs = backups[0]?.ts ?? null;
+    if (!zipPath) return NextResponse.json({ error: "다운로드할 백업이 없습니다." }, { status: 404 });
   } else {
+    // 활성 + ts 없음: 새 백업 후 스트리밍
     const backup = await backupWorld(id, { force: true }); // force=잠금 중에도 허용
     if (!backup.success) {
       return NextResponse.json({ error: backup.error || "백업/다운로드에 실패했습니다." }, { status: 502 });
@@ -48,7 +64,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   }
 
   const safeName = (world.name || "world").replace(/[^\w가-힣 .-]/g, "_");
-  const filename = `${safeName}.zip`;
+  const dateSuffix = chosenTs ? "_" + new Date(chosenTs).toISOString().slice(0, 10) : "";
+  const filename = `${safeName}${dateSuffix}.zip`;
   const nodeStream = createReadStream(zipPath);
   const webStream = Readable.toWeb(nodeStream) as unknown as ReadableStream<Uint8Array>;
 

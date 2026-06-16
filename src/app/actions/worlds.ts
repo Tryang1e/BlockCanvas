@@ -7,7 +7,7 @@ import { verifySession } from "@/lib/session";
 import { getWorldQuotaBytes } from "@/lib/worldQuota";
 import { WORLD_ICON_KEYS } from "@/lib/worldIcons";
 import { computeWorldKey, worldFolderFromKey } from "@/lib/worldNaming";
-import { archiveWorld as archiveWorldLifecycle } from "@/lib/worldLifecycle";
+import { archiveWorld as archiveWorldLifecycle, recordBackup, unlinkAllBackups, parseBackupList } from "@/lib/worldLifecycle";
 import { evaluateQuota } from "@/lib/worldQuotaEnforcement";
 import {
   createMinecraftWorld,
@@ -90,6 +90,7 @@ export async function getMyWorlds() {
       lastBackupAt: w.last_backup_at ? w.last_backup_at.toISOString() : null,
       archivedAt: w.archived_at ? w.archived_at.toISOString() : null,
       createdAt: w.created_at.toISOString(),
+      backups: parseBackupList(w.backups).map((b) => ({ ts: b.ts, bytes: b.bytes })), // 날짜별 다운로드용(경로 비노출)
     }));
 
     // 쿼터 사용량 = 모든 월드(활성+비활성). 비활성화로는 안 줄고 삭제해야 줄어든다(잠금이 의미를 갖도록).
@@ -474,15 +475,15 @@ export async function backupWorld(worldId: string, opts?: { force?: boolean }) {
     if (!res.success || !res.backupPath) {
       return { success: false as const, error: res.error || "백업에 실패했습니다. (서버 연결 확인)" };
     }
-    // 이전 백업 zip 정리(최신 1개만 유지)
-    if (world.backup_path && world.backup_path !== res.backupPath) {
-      await fs.unlink(world.backup_path).catch(() => {});
-    }
-    await prisma.minecraftWorld.update({
-      where: { id: world.id },
-      data: { last_backup_at: new Date(), backup_path: res.backupPath },
-    });
-    return { success: true as const, backupPath: res.backupPath, zipBytes: res.zipBytes ?? 0 };
+    // 백업 리스트(최신순 최대 5개)에 추가 — 초과분 zip 은 recordBackup 이 삭제, backup_path 도 갱신.
+    const list = await recordBackup(world.id, res.backupPath, res.zipBytes ?? 0);
+    await prisma.minecraftWorld.update({ where: { id: world.id }, data: { last_backup_at: new Date() } });
+    return {
+      success: true as const,
+      backupPath: res.backupPath,
+      zipBytes: res.zipBytes ?? 0,
+      backups: list.map((b) => ({ ts: b.ts, bytes: b.bytes })),
+    };
   } catch (e: unknown) {
     return { success: false as const, error: e instanceof Error ? e.message : String(e) };
   }
@@ -496,7 +497,8 @@ export async function deleteWorld(worldId: string) {
     if (!world || world.owner_id !== profile.id) return { success: false as const, error: "월드를 찾을 수 없습니다." };
 
     if (world.mv_world) await deleteMinecraftWorld(world.mv_world); // 서버 제거(베스트 에포트)
-    if (world.backup_path) await fs.unlink(world.backup_path).catch(() => {});
+    await unlinkAllBackups(world.backups); // 백업 리스트의 모든 zip 삭제
+    if (world.backup_path) await fs.unlink(world.backup_path).catch(() => {}); // 리스트에 없던 레거시 경로 대비
     await prisma.minecraftWorld.delete({ where: { id: world.id } });
     await logWorld(profile.creator_name, "WORLD_DELETE", `월드 삭제: ${world.name}`);
     try { await evaluateQuota(profile.id); } catch { /* 평가 실패는 무시 */ } // 삭제로 용량 확보 → 잠금 해제 가능
