@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 export default async function AdminDashboardPage() {
   // 1. Fetch total creator count
   const creatorCount = await prisma.profile.count({
-    where: { role: 'creator' }
+    where: { role: { in: ['creator', 'official'] } }
   })
 
   // 2. Fetch total projects count

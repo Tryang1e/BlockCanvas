@@ -1,19 +1,22 @@
 // 역할별 클라우드(월드) 저장 쿼터 (MyIdea §2-4).
-// 역할 체계(AdminTable): user=일반 사용자, pro=유료 크리에이터(Premium), creator=공식 크리에이터(Official), admin=관리자.
-//   user 1GB / pro 5GB / creator 50GB / admin 무제한. 플랜 조정은 이 함수만 수정하면 됨.
+// 웹 역할 ↔ 인게임 LuckPerms 그룹: user(=LP builder) / creator(=LP creator, 일반) / official(=LP offcial, 공식) / admin(=LP manager·admin).
+//   user 1GB / creator 5GB / official 50GB / admin 무제한. LP default(미가입 MC 유저)는 웹 계정 없음. 플랜 조정은 이 함수만 수정하면 됨.
 // Infinity = 무제한(액션 경계에서 null 로 직렬화).
 const GB = 1024 * 1024 * 1024;
 
 export function getWorldQuotaBytes(role: string | null | undefined): number {
   switch ((role || "").toLowerCase()) {
     case "admin":
-      return Infinity; // 관리자
+    case "manager": // LP manager = 웹 admin
+      return Infinity;
+    case "official":
+      return 50 * GB; // 공식 크리에이터 (LP offcial)
     case "creator":
-      return 50 * GB; // 공식 크리에이터 (Official)
-    case "pro":
-      return 5 * GB; // 유료 크리에이터 (Premium)
+      return 5 * GB; // 일반 크리에이터 (LP creator)
+    case "pro": // Premium 폐지 → creator 이관. 잔존 행 안전망(동일 5GB)
+      return 5 * GB;
     case "user":
-      return 1 * GB; // 일반 사용자
+      return 1 * GB; // 일반 사용자 (LP builder)
     default:
       return 1 * GB; // 알 수 없는 역할 → 보수적으로 1GB
   }

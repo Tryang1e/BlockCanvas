@@ -167,15 +167,15 @@ export default function AdminTable({ profiles }: { profiles: any[] }) {
                       const r = profile.role?.toLowerCase()
                       let badgeClass = 'bg-neutral-100 text-neutral-600'
                       let label = profile.role
-                      if (r === 'admin') {
+                      if (r === 'admin' || r === 'manager') {
                         badgeClass = 'bg-purple-100 text-purple-700'
                         label = 'ADMIN'
-                      } else if (r === 'pro') {
-                        badgeClass = 'bg-blue-100 text-blue-700'
-                        label = 'PREMIUM'
-                      } else if (r === 'creator') {
+                      } else if (r === 'official') {
                         badgeClass = 'bg-green-100 text-green-700'
                         label = 'OFFICIAL'
+                      } else if (r === 'creator') {
+                        badgeClass = 'bg-blue-100 text-blue-700'
+                        label = 'CREATOR'
                       } else if (r === 'user') {
                         badgeClass = 'bg-neutral-100 text-neutral-600 border border-neutral-200'
                         label = 'USER'
@@ -284,8 +284,8 @@ export default function AdminTable({ profiles }: { profiles: any[] }) {
                       onChange={(e) => setModalConfig({ ...modalConfig, selectedRole: e.target.value })}
                       className="w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                      <option value="creator">Creator (공식 크리에이터)</option>
-                      <option value="pro">Premium (유료 크리에이터)</option>
+                      <option value="official">Official (공식 크리에이터)</option>
+                      <option value="creator">Creator (일반 크리에이터)</option>
                       <option value="user">User (일반 사용자)</option>
                       <option value="admin">Admin (관리자)</option>
                     </select>
@@ -372,15 +372,15 @@ export default function AdminTable({ profiles }: { profiles: any[] }) {
                       const r = selectedUserProfile.role?.toLowerCase()
                       let badgeClass = 'bg-neutral-50 dark:bg-neutral-950/20 text-neutral-600 dark:text-neutral-400 border-neutral-200 dark:border-neutral-800'
                       let label = selectedUserProfile.role
-                      if (r === 'admin') {
+                      if (r === 'admin' || r === 'manager') {
                         badgeClass = 'bg-purple-50 dark:bg-purple-950/20 text-purple-600 dark:text-purple-400 border-purple-100 dark:border-purple-900/40'
                         label = 'ADMIN'
-                      } else if (r === 'pro') {
-                        badgeClass = 'bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-900/40'
-                        label = 'PREMIUM'
-                      } else if (r === 'creator') {
+                      } else if (r === 'official') {
                         badgeClass = 'bg-green-50 dark:bg-green-950/20 text-green-600 dark:text-green-400 border-green-100 dark:border-green-900/40'
                         label = 'OFFICIAL'
+                      } else if (r === 'creator') {
+                        badgeClass = 'bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-900/40'
+                        label = 'CREATOR'
                       } else if (r === 'user') {
                         badgeClass = 'bg-neutral-50 dark:bg-neutral-950/20 text-neutral-600 dark:text-neutral-400 border-neutral-200 dark:border-neutral-800'
                         label = 'USER'

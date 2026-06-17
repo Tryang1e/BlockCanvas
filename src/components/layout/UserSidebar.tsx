@@ -7,6 +7,7 @@ import { X, Loader2, CheckCircle2 } from 'lucide-react'
 
 import { logout } from '@/app/actions/auth'
 import { submitSystemSupport, submitSystemFeedback } from '@/app/actions/contact'
+import { canManagePortfolio } from '@/lib/roles'
 
 interface SupportFeedbackModalProps {
   isOpen: boolean
@@ -302,7 +303,7 @@ export default function UserSidebar({
             const protocol = typeof window !== 'undefined' ? window.location.protocol : 'https:'
             const rootUrl = `${protocol}//${userHandle}.${baseDomain}`
 
-            const hasPortfolioAccess = userRole?.toLowerCase() !== 'user'
+            const hasPortfolioAccess = canManagePortfolio(userRole)
 
             return (
               <>

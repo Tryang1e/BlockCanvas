@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers'
 import { prisma } from './prisma'
 import { verifySession } from './session'
+import { isAdminRole } from './roles'
 
 /**
  * Checks if the current session matches the requested creatorName.
@@ -23,7 +24,7 @@ export async function requireAuth(creatorName: string): Promise<string> {
       where: { creator_name: session },
       select: { role: true }
     })
-    if (sessionProfile?.role === 'admin') {
+    if (isAdminRole(sessionProfile?.role)) {
       isAuthorized = true
     }
   }

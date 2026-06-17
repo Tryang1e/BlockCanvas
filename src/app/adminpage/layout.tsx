@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { verifySession } from '@/lib/session'
+import { isAdminRole } from '@/lib/roles'
 
 export default async function AdminLayout({
   children,
@@ -20,7 +21,7 @@ export default async function AdminLayout({
       where: { creator_name: session }
     })
     
-    if (!profile || profile.role !== 'admin') {
+    if (!profile || !isAdminRole(profile.role)) {
       redirect(`http://${session}.craftopia.work/dashboard`)
     }
   }

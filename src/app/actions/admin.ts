@@ -6,6 +6,8 @@ import { revalidatePath } from 'next/cache'
 import { hashPassword } from '@/lib/hash'
 import { deleteUserPhysicalFiles } from '@/lib/file-delete'
 import { signSession, verifySession } from '@/lib/session'
+import { roleToLpGroup } from '@/lib/roles'
+import { setMinecraftLuckPermsGroup } from '@/lib/minecraft'
 
 async function requireAdmin() {
   const cookieStore = await cookies()
@@ -82,7 +84,17 @@ export async function updateUserRoleAction(id: string, role: string) {
         data: { admin_name: admin, action: 'UPDATE_ROLE', target_id: id, details: `Changed ${user.creator_name}'s role to ${role}` }
       })
     }
-    
+
+    // 웹 → 인게임: 연동된 계정이면 LuckPerms 그룹도 맞춰 변경(베스트에포트)
+    if (user.minecraft_uuid) {
+      const group = roleToLpGroup(role)
+      if (group) {
+        await setMinecraftLuckPermsGroup(user.minecraft_uuid, group).catch((e) =>
+          console.warn('web→ingame role sync failed:', e instanceof Error ? e.message : String(e))
+        )
+      }
+    }
+
     revalidatePath('/adminpage')
     return { success: true }
   } catch (err: any) {

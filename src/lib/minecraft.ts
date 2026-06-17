@@ -303,6 +303,15 @@ export async function setMinecraftWorldAccess(
   return { success: res.success, status: res.status };
 }
 
+/** 웹 role 변경을 인게임 LuckPerms 그룹에 반영(웹→인게임). (BlockCanvasLink /api/luckperms/set-group) */
+export async function setMinecraftLuckPermsGroup(
+  uuid: string,
+  group: string
+): Promise<{ success: boolean; status: number }> {
+  const res = await sendToMinecraft("/api/luckperms/set-group", { uuid, group });
+  return { success: res.success, status: res.status };
+}
+
 /** 서버에서 월드 런타임 정보를 조회한다. (BlockCanvasLink /api/world/info) */
 export async function getMinecraftWorldInfo(
   worldName: string
