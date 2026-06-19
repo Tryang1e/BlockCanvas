@@ -14,6 +14,7 @@ export default function LoginPage() {
   const [mode, setMode] = useState<'login' | 'signup'>('login')
   const [isPending, setIsPending] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   // 2FA 상태 관리
   const [requires2FA, setRequires2FA] = useState(false)
@@ -32,6 +33,7 @@ export default function LoginPage() {
     setIsPending(true)
     setErrorMessage(null)
 
+    setSuccessMessage(null)
     const formData = new FormData(e.currentTarget)
     try {
       if (mode === 'login') {
@@ -45,7 +47,12 @@ export default function LoginPage() {
           window.location.href = res.redirectUrl
         }
       } else {
-        await signup(formData)
+        const res = await signup(formData)
+        if (res && res.error) {
+          setErrorMessage(res.error)
+        } else if (res && res.success) {
+          setSuccessMessage(res.message)
+        }
       }
     } catch (err: any) {
       setErrorMessage(err?.message || '인증 과정 중 알 수 없는 오류가 발생했습니다.')
@@ -149,19 +156,17 @@ export default function LoginPage() {
               />
               <button
                 type="button"
-                onClick={() => { setMode('login'); setErrorMessage(null) }}
+                onClick={() => { setMode('login'); setErrorMessage(null); setSuccessMessage(null) }}
                 className={`flex-1 text-center py-2.5 text-xs font-bold rounded-full relative z-10 transition-colors duration-500 ${mode === 'login' ? 'text-neutral-900 dark:text-white' : 'text-neutral-400 hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300'}`}
               >
                 로그인
               </button>
               <button
                 type="button"
-                disabled
-                className="flex-1 text-center py-2.5 text-xs font-bold rounded-full relative z-10 opacity-30 cursor-not-allowed text-neutral-400 dark:text-neutral-500 flex items-center justify-center gap-1.5 select-none"
-                title="현재 회원가입은 임시 비활성화 상태입니다."
+                onClick={() => { setMode('signup'); setErrorMessage(null); setSuccessMessage(null) }}
+                className={`flex-1 text-center py-2.5 text-xs font-bold rounded-full relative z-10 transition-colors duration-500 ${mode === 'signup' ? 'text-neutral-900 dark:text-white' : 'text-neutral-400 hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300'}`}
               >
                 회원가입
-                <span className="text-[9px] px-1.5 py-0.5 bg-neutral-200 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 rounded-full font-medium scale-90">준비중</span>
               </button>
             </div>
 
@@ -199,6 +204,23 @@ export default function LoginPage() {
                 </div>
               </div>
 
+              {/* 🔏 회원가입 모드 전용: 개인정보 동의 + 안내 */}
+              {mode === 'signup' && (
+                <label className="flex items-start gap-2.5 text-xs text-neutral-500 dark:text-neutral-400 font-medium select-none cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="privacy_consent"
+                    value="1"
+                    required
+                    className="mt-0.5 h-4 w-4 rounded border-neutral-300 dark:border-neutral-700 accent-neutral-900 dark:accent-white shrink-0"
+                  />
+                  <span>
+                    <Link href="/privacy" target="_blank" className="underline hover:text-neutral-900 dark:hover:text-white">개인정보 처리방침</Link>에 동의합니다.
+                    가입 시 입력한 이메일로 인증 메일이 발송됩니다.
+                  </span>
+                </label>
+              )}
+
               {/* ⚡ 웅장하고 미니멀한 버튼 피드백 */}
               <button
                 type="submit"
@@ -210,9 +232,16 @@ export default function LoginPage() {
                 ) : mode === 'login' ? (
                   '로그인하기'
                 ) : (
-                  '회원가입 완료하기'
+                  '인증 메일 받기'
                 )}
               </button>
+
+              {/* ✅ 성공 안내(가입 인증 메일 발송 등) */}
+              {successMessage && (
+                <div className="mt-4 p-4 text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/40 rounded-2xl text-center shadow-sm animate-in fade-in slide-in-from-top-4 duration-300">
+                  {successMessage}
+                </div>
+              )}
 
               {/* ⚠️ 에러/안내 메시지 레이아웃 */}
               {errorMessage && (

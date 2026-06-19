@@ -1,49 +1,32 @@
 "use client";
 
 import { useState } from "react";
+import { unlinkDiscord } from "@/app/actions/discord";
+import { roleLabel } from "@/lib/roles";
 
 interface Props {
+  creatorName: string;
+  displayName: string | null;
+  role: string;
+  dashboardHref: string;
   discord: { id: string; username: string | null } | null;
   minecraft: { uuid: string; username: string | null } | null;
-  bridgedName: string | null;
-  creatorSession: string | null;
   discordConfigured: boolean;
-  minecraftConfigured: boolean;
 }
 
 export default function HubConnections(props: Props) {
   const [busy, setBusy] = useState<string | null>(null);
 
-  const disconnect = async (provider: "discord" | "minecraft" | "web") => {
-    if (!confirm("이 연결을 해제할까요?")) return;
-    setBusy(provider);
+  const disconnectDiscord = async () => {
+    if (!confirm("Discord 연결을 해제할까요?")) return;
+    setBusy("discord");
     try {
-      const res = await fetch("/api/auth/hub/disconnect", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (data?.success) {
+      const res = await unlinkDiscord();
+      if (res?.success) {
         window.location.href = "/auth";
         return;
       }
-      alert(data?.error || "연결 해제에 실패했습니다.");
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const bridge = async () => {
-    setBusy("web");
-    try {
-      const res = await fetch("/api/auth/hub/bridge", { method: "POST" });
-      const data = await res.json().catch(() => ({}));
-      if (data?.success) {
-        window.location.href = "/auth?connected=web";
-        return;
-      }
-      alert(data?.error || "웹 계정 연결에 실패했습니다.");
+      alert(res?.error || "연결 해제에 실패했습니다.");
     } finally {
       setBusy(null);
     }
@@ -51,6 +34,25 @@ export default function HubConnections(props: Props) {
 
   return (
     <div className="space-y-2.5">
+      {/* 로그인된 계정 정체성 */}
+      <div className="flex items-center justify-between gap-3 bg-neutral-50/50 dark:bg-neutral-950/40 border border-neutral-200 dark:border-neutral-800/80 rounded-2xl p-3.5">
+        <div className="min-w-0">
+          <div className="font-bold text-sm text-neutral-900 dark:text-white truncate">
+            {props.displayName || props.creatorName}
+          </div>
+          <div className="text-xs text-neutral-400 truncate">
+            @{props.creatorName} · {roleLabel(props.role)}
+          </div>
+        </div>
+        <a
+          href={props.dashboardHref}
+          className="text-xs px-3.5 py-2 rounded-xl bg-neutral-950 dark:bg-white text-white dark:text-neutral-950 font-bold hover:opacity-90 transition-opacity whitespace-nowrap"
+        >
+          내 대시보드
+        </a>
+      </div>
+
+      {/* Discord 연결 */}
       <ConnectionCard
         name="Discord"
         color="#5865F2"
@@ -59,50 +61,19 @@ export default function HubConnections(props: Props) {
         connectHref="/api/auth/discord/start"
         configured={props.discordConfigured}
         busy={busy === "discord"}
-        onDisconnect={() => disconnect("discord")}
+        onDisconnect={disconnectDiscord}
       />
+
+      {/* 마인크래프트 — 서버 인증(인게임 코드)은 대시보드에서. 허브는 상태 표시만. */}
       <ConnectionCard
         name="Minecraft"
         color="#3AAE4F"
         connected={!!props.minecraft}
         label={props.minecraft?.username || props.minecraft?.uuid || null}
-        connectHref="/api/auth/minecraft/start?flow=hub"
-        configured={props.minecraftConfigured}
-        busy={busy === "minecraft"}
-        onDisconnect={() => disconnect("minecraft")}
+        configured={false}
+        note="대시보드에서 연동"
+        busy={false}
       />
-
-      {/* craftopia 웹 계정 브리지 */}
-      {props.bridgedName ? (
-        <ConnectionCard
-          name="craftopia 웹"
-          color="#111827"
-          connected
-          label={props.bridgedName}
-          configured
-          busy={busy === "web"}
-          onDisconnect={() => disconnect("web")}
-        />
-      ) : props.creatorSession ? (
-        <CardShell name="craftopia 웹" color="#111827" sub={`${props.creatorSession} 계정 감지됨`}>
-          <button
-            onClick={bridge}
-            disabled={busy === "web"}
-            className="text-xs px-3.5 py-2 rounded-xl bg-neutral-950 dark:bg-white text-white dark:text-neutral-950 font-bold hover:opacity-90 transition-opacity disabled:opacity-50 whitespace-nowrap"
-          >
-            {busy === "web" ? "..." : "연결"}
-          </button>
-        </CardShell>
-      ) : (
-        <CardShell name="craftopia 웹" color="#111827" sub="연결 안 됨">
-          <a
-            href="/login"
-            className="text-xs px-3.5 py-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 font-bold hover:bg-neutral-50 dark:hover:bg-neutral-950 transition-colors whitespace-nowrap"
-          >
-            로그인
-          </a>
-        </CardShell>
-      )}
 
       <div className="text-center pt-3">
         <a
@@ -153,6 +124,7 @@ function ConnectionCard({
   label,
   connectHref,
   configured,
+  note,
   busy,
   onDisconnect,
 }: {
@@ -162,19 +134,24 @@ function ConnectionCard({
   label: string | null;
   connectHref?: string;
   configured: boolean;
+  note?: string;
   busy: boolean;
-  onDisconnect: () => void;
+  onDisconnect?: () => void;
 }) {
   return (
     <CardShell name={name} color={color} sub={connected ? label || "연결됨" : "연결 안 됨"}>
       {connected ? (
-        <button
-          onClick={onDisconnect}
-          disabled={busy}
-          className="text-xs px-3.5 py-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-rose-600 hover:border-rose-200 transition-colors disabled:opacity-50 whitespace-nowrap"
-        >
-          {busy ? "..." : "해제"}
-        </button>
+        onDisconnect ? (
+          <button
+            onClick={onDisconnect}
+            disabled={busy}
+            className="text-xs px-3.5 py-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-rose-600 hover:border-rose-200 transition-colors disabled:opacity-50 whitespace-nowrap"
+          >
+            {busy ? "..." : "해제"}
+          </button>
+        ) : (
+          <span className="text-[10px] text-emerald-500 dark:text-emerald-400 font-bold whitespace-nowrap">연결됨</span>
+        )
       ) : configured && connectHref ? (
         <a
           href={connectHref}
@@ -184,7 +161,7 @@ function ConnectionCard({
           연결
         </a>
       ) : (
-        <span className="text-[10px] text-neutral-400 dark:text-neutral-600 whitespace-nowrap">설정 필요</span>
+        <span className="text-[10px] text-neutral-400 dark:text-neutral-600 whitespace-nowrap">{note || "설정 필요"}</span>
       )}
     </CardShell>
   );

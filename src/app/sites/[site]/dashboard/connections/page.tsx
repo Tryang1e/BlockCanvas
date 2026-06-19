@@ -21,7 +21,7 @@ export default async function ConnectionsPage({
       <div className="mb-8">
         <h1 className="text-3xl font-black text-neutral-900 tracking-tight mb-2">외부 계정 연동</h1>
         <p className="text-neutral-500 font-medium">
-          디스코드·마인크래프트(Microsoft) 계정의 연동 상태를 확인하고 관리하세요.
+          디스코드·마인크래프트 계정의 연동 상태를 확인하고 관리하세요.
         </p>
       </div>
 

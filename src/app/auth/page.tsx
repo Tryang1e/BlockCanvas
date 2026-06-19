@@ -1,10 +1,8 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import Image from "next/image";
-import { verifyHubSession, HUB_COOKIE } from "@/lib/hubSession";
+import { prisma } from "@/lib/prisma";
 import { verifySession } from "@/lib/session";
-import { getHubAccount, getBridgedProfileName } from "@/lib/hub";
 import { isDiscordOAuthConfigured } from "@/lib/discordOAuth";
-import { isOAuthConfigured } from "@/lib/minecraftOAuth";
 import HubConnections from "@/components/auth/HubConnections";
 
 export const dynamic = "force-dynamic";
@@ -14,12 +12,9 @@ function hubErrorText(code: string): string {
     case "invalid_state":
       return "보안 검증에 실패했습니다. 다시 시도해주세요.";
     case "oauth_failed":
-      return "인증에 실패했습니다. 정품 계정인지 확인 후 다시 시도해주세요.";
-    case "oauth_not_configured":
+      return "인증에 실패했습니다. 다시 시도해주세요.";
     case "discord_not_configured":
-      return "이 제공자는 아직 설정되지 않았습니다.";
-    case "link_failed":
-      return "연결에 실패했습니다.";
+      return "Discord 로그인이 아직 설정되지 않았습니다.";
     default:
       try {
         return decodeURIComponent(code);
@@ -29,6 +24,17 @@ function hubErrorText(code: string): string {
   }
 }
 
+/** 현재 공개 호스트(auth.craftopia.work)에서 베이스 도메인을 구해 대시보드 절대 URL 생성. */
+async function buildDashboardHref(creatorName: string): Promise<string> {
+  const h = await headers();
+  const host = h.get("x-forwarded-host") || h.get("host") || "craftopia.work";
+  const isLocal = host.includes("localhost") || host.includes("127.0.0.1");
+  const proto = !isLocal || h.get("x-forwarded-proto") === "https" ? "https" : "http";
+  // auth.craftopia.work → craftopia.work / auth.localhost:3000 → localhost:3000
+  const baseDomain = isLocal ? host.split(".").slice(-1).join(".") : host.split(".").slice(-2).join(".");
+  return `${proto}://${creatorName}.${baseDomain}/dashboard`;
+}
+
 export default async function AuthHubPage({
   searchParams,
 }: {
@@ -36,17 +42,19 @@ export default async function AuthHubPage({
 }) {
   const sp = await searchParams;
   const cookieStore = await cookies();
-  const accountId = verifyHubSession(cookieStore.get(HUB_COOKIE)?.value);
-  const account = accountId ? await getHubAccount(accountId) : null;
-  const creatorSession = verifySession(cookieStore.get("session")?.value);
-  const bridgedName = account?.profile_id ? await getBridgedProfileName(account.profile_id) : null;
+  const creatorName = verifySession(cookieStore.get("session")?.value);
+  const profile = creatorName
+    ? await prisma.profile.findUnique({ where: { creator_name: creatorName.toLowerCase() } })
+    : null;
 
   const connectedMsg = sp.connected
-    ? sp.connected === "web"
-      ? "craftopia 웹 계정 연결 완료"
-      : `${sp.connected === "discord" ? "Discord" : "Minecraft"} 연결 완료`
+    ? sp.connected === "discord"
+      ? "Discord 연결 완료"
+      : "로그인되었습니다"
     : null;
   const errorMsg = sp.error ? hubErrorText(sp.error) : null;
+
+  const dashboardHref = profile ? await buildDashboardHref(profile.creator_name) : null;
 
   return (
     <div className="relative min-h-screen w-full flex items-center justify-center bg-[#fafafa] dark:bg-[#070708] overflow-hidden px-6 py-20 transition-colors duration-500">
@@ -69,7 +77,7 @@ export default async function AuthHubPage({
           </div>
           <h1 className="text-2xl font-extrabold tracking-tight text-neutral-900 dark:text-white leading-tight">계정 연동</h1>
           <p className="text-xs text-neutral-400 dark:text-neutral-500 mt-2 font-medium tracking-wide">
-            Discord · Minecraft 계정을 연결하세요
+            Discord · 마인크래프트 계정을 연결하세요
           </p>
         </div>
 
@@ -89,16 +97,17 @@ export default async function AuthHubPage({
           </div>
         )}
 
-        {account ? (
+        {profile ? (
           <HubConnections
-            discord={account.discord_id ? { id: account.discord_id, username: account.discord_username } : null}
+            creatorName={profile.creator_name}
+            displayName={profile.display_name}
+            role={profile.role}
+            dashboardHref={dashboardHref || "#"}
+            discord={profile.discord_id ? { id: profile.discord_id, username: profile.discord_username } : null}
             minecraft={
-              account.minecraft_uuid ? { uuid: account.minecraft_uuid, username: account.minecraft_username } : null
+              profile.minecraft_uuid ? { uuid: profile.minecraft_uuid, username: profile.minecraft_username } : null
             }
-            bridgedName={bridgedName}
-            creatorSession={creatorSession}
             discordConfigured={isDiscordOAuthConfigured()}
-            minecraftConfigured={isOAuthConfigured()}
           />
         ) : (
           <div className="space-y-3">
@@ -110,14 +119,21 @@ export default async function AuthHubPage({
               Discord 로 계속
             </a>
             <a
-              href="/api/auth/minecraft/start?flow=hub"
-              className="flex items-center justify-center gap-2 w-full py-3.5 rounded-2xl font-bold text-sm text-white shadow-sm hover:opacity-90 active:scale-[0.99] transition-all"
-              style={{ backgroundColor: "#3AAE4F" }}
+              href="/login"
+              className="flex items-center justify-center gap-2 w-full py-3.5 rounded-2xl font-bold text-sm text-neutral-700 dark:text-neutral-300 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm hover:bg-neutral-50 dark:hover:bg-neutral-950 active:scale-[0.99] transition-all"
             >
-              Minecraft 로 계속
+              이메일로 로그인 / 회원가입
             </a>
             <p className="text-[11px] text-neutral-400 dark:text-neutral-600 text-center pt-2">
-              Discord 또는 Minecraft 로 로그인해 계정을 연결하세요
+              Discord 로 로그인하면 계정이 자동으로 만들어집니다.<br />
+              마인크래프트는 로그인 후 대시보드에서 서버 인증(인게임 코드)으로 연동됩니다.
+            </p>
+            <p className="text-[10px] text-neutral-400 dark:text-neutral-600 text-center">
+              계속하면{" "}
+              <a href="/privacy" target="_blank" className="underline hover:text-neutral-700 dark:hover:text-neutral-400">
+                개인정보 처리방침
+              </a>
+              에 동의하는 것으로 간주됩니다.
             </p>
           </div>
         )}
