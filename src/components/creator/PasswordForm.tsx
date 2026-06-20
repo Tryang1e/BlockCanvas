@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { changePasswordAction } from '@/app/actions/auth'
+import { validatePassword, PASSWORD_POLICY_HINT } from '@/lib/password-policy'
 
 export default function PasswordForm({ creatorName }: { creatorName: string }) {
   const [currentPass, setCurrentPass] = useState('')
@@ -16,13 +17,14 @@ export default function PasswordForm({ creatorName }: { creatorName: string }) {
     setMessage('')
     setError('')
 
-    if (newPass !== confirmPass) {
-      setError('새 비밀번호가 일치하지 않습니다.')
+    const pwCheck = validatePassword(newPass)
+    if (!pwCheck.ok) {
+      setError(pwCheck.error || '비밀번호 형식을 확인해 주세요.')
       return
     }
 
-    if (newPass.length < 6) {
-      setError('새 비밀번호는 6자 이상이어야 합니다.')
+    if (newPass !== confirmPass) {
+      setError('새 비밀번호가 일치하지 않습니다.')
       return
     }
 
@@ -54,16 +56,17 @@ export default function PasswordForm({ creatorName }: { creatorName: string }) {
         placeholder="현재 비밀번호 (기존 가입자는 비워두세요)" 
         className="w-full border border-neutral-200 p-3 rounded-lg bg-neutral-50 focus:bg-white focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all font-medium text-sm" 
       />
-      <input 
-        type="password" 
+      <input
+        type="password"
         value={newPass}
         onChange={(e) => setNewPass(e.target.value)}
-        placeholder="새 비밀번호" 
+        placeholder="새 비밀번호"
         required
-        className="w-full border border-neutral-200 p-3 rounded-lg bg-neutral-50 focus:bg-white focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all font-medium text-sm" 
+        className="w-full border border-neutral-200 p-3 rounded-lg bg-neutral-50 focus:bg-white focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all font-medium text-sm"
       />
-      <input 
-        type="password" 
+      <p className="text-xs text-neutral-400 font-medium -mt-1 pl-1">{PASSWORD_POLICY_HINT}</p>
+      <input
+        type="password"
         value={confirmPass}
         onChange={(e) => setConfirmPass(e.target.value)}
         placeholder="새 비밀번호 확인" 

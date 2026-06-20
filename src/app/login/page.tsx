@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useSearchParams } from 'next/navigation'
 import { login, signup, verify2faLoginAction } from '@/app/actions/auth'
+import { validatePassword, PASSWORD_POLICY_HINT } from '@/lib/password-policy'
 
 export default function LoginPage() {
   const searchParams = useSearchParams()
@@ -47,6 +48,23 @@ export default function LoginPage() {
           window.location.href = res.redirectUrl
         }
       } else {
+        // 클라이언트 1차 검증(서버에서도 동일하게 재검증됨)
+        const nickname = ((formData.get('nickname') as string) || '').trim()
+        const pw = (formData.get('password') as string) || ''
+        const pwConfirm = (formData.get('password_confirm') as string) || ''
+        if (!nickname || nickname.length < 2 || nickname.length > 20) {
+          setErrorMessage('닉네임을 2자 이상 20자 이하로 입력해 주세요.')
+          return
+        }
+        const pc = validatePassword(pw)
+        if (!pc.ok) {
+          setErrorMessage(pc.error || '비밀번호 형식을 확인해 주세요.')
+          return
+        }
+        if (pw !== pwConfirm) {
+          setErrorMessage('비밀번호와 비밀번호 확인이 일치하지 않습니다.')
+          return
+        }
         const res = await signup(formData)
         if (res && res.error) {
           setErrorMessage(res.error)
@@ -172,6 +190,27 @@ export default function LoginPage() {
 
             {/* 📝 하이엔드 인풋 리스트 폼 */}
             <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+              {/* 닉네임 — 회원가입 모드 전용(필수) */}
+              {mode === 'signup' && (
+                <div>
+                  <label className="block text-[10px] uppercase font-bold text-neutral-400 dark:text-neutral-500 mb-1.5 tracking-wider" htmlFor="nickname">
+                    닉네임
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="nickname"
+                      name="nickname"
+                      type="text"
+                      placeholder="예: 블록마스터"
+                      required
+                      minLength={2}
+                      maxLength={20}
+                      className="w-full rounded-2xl px-4 py-3.5 bg-neutral-50/50 dark:bg-neutral-950/40 border border-neutral-200 dark:border-neutral-800/80 focus:border-neutral-900 dark:focus:border-white focus:ring-4 focus:ring-neutral-900/5 dark:focus:ring-white/5 outline-none text-sm text-neutral-950 dark:text-white placeholder-neutral-400 transition-all duration-300 shadow-sm"
+                    />
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block text-[10px] uppercase font-bold text-neutral-400 dark:text-neutral-500 mb-1.5 tracking-wider" htmlFor="email">
                   이메일 주소
@@ -202,7 +241,31 @@ export default function LoginPage() {
                     className="w-full rounded-2xl px-4 py-3.5 bg-neutral-50/50 dark:bg-neutral-950/40 border border-neutral-200 dark:border-neutral-800/80 focus:border-neutral-900 dark:focus:border-white focus:ring-4 focus:ring-neutral-900/5 dark:focus:ring-white/5 outline-none text-sm text-neutral-950 dark:text-white placeholder-neutral-400 transition-all duration-300 shadow-sm"
                   />
                 </div>
+                {mode === 'signup' && (
+                  <p className="mt-1.5 text-[11px] text-neutral-400 dark:text-neutral-500 font-medium pl-1">
+                    {PASSWORD_POLICY_HINT}
+                  </p>
+                )}
               </div>
+
+              {/* 비밀번호 확인 — 회원가입 모드 전용 */}
+              {mode === 'signup' && (
+                <div>
+                  <label className="block text-[10px] uppercase font-bold text-neutral-400 dark:text-neutral-500 mb-1.5 tracking-wider" htmlFor="password_confirm">
+                    비밀번호 확인
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="password_confirm"
+                      name="password_confirm"
+                      type="password"
+                      placeholder="••••••••"
+                      required
+                      className="w-full rounded-2xl px-4 py-3.5 bg-neutral-50/50 dark:bg-neutral-950/40 border border-neutral-200 dark:border-neutral-800/80 focus:border-neutral-900 dark:focus:border-white focus:ring-4 focus:ring-neutral-900/5 dark:focus:ring-white/5 outline-none text-sm text-neutral-950 dark:text-white placeholder-neutral-400 transition-all duration-300 shadow-sm"
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* 🔏 회원가입 모드 전용: 개인정보 동의 + 안내 */}
               {mode === 'signup' && (
@@ -250,6 +313,19 @@ export default function LoginPage() {
                 </div>
               )}
             </form>
+
+            {/* 🔎 로그인 모드 전용: 계정 찾기 도움 링크 */}
+            {mode === 'login' && (
+              <div className="mt-6 flex items-center justify-center gap-3 text-[11px] font-semibold text-neutral-400 dark:text-neutral-500 select-none">
+                <Link href="/find-account" className="hover:text-neutral-900 dark:hover:text-white transition-colors">
+                  아이디 찾기
+                </Link>
+                <span className="text-neutral-300 dark:text-neutral-700">·</span>
+                <Link href="/forgot-password" className="hover:text-neutral-900 dark:hover:text-white transition-colors">
+                  비밀번호 찾기
+                </Link>
+              </div>
+            )}
           </div>
         ) : (
           /* 🔐 2FA OTP 입력 인터페이스 */

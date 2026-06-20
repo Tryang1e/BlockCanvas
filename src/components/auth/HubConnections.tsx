@@ -64,7 +64,7 @@ export default function HubConnections(props: Props) {
         onDisconnect={disconnectDiscord}
       />
 
-      {/* 마인크래프트 — 서버 인증(인게임 코드)은 대시보드에서. 허브는 상태 표시만. */}
+      {/* 마인크래프트 — 연동은 대시보드(Microsoft 로그인/인게임 코드)에서. 허브는 상태 표시만. */}
       <ConnectionCard
         name="Minecraft"
         color="#3AAE4F"

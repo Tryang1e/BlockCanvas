@@ -32,3 +32,35 @@ export function cookieDomain(req: NextRequest): string | undefined {
   const isLocal = host.includes("localhost") || host.includes("127.0.0.1");
   return isLocal ? undefined : ".craftopia.work";
 }
+
+function publicHost(req: NextRequest): string {
+  return req.headers.get("x-forwarded-host") || req.headers.get("host") || req.nextUrl.host;
+}
+function publicProto(req: NextRequest): string {
+  return req.headers.get("x-forwarded-proto") || (req.nextUrl.protocol ? req.nextUrl.protocol.replace(":", "") : "http");
+}
+
+/** 베이스 도메인(끝 2 라벨). localhost 계열은 host(포트 포함) 그대로. */
+export function baseDomainOf(req: NextRequest): string {
+  const host = publicHost(req);
+  if (host.includes("localhost") || host.includes("127.0.0.1")) return host;
+  const parts = host.split(".");
+  return parts.length >= 2 ? parts.slice(-2).join(".") : host;
+}
+
+/**
+ * 중앙화된 마크 OAuth 처리 호스트(허브) 오리진.
+ *  - prod: https://auth.<base> (모든 크리에이터가 단일 redirect_uri 를 공유 → Azure 등록 1개)
+ *  - localhost: 현재 호스트 그대로(서브도메인 분리 없음 → 동일 호스트라 세션·state 그대로 읽힘)
+ */
+export function authHubOrigin(req: NextRequest): string {
+  const host = publicHost(req);
+  const proto = publicProto(req);
+  if (host.includes("localhost") || host.includes("127.0.0.1")) return `${proto}://${host}`;
+  return `${proto}://auth.${baseDomainOf(req)}`;
+}
+
+/** 크리에이터 서브도메인 절대 URL. ({creator}.<base><pathWithQuery>) */
+export function creatorUrl(req: NextRequest, creatorName: string, pathWithQuery = "/dashboard"): string {
+  return `${publicProto(req)}://${creatorName}.${baseDomainOf(req)}${pathWithQuery}`;
+}

@@ -126,7 +126,7 @@ export default async function AuthHubPage({
             </a>
             <p className="text-[11px] text-neutral-400 dark:text-neutral-600 text-center pt-2">
               Discord 로 로그인하면 계정이 자동으로 만들어집니다.<br />
-              마인크래프트는 로그인 후 대시보드에서 서버 인증(인게임 코드)으로 연동됩니다.
+              마인크래프트는 로그인 후 대시보드에서 Microsoft 로그인 또는 인게임 서버 인증(코드)으로 연동됩니다.
             </p>
             <p className="text-[10px] text-neutral-400 dark:text-neutral-600 text-center">
               계속하면{" "}

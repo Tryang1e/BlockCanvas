@@ -1,9 +1,25 @@
 import { prisma } from '@/lib/prisma'
+import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { Boxes, ArrowRight } from 'lucide-react'
 import MinecraftIntegration from '@/components/dashboard/MinecraftIntegration'
 import DiscordIntegration from '@/components/dashboard/DiscordIntegration'
+
+/**
+ * 마크 OAuth 중앙화: 모든 크리에이터가 단일 호스트(auth.<base>)에서 OAuth 를 처리하도록
+ * "Microsoft 로그인" 버튼 URL 을 절대 경로로 만든다(서브도메인별 redirect_uri 난립 방지 → Azure 등록 1개).
+ * localhost 계열은 현재 호스트 그대로(서브도메인 분리 없음 → 동일 호스트라 세션·state 가 그대로 읽힘).
+ */
+async function buildMsLoginUrl(): Promise<string> {
+  const h = await headers()
+  const host = h.get('x-forwarded-host') || h.get('host') || 'craftopia.work'
+  const isLocal = host.includes('localhost') || host.includes('127.0.0.1')
+  const proto = !isLocal || h.get('x-forwarded-proto') === 'https' ? 'https' : 'http'
+  const base = isLocal ? host : host.split('.').slice(-2).join('.')
+  const authHost = isLocal ? host : `auth.${base}`
+  return `${proto}://${authHost}/api/auth/minecraft/start`
+}
 
 export default async function ConnectionsPage({
   params,
@@ -16,6 +32,8 @@ export default async function ConnectionsPage({
   })
   if (!profile) notFound()
 
+  const msLoginUrl = await buildMsLoginUrl()
+
   return (
     <div className="animate-in fade-in zoom-in-95 duration-500">
       <div className="mb-8">
@@ -26,8 +44,8 @@ export default async function ConnectionsPage({
       </div>
 
       <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-neutral-200 overflow-hidden p-8 space-y-2">
-        {/* 마인크래프트(Microsoft) 계정 연동 */}
-        <MinecraftIntegration />
+        {/* 마인크래프트 계정 연동 (Microsoft 정품 로그인 또는 인게임 코드) */}
+        <MinecraftIntegration msLoginUrl={msLoginUrl} />
         {/* Discord 계정 연동 */}
         <DiscordIntegration />
       </div>

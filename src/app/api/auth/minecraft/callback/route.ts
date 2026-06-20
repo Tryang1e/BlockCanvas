@@ -5,7 +5,7 @@ import { verifySession } from "@/lib/session";
 import { exchangeCodeForIdentity } from "@/lib/minecraftOAuth";
 import { linkProviderToHub, syncBridgeFromProfile } from "@/lib/hub";
 import { signHubSession, verifyHubSession, HUB_COOKIE } from "@/lib/hubSession";
-import { oauthRedirectUri, publicUrl, cookieDomain } from "@/lib/publicUrl";
+import { oauthRedirectUri, publicUrl, cookieDomain, creatorUrl } from "@/lib/publicUrl";
 
 /**
  * GET /api/auth/minecraft/callback
@@ -68,10 +68,10 @@ export async function GET(req: NextRequest) {
   const creatorName = verifySession(cookieStore.get("session")?.value);
   if (!creatorName) return clear(NextResponse.redirect(publicUrl(req, "/")));
 
+  // 중앙화: OAuth 가 auth.<base> 에서 처리되므로, 결과는 크리에이터 본인 서브도메인 대시보드로 되돌린다.
   const accountUrl = (params: Record<string, string>) => {
-    const u = publicUrl(req, `/sites/${creatorName}/dashboard/account`);
-    for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
-    return u;
+    const qs = new URLSearchParams(params).toString();
+    return creatorUrl(req, creatorName, `/dashboard/connections${qs ? `?${qs}` : ""}`);
   };
 
   if (oauthError) return clear(NextResponse.redirect(accountUrl({ mc_error: oauthError })));

@@ -27,15 +27,19 @@ model Profile {
   two_factor_enabled  Boolean            @default(false)
   privacy_consented   Boolean            @default(false)
   privacy_consented_at DateTime?
+  privacy_consent_version String?            // 동의한 개인정보 처리방침 버전(예: v2). 현재 버전과 다르면 재동의 필요. null=레거시 동의.
 
   // --- Minecraft 연동 (MC_SER) ---
   minecraft_uuid      String?                @unique
   minecraft_username  String?
+  last_seen_at        DateTime?              // 마지막 MC 접속(역동기화 role-sync). 스키매틱 90일 미접속 정리에 사용.
   world_quota_state   String                 @default("ok") // 월드 클라우드 쿼터: ok | warned(90%+) | locked(초과→전 월드 비활성, 다운로드/삭제만)
   verification        MinecraftVerification?
   minecraft_plots     MinecraftPlot[]
   minecraft_worlds    MinecraftWorld[]
   pending_transfers   PendingTransfer[]
+  schematic_shares_owned    SchematicShare[]  @relation("SchematicShareOwner")    // 내가 남에게 공유한 폴더
+  schematic_shares_received SchematicShare[]  @relation("SchematicShareGrantee")  // 나에게 공유된 폴더
 
   // --- Discord 연동 ---
   discord_username     String?
@@ -212,6 +216,7 @@ model MinecraftPlot {
   trusted_players String?  // JSON 배열(영구 trust 권한 UUID들)
   center_x        Int?     // 플롯 중심 월드 X (Dynmap 임베드용)
   center_z        Int?     // 플롯 중심 월드 Z (Dynmap 임베드용)
+  auction_price   Float?   // 경매 매물 가격(코인). null = 경매중 아님 (인게임에서 역동기화)
   updated_at      DateTime @updatedAt
   owner           Profile  @relation(fields: [owner_id], references: [id], onDelete: Cascade)
 
@@ -239,6 +244,26 @@ model DiscordVerification {
   code        String   @unique // @unique 로 코드 충돌(엉뚱한 계정 연동) 차단
   created_at  DateTime @default(now())
   profile     Profile  @relation(fields: [profile_id], references: [id], onDelete: Cascade)
+}
+
+// 이메일/비밀번호 회원가입 대기열. 인증 메일의 토큰 링크를 클릭하면 Profile(role=user) 로 승격된다.
+// 인증 전에는 Profile 을 만들지 않아(핸들 선점·미인증 계정 방지) 토큰 소비 시점에 생성한다.
+model EmailVerification {
+  id            String   @id @default(uuid())
+  email         String   @unique // 동일 이메일 재가입 시 upsert 로 토큰 갱신
+  password_hash String
+  display_name  String?  // 가입 시 입력한 닉네임. 인증 완료 시 Profile.display_name + 핸들 기준으로 사용.
+  token         String   @unique
+  created_at    DateTime @default(now())
+}
+
+// 비밀번호 재설정(비밀번호 찾기) 1회용 토큰. 메일 링크의 토큰으로 새 비밀번호를 설정하면 소비된다.
+// 계정 존재 여부 노출 방지를 위해 요청 액션은 항상 동일한 성공 응답을 반환한다(여기 레코드 유무는 비공개).
+model PasswordReset {
+  id         String   @id @default(uuid())
+  email      String   @unique // 동일 이메일 재요청 시 upsert 로 토큰 갱신
+  token      String   @unique
+  created_at DateTime @default(now())
 }
 
 // auth.craftopia.work 독립 연동 허브의 신원(크리에이터 Profile 과 별개 — 누구나 Discord↔Minecraft 묶음).
@@ -277,10 +302,28 @@ model MinecraftWorld {
   backup_path     String?   // 최신 백업/아카이브 zip 절대경로(복구용 = backups[0]).
   backups         String?   // JSON 배열 [{path,ts,bytes}] 최신순, 최대 5개(초과 시 가장 오래된 것 삭제). 날짜별 다운로드용.
   archived_at     DateTime? // 아카이브된 시각
+  pending_transfer_to String?   // 양도 대기: 받는 사람 Profile.id (수락 시 owner_id 로 이전). null=대기 없음.
+  pending_transfer_at DateTime? // 양도 요청 시각
   created_at      DateTime  @default(now())
   updated_at      DateTime  @updatedAt
   owner           Profile   @relation(fields: [owner_id], references: [id], onDelete: Cascade)
 
   @@index([owner_id, status])       // 소유자별 월드 조회
   @@index([status, last_active_at]) // 수명주기 스윕(만료/삭제 대상 탐색)
+}
+
+// 스키매틱 폴더 공유 — owner 가 grantee 에게 자기 개인 스키매틱 폴더(= owner.minecraft_uuid)를 공유.
+// 권한 레벨(월드 멤버 권한과 동일한 "권한 형식" 철학): view(보기/다운로드) | edit(+업로드/삭제).
+// 인게임 //schem load 는 FAWE 전체공개라 세분화 불가 → 웹 공유만 권한 세분화(다운로드 후 본인 폴더 업로드로 인게임 사용).
+model SchematicShare {
+  id         String   @id @default(uuid())
+  owner_id   String   // 폴더 소유자 Profile.id (실제 폴더 = owner.minecraft_uuid)
+  grantee_id String   // 공유받는 사람 Profile.id (웹 로그인해 "공유받은 스키매틱"에서 접근)
+  perm       String   @default("view") // view(보기/다운로드) | edit(+업로드/삭제)
+  created_at DateTime @default(now())
+  owner      Profile  @relation("SchematicShareOwner", fields: [owner_id], references: [id], onDelete: Cascade)
+  grantee    Profile  @relation("SchematicShareGrantee", fields: [grantee_id], references: [id], onDelete: Cascade)
+
+  @@unique([owner_id, grantee_id]) // 한 사람당 한 폴더에 권한 하나
+  @@index([grantee_id])            // 나에게 공유된 폴더 목록 조회
 }

@@ -3,11 +3,12 @@ import crypto from "crypto";
 import { cookies } from "next/headers";
 import { verifySession } from "@/lib/session";
 import { buildAuthorizeUrl, isOAuthConfigured } from "@/lib/minecraftOAuth";
-import { oauthRedirectUri, publicUrl } from "@/lib/publicUrl";
+import { oauthRedirectUri, publicUrl, creatorUrl } from "@/lib/publicUrl";
 
 /**
  * GET /api/auth/minecraft/start
  *  - 기본(flow=link): 로그인된 크리에이터가 대시보드에서 마크 계정 연동.
+ *    중앙화: 대시보드 버튼이 단일 호스트(auth.<base>)로 보내므로 여기서 생성되는 redirect_uri 도 단일 호스트 1개.
  *  - flow=hub: 연동 허브의 Minecraft 로그인/연결(크리에이터 세션 불필요).
  * redirect_uri 는 요청의 공개 호스트에서 동적 생성(터널 대응).
  */
@@ -19,7 +20,7 @@ export async function GET(req: NextRequest) {
     const creatorName = verifySession(cookieStore.get("session")?.value);
     if (!creatorName) return NextResponse.redirect(publicUrl(req, "/"));
     if (!isOAuthConfigured()) {
-      return NextResponse.redirect(publicUrl(req, `/sites/${creatorName}/dashboard/account?mc_error=oauth_not_configured`));
+      return NextResponse.redirect(creatorUrl(req, creatorName, `/dashboard/connections?mc_error=oauth_not_configured`));
     }
   } else if (!isOAuthConfigured()) {
     return NextResponse.redirect(publicUrl(req, "/auth?error=oauth_not_configured"));
