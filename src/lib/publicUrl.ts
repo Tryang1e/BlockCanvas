@@ -5,7 +5,7 @@ import type { NextRequest } from "next/server";
  * req.url 은 내부 호스트(localhost)를 가리키므로 x-forwarded-* 를 우선한다.
  */
 export function getPublicOrigin(req: NextRequest): string {
-  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || req.nextUrl.host;
+  const host = publicHost(req);
   const proto =
     req.headers.get("x-forwarded-proto") ||
     (req.nextUrl.protocol ? req.nextUrl.protocol.replace(":", "") : "http");
@@ -28,13 +28,36 @@ export function oauthRedirectUri(req: NextRequest, callbackPath: string): string
  * 크리에이터 세션(actions/auth.ts getDynamicConfig)과 동일 규칙으로 허브 세션도 .craftopia.work 공유.
  */
 export function cookieDomain(req: NextRequest): string | undefined {
-  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || req.nextUrl.host;
+  const host = publicHost(req);
   const isLocal = host.includes("localhost") || host.includes("127.0.0.1");
   return isLocal ? undefined : ".craftopia.work";
 }
 
+// 공개 베이스 도메인(허용 호스트 판정 기준). 프록시/터널이 넘기는 x-forwarded-host 를 이 목록으로 검증한다.
+const CANONICAL_BASE = (process.env.PUBLIC_BASE_DOMAIN || "craftopia.work").toLowerCase();
+
+/** 허용 호스트: localhost 계열 · <base> · *.<base>. 그 외(위조 x-forwarded-host)는 거부. */
+function isAllowedHost(host: string | null | undefined): boolean {
+  if (!host) return false;
+  const h = host.toLowerCase();
+  const bare = h.split(":")[0];
+  if (bare === "localhost" || bare === "127.0.0.1" || bare.endsWith(".localhost")) return true;
+  return h === CANONICAL_BASE || h.endsWith("." + CANONICAL_BASE);
+}
+
+/**
+ * 공개 호스트 — x-forwarded-host(프록시) 우선, 단 허용 목록으로 검증한다.
+ * 위조된 x-forwarded-host(예: evil.example)는 무시하고 canonical 베이스로 폴백해
+ * 오픈리다이렉트/OAuth redirect_uri 하이재킹/쿠키 도메인 오염을 차단한다.
+ */
 function publicHost(req: NextRequest): string {
-  return req.headers.get("x-forwarded-host") || req.headers.get("host") || req.nextUrl.host;
+  const xfh = req.headers.get("x-forwarded-host");
+  if (isAllowedHost(xfh)) return xfh as string;
+  const host = req.headers.get("host");
+  if (isAllowedHost(host)) return host as string;
+  const nextHost = req.nextUrl.host;
+  if (isAllowedHost(nextHost)) return nextHost;
+  return CANONICAL_BASE; // 어느 것도 허용 목록에 없으면 안전한 canonical 로 폴백
 }
 function publicProto(req: NextRequest): string {
   return req.headers.get("x-forwarded-proto") || (req.nextUrl.protocol ? req.nextUrl.protocol.replace(":", "") : "http");
@@ -63,4 +86,12 @@ export function authHubOrigin(req: NextRequest): string {
 /** 크리에이터 서브도메인 절대 URL. ({creator}.<base><pathWithQuery>) */
 export function creatorUrl(req: NextRequest, creatorName: string, pathWithQuery = "/dashboard"): string {
   return `${publicProto(req)}://${creatorName}.${baseDomainOf(req)}${pathWithQuery}`;
+}
+
+/**
+ * 메인(루트) 도메인 절대 URL. (<base><pathWithQuery>)
+ * auth.* 등 서브도메인에서 처리된 흐름을 메인 도메인의 로그인/가입 페이지로 보낼 때 사용.
+ */
+export function mainSiteUrl(req: NextRequest, pathWithQuery = "/"): string {
+  return `${publicProto(req)}://${baseDomainOf(req)}${pathWithQuery}`;
 }

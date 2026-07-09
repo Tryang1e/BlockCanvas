@@ -25,37 +25,45 @@ export default function ScrollFillText({
   useEffect(() => {
     if (!container.current || !fg1.current || !fg2.current || !fg3.current) return
 
-    const tl = gsap.timeline({
-      scrollTrigger: {
-        trigger: container.current,
-        start: 'center center', // Pin when the text reaches the center of the screen
-        end: '+=150%', // Keep it pinned for 1.5x the viewport height
-        scrub: 1.5, // Smooth scrubbing
-        pin: true, // Fix the position while the animation plays
-        anticipatePin: 1
-      }
-    })
-
-    // Staggered fill effect from left to right using clip-path
-    tl.fromTo(fg1.current, { clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0% 0 0)', ease: 'none', duration: 1 })
-      .fromTo(fg2.current, { clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0% 0 0)', ease: 'none', duration: 1 }, '-=0.5')
-      .fromTo(fg3.current, { clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0% 0 0)', ease: 'none', duration: 1 }, '-=0.5')
-
-    // Cinematic Exit: After filling, the entire text scales up and fades out, revealing the next section
-    tl.to('.scroll-fill-text-line', {
-      scale: 1.5,
-      opacity: 0,
-      filter: 'blur(10px)',
-      duration: 1.5,
-      ease: 'power2.in',
-      stagger: 0.1
-    }, '+=0.5')
-
-    return () => {
-      ScrollTrigger.getAll().forEach(t => {
-        if(t.trigger === container.current) t.kill()
-      })
+    // 모션 최소화 사용자: 핀/스크럽/블러 퇴장 없이 채워진 정지 상태만 보여준다
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      const fills = [fg1.current, fg2.current, fg3.current] // 언마운트 시점엔 ref가 null일 수 있어 미리 캡처
+      gsap.set(fills, { clipPath: 'inset(0 0% 0 0)' })
+      return () => { gsap.set(fills, { clearProps: 'clipPath' }) }
     }
+
+    // gsap.context(scope) — '.scroll-fill-text-line' 셀렉터를 이 컴포넌트 루트로 한정.
+    // 전역 querySelector였다면 한 페이지에 인스턴스 2개가 뜰 때 서로의 라인까지 트윈해 간섭한다.
+    const ctx = gsap.context(() => {
+      const tl = gsap.timeline({
+        scrollTrigger: {
+          trigger: container.current,
+          start: 'center center', // Pin when the text reaches the center of the screen
+          end: '+=150%', // Keep it pinned for 1.5x the viewport height
+          scrub: 1.5, // Smooth scrubbing
+          pin: true, // Fix the position while the animation plays
+          anticipatePin: 1
+        }
+      })
+
+      // Staggered fill effect from left to right using clip-path
+      tl.fromTo(fg1.current, { clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0% 0 0)', ease: 'none', duration: 1 })
+        .fromTo(fg2.current, { clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0% 0 0)', ease: 'none', duration: 1 }, '-=0.5')
+        .fromTo(fg3.current, { clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0% 0 0)', ease: 'none', duration: 1 }, '-=0.5')
+
+      // Cinematic Exit: After filling, the entire text scales up and fades out, revealing the next section
+      tl.to('.scroll-fill-text-line', {
+        scale: 1.5,
+        opacity: 0,
+        filter: 'blur(10px)',
+        duration: 1.5,
+        ease: 'power2.in',
+        stagger: 0.1
+      }, '+=0.5')
+    }, container)
+
+    // revert = 컨텍스트 안에서 만든 ScrollTrigger(핀 스페이서 포함)·트윈·인라인 스타일 전부 회수
+    return () => ctx.revert()
   }, [])
 
   return (

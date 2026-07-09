@@ -1,11 +1,17 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import gsap from 'gsap'
+import { ScrambleTextPlugin } from 'gsap/ScrambleTextPlugin'
 import { PreviewLinkCard } from '@/components/ui/preview-link-card'
 import { submitContactMessage } from '@/app/actions/contact'
 import AvatarGroup, { AvatarGroupItem } from '@/components/ui/AvatarGroup'
+
+if (typeof window !== 'undefined') {
+  gsap.registerPlugin(ScrambleTextPlugin)
+}
 
 interface CreatorFooterProps {
   profileData: any;
@@ -41,6 +47,48 @@ export default function CreatorFooter({ profileData, creatorName, recommendedCre
       setPlatformMainUrl(`${protocol}//${baseDomain}`)
     }
   }, [])
+
+  // Discord 'Copy ID' — alert 대신 클립보드 복사 + 라벨 ScrambleText 피드백.
+  const discordCopyLabelRef = useRef<HTMLSpanElement>(null)
+  const discordCopyBusyRef = useRef(false) // 애니메이션 중 더블클릭 무시
+
+  const handleDiscordCopy = () => {
+    const handle = profileData.sns_settings?.discordHandle
+    if (!handle || discordCopyBusyRef.current) return
+
+    try {
+      navigator.clipboard?.writeText(handle)?.catch(() => { /* 권한 거부 등 — 조용히 무시 */ })
+    } catch {
+      /* 클립보드 미지원 환경 — 조용히 무시 */
+    }
+
+    const label = discordCopyLabelRef.current
+    if (!label) return
+    discordCopyBusyRef.current = true
+    const original = label.textContent || 'Copy ID'
+
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    if (reducedMotion) {
+      // 모션 최소화: 스크램블 없이 같은 타이밍의 단순 텍스트 스왑
+      label.textContent = 'COPIED ✓'
+      window.setTimeout(() => {
+        label.textContent = original
+        discordCopyBusyRef.current = false
+      }, 1600)
+      return
+    }
+
+    gsap.to(label, {
+      duration: 0.5,
+      scrambleText: { text: 'COPIED ✓', chars: 'upperCase' },
+    })
+    gsap.to(label, {
+      duration: 0.5,
+      delay: 1.6,
+      scrambleText: { text: original, chars: 'upperCase' },
+      onComplete: () => { discordCopyBusyRef.current = false },
+    })
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -177,14 +225,11 @@ export default function CreatorFooter({ profileData, creatorName, recommendedCre
                   </PreviewLinkCard>
                 </li>
               )}
-              {profileData.sns_settings?.discord && profileData.discord_id && (
+              {profileData.sns_settings?.discord && profileData.sns_settings?.discordHandle && (
                 <li>
-                  <div className="flex items-center justify-between w-full p-3 rounded-lg hover:bg-[#222222] group transition-all text-[#CCCCCC] hover:text-white cursor-pointer" onClick={() => {
-                    navigator.clipboard.writeText(profileData.discord_id)
-                    alert('Discord ID Copied!')
-                  }}>
+                  <div className="flex items-center justify-between w-full p-3 rounded-lg hover:bg-[#222222] group transition-all text-[#CCCCCC] hover:text-white cursor-pointer" onClick={handleDiscordCopy}>
                     <span className="font-semibold text-[15px]">Discord</span>
-                    <span className="text-[#666666] group-hover:text-white transition-colors text-xs font-bold uppercase">Copy ID</span>
+                    <span ref={discordCopyLabelRef} className="text-[#666666] group-hover:text-white transition-colors text-xs font-bold uppercase">Copy ID</span>
                   </div>
                 </li>
               )}
@@ -201,7 +246,8 @@ export default function CreatorFooter({ profileData, creatorName, recommendedCre
               <div className="relative w-7 h-7 opacity-90">
                 <Image src="/logo_icon_white.png" alt="BlockCanvas Logo" fill className="object-contain" />
               </div>
-              <span className="font-black text-xl tracking-tighter text-white">BLOCKCANVAS<span className="text-[#FF424D]">.</span></span>
+              <Image src="/logo_text_white.png" alt="BLOCK CANVAS" width={166} height={20} className="h-5 w-auto object-contain" />
+              <span className="font-black text-xl text-[#FF424D] leading-none">.</span>
             </div>
             <div className="flex items-center gap-4 text-xs font-semibold text-[#888888]">
               <p className="text-[#666666] font-medium">© 2026 BlockCanvas. All rights reserved.</p>
@@ -215,7 +261,14 @@ export default function CreatorFooter({ profileData, creatorName, recommendedCre
                 개인정보처리방침
               </a>
               <span>|</span>
-              <span className="text-[#444444] cursor-not-allowed select-none">이용약관</span>
+              <a
+                href={`${platformMainUrl}/terms`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-white hover:underline font-black tracking-tight"
+              >
+                이용약관
+              </a>
             </div>
             <p className="text-[#444444] text-[10px] mt-1 font-medium max-w-md leading-relaxed">
               Open Source Licenses: Next.js (MIT), React (MIT), Tailwind CSS (MIT), Framer Motion (MIT), GSAP (Standard), Prisma (Apache-2.0), Radix UI (MIT), Lucide (ISC), Lenis (MIT), Animate UI (MIT).

@@ -96,6 +96,28 @@ export async function deleteUserPhysicalFiles(profileId: string) {
   }
 }
 
+/**
+ * 주어진 /uploads/ URL 목록의 물리 파일을 안전하게 삭제한다(경로 격리 + 기본 이미지 보호).
+ * 발행 시 본문에서 제거된 잉여 업로드를 정리하는 데 사용한다. 절대 throw 하지 않는다.
+ */
+export async function deleteUploadUrls(urls: string[]) {
+  const uploadsRoot = path.join(process.cwd(), 'public', 'uploads')
+  for (const url of urls) {
+    if (typeof url !== 'string' || !url.startsWith('/uploads/')) continue
+    if (url.includes('default_avatar.png') || url.includes('default_banner.png')) continue
+    const relativePath = url.replace(/^\//, '')
+    const absolutePath = path.resolve(process.cwd(), 'public', relativePath)
+    // 경로 탐색 방지: 반드시 uploads 디렉터리 하위만 삭제
+    if (absolutePath !== uploadsRoot && !absolutePath.startsWith(uploadsRoot + path.sep)) continue
+    try {
+      await fs.access(absolutePath)
+      await fs.unlink(absolutePath)
+    } catch {
+      // 파일이 없거나 접근 불가 → 무시
+    }
+  }
+}
+
 function scanForUploadUrls(text: string, set: Set<string>) {
   // Regex to match any instances of /uploads/projects/<filename> or similar
   const regex = /\/uploads\/[a-zA-Z0-9.\-_/]+/g

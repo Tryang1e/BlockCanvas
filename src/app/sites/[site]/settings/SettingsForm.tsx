@@ -360,8 +360,13 @@ export default function SettingsForm({ profile, allCreators = [] }: { profile: a
           {/* Discord */}
           <div className="flex items-center gap-4 p-4 border border-neutral-200 rounded-lg bg-white shadow-sm">
             <div className="flex-1">
-              <label className="block text-xs font-bold mb-1 text-neutral-700">Discord ID</label>
-              <input name="discord_id" defaultValue={profile.discord_id} placeholder="User#1234" className="w-full bg-transparent focus:outline-none font-medium text-sm" />
+              <label className="block text-xs font-bold mb-1 text-neutral-700">Discord 연락처 (표시용)</label>
+              <input
+                value={snsSettings.discordHandle || ''}
+                onChange={(e) => setSnsSettings(prev => ({ ...prev, discordHandle: e.target.value }))}
+                placeholder="유저명 (예: rain7857)"
+                className="w-full bg-transparent focus:outline-none font-medium text-sm"
+              />
             </div>
             <div className="flex flex-col items-center gap-1 border-l pl-4 border-neutral-200">
               <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">노출</span>

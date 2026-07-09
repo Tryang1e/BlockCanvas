@@ -30,6 +30,8 @@ export async function publishProjectAction(formData: FormData) {
   const sectionId = formData.get('section_id') as string | null
   const projectId = formData.get('project_id') as string | null
   const categoryId = formData.get('category_id') as string | null
+  // 공개/비공개 발행 여부(기본 공개, 명시적 'false'만 비공개)
+  const isPublishedValue = (formData.get('is_published') as string | null) !== 'false'
   const customDateStr = formData.get('created_at') as string | null
   const createdAtDate = (customDateStr && customDateStr.trim() !== '') ? new Date(customDateStr) : undefined
   
@@ -39,7 +41,7 @@ export async function publishProjectAction(formData: FormData) {
   
   const widgets = JSON.parse(widgetsStr || '[]')
 
-  // 2. Transact Project 
+  // 2. Transact Project
   let targetProjectId = ''
 
   if (projectId) {
@@ -62,6 +64,7 @@ export async function publishProjectAction(formData: FormData) {
         youtube_url: youtubeUrl || null,
         section_id: sectionId || null,
         category_id: categoryId || null,
+        is_published: isPublishedValue,
         created_at: createdAtDate || undefined
       }
     })
@@ -89,7 +92,7 @@ export async function publishProjectAction(formData: FormData) {
         title: title || '제목 없는 작품',
         description: description || '',
         category_id: categoryId || null,
-        is_published: true,
+        is_published: isPublishedValue,
         thumbnail_url: thumbnailUrl,
         youtube_url: youtubeUrl || null,
         section_id: sectionId || null,
@@ -121,6 +124,27 @@ export async function publishProjectAction(formData: FormData) {
     await prisma.projectWidget.createMany({
       data: widgetInserts
     })
+  }
+
+  // 3.5 발행 시, 이번 세션에 올렸지만 최종 본문에 포함되지 않은(중간에 올렸다 지운) 잉여 이미지 정리.
+  // 클라이언트가 보낸 세션 업로드 목록 중 최종 본문(widgets/썸네일/설명)에 없는 것만 삭제한다.
+  const sessionUploadsRaw = formData.get('session_uploads') as string | null
+  if (sessionUploadsRaw) {
+    try {
+      const sessionUploads = JSON.parse(sessionUploadsRaw)
+      if (Array.isArray(sessionUploads) && sessionUploads.length > 0) {
+        const keptText = `${widgetsStr || ''} ${thumbnailUrl || ''} ${description || ''}`
+        const surplus = sessionUploads.filter(
+          (u: any) => typeof u === 'string' && u.startsWith('/uploads/') && !keptText.includes(u)
+        )
+        if (surplus.length > 0) {
+          const { deleteUploadUrls } = await import('@/lib/file-delete')
+          await deleteUploadUrls(surplus)
+        }
+      }
+    } catch (e) {
+      console.warn('[publish] 잉여 업로드 정리 실패:', e)
+    }
   }
 
   // 4. Return to Creator's Portfolio Subdomain instead of main landing

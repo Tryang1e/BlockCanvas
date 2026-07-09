@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import * as cheerio from 'cheerio';
 import dns from 'dns/promises';
 import net from 'net';
+import { Agent } from 'undici';
+import { verifySession } from '@/lib/session';
+import { rateLimit } from '@/lib/rate-limit';
 
 // SSRF 방어 설정: 리다이렉트/타임아웃/응답크기 제한
 const MAX_REDIRECTS = 4;
@@ -47,10 +51,11 @@ function ipIsPrivate(ipRaw: string): boolean {
 }
 
 /**
- * 주어진 URL이 공개 인터넷의 http(s) 자원인지 검증한다.
+ * 주어진 URL이 공개 인터넷의 http(s) 자원인지 검증하고, **검증에 통과한 공개 IP를 반환**한다.
  * 스킴 위반, 내부 호스트명, 사설 IP로 해석되는 경우 throw.
+ * 반환한 IP를 이후 fetch 연결에 고정(pin)해 DNS 리바인딩(검증과 fetch가 서로 다른 IP로 해석되는 TOCTOU)을 막는다.
  */
-async function assertPublicUrl(raw: string): Promise<void> {
+async function assertPublicUrl(raw: string): Promise<{ address: string; family: number }> {
   let u: URL;
   try {
     u = new URL(raw);
@@ -78,11 +83,11 @@ async function assertPublicUrl(raw: string): Promise<void> {
   // 호스트가 IP 리터럴이면 직접 검사
   if (net.isIP(host)) {
     if (ipIsPrivate(host)) throw new Error('Blocked private IP');
-    return;
+    return { address: host, family: net.isIPv6(host) ? 6 : 4 };
   }
 
   // 도메인은 DNS 해석 후 모든 주소가 공개 대역인지 확인 (DNS 리바인딩 1차 방어)
-  let addrs: { address: string }[];
+  let addrs: { address: string; family: number }[];
   try {
     addrs = await dns.lookup(host, { all: true });
   } catch {
@@ -92,39 +97,103 @@ async function assertPublicUrl(raw: string): Promise<void> {
   for (const a of addrs) {
     if (ipIsPrivate(a.address)) throw new Error('Blocked private IP');
   }
+  // 검증된 첫 주소로 연결을 고정한다(모든 주소가 공개임을 확인했으므로 어느 것을 골라도 안전).
+  return { address: addrs[0].address, family: addrs[0].family };
 }
 
 /**
- * 리다이렉트를 직접 따라가며 매 홉마다 공개 URL 검증을 수행한다.
- * (공개 URL -> 내부 주소로의 리다이렉트 우회 차단)
+ * 응답 본문을 상한(maxBytes)까지만 스트리밍으로 읽는다.
+ * Content-Length 헤더에 의존하지 않으므로 chunked(transfer-encoding) 응답의 무제한 버퍼링(메모리 DoS)을 막는다.
  */
-async function safeFetch(initialUrl: string): Promise<Response> {
+async function readCapped(res: Response, maxBytes: number): Promise<string> {
+  const reader = res.body?.getReader();
+  if (!reader) return '';
+  const chunks: Buffer[] = [];
+  let total = 0;
+  try {
+    while (total < maxBytes) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value && value.byteLength) {
+        chunks.push(Buffer.from(value)); // Uint8Array → 복사(스트림 버퍼 재사용으로부터 안전)
+        total += value.byteLength;
+      }
+    }
+  } finally {
+    reader.cancel().catch(() => {});
+  }
+  return Buffer.concat(chunks).subarray(0, maxBytes).toString('utf8');
+}
+
+/**
+ * 리다이렉트를 직접 따라가며 매 홉마다 공개 URL 검증을 수행하고, 최종 응답 HTML(상한까지)을 반환한다.
+ * - 매 홉의 fetch 를 **검증된 IP로 고정(undici Agent connect.lookup)** 해 리바인딩을 차단한다
+ *   (URL 을 IP 로 바꿔치기하지 않으므로 https SNI/인증서 검증은 원래 호스트명으로 정상 수행).
+ * - 본문은 스트리밍 상한(readCapped)으로 읽어 chunked 무제한 버퍼링을 막는다.
+ */
+async function safeFetchHtml(initialUrl: string): Promise<{ status: number; html: string }> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  const pin = { address: '', family: 4 };
+  const agent = new Agent({
+    connect: {
+      // 검증된 공개 IP로 DNS 를 고정 — fetch 의 connect 시점 재해석(리바인딩)을 우회한다.
+      // undici 는 lookup 을 { all: true } 로 호출하므로 배열 형태로 콜백한다(단일 형태도 함께 방어).
+      lookup: (
+        _hostname: string,
+        opts: { all?: boolean } | undefined,
+        cb: (err: Error | null, address: string | { address: string; family: number }[], family?: number) => void,
+      ) => {
+        if (opts && opts.all) cb(null, [{ address: pin.address, family: pin.family }]);
+        else cb(null, pin.address, pin.family);
+      },
+    },
+  });
   try {
     let currentUrl = initialUrl;
     for (let i = 0; i <= MAX_REDIRECTS; i++) {
-      await assertPublicUrl(currentUrl);
+      const validated = await assertPublicUrl(currentUrl);
+      pin.address = validated.address;
+      pin.family = validated.family;
       const res = await fetch(currentUrl, {
         headers: { 'User-Agent': USER_AGENT },
         redirect: 'manual',
         signal: controller.signal,
-      });
+        cache: 'no-store',
+        dispatcher: agent,
+      } as RequestInit & { dispatcher: Agent });
       if (res.status >= 300 && res.status < 400) {
         const loc = res.headers.get('location');
-        if (!loc) return res;
+        await res.body?.cancel().catch(() => {});
+        if (!loc) return { status: res.status, html: '' };
         currentUrl = new URL(loc, currentUrl).toString();
         continue;
       }
-      return res;
+      if (res.status < 200 || res.status >= 300) {
+        await res.body?.cancel().catch(() => {});
+        return { status: res.status, html: '' };
+      }
+      const html = await readCapped(res, MAX_BODY_BYTES);
+      return { status: res.status, html };
     }
     throw new Error('Too many redirects');
   } finally {
     clearTimeout(timeout);
+    agent.destroy().catch(() => {});
   }
 }
 
 export async function GET(request: Request) {
+  // 인증 필수 — 예전엔 무인증 오픈 프록시라 누구나 서버를 임의 HTTP 클라이언트로 악용(SSRF 도달성↑)했다.
+  // 링크 프리뷰는 로그인 사용자(콘텐츠 편집)만 필요하므로 세션을 요구하고 사용자별 레이트리밋을 건다.
+  const session = verifySession((await cookies()).get('session')?.value);
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  if (!rateLimit(`metadata:${session}`, 30, 60_000)) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+  }
+
   const { searchParams } = new URL(request.url);
   const url = searchParams.get('url');
 
@@ -167,20 +236,13 @@ export async function GET(request: Request) {
       // Ignore URL parsing errors
     }
 
-    // SSRF 방어: 스킴/사설IP 검증 + 리다이렉트 재검증 + 타임아웃
-    const response = await safeFetch(fetchUrl);
+    // SSRF 방어: 스킴/사설IP 검증 + IP 고정(리바인딩 차단) + 리다이렉트 재검증 + 타임아웃 + 본문 상한
+    const { status, html } = await safeFetchHtml(fetchUrl);
 
-    if (!response.ok) {
+    if (status < 200 || status >= 300) {
       throw new Error('Failed to fetch the URL');
     }
 
-    // 응답 크기 제한 (선언된 content-length가 과도하면 거부)
-    const lenHeader = response.headers.get('content-length');
-    if (lenHeader && Number(lenHeader) > MAX_BODY_BYTES) {
-      throw new Error('Response too large');
-    }
-
-    const html = (await response.text()).slice(0, MAX_BODY_BYTES);
     const $ = cheerio.load(html);
 
     const title =

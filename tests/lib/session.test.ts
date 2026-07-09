@@ -1,15 +1,15 @@
-import { test, describe, before } from 'node:test'
+import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 
 // session.ts 의 getSessionSecret 은 호출 시점에 env 를 읽으므로, import 전에 설정해 둔다.
 process.env.SESSION_SECRET = 'test-secret-must-be-at-least-32-characters-long'
 
-import { signSession, verifySession, SESSION_TTL_MS } from '../../src/lib/session.ts'
+import { signSession, verifySession, verifySessionFull, SESSION_TTL_MS } from '../../src/lib/session.ts'
 
 describe('signSession / verifySession', () => {
-  test('서명한 토큰은 name.expiry.signature 3파트 구조', () => {
+  test('서명한 토큰은 name.version.expiry.signature 4파트 구조', () => {
     const token = signSession('Alice')
-    assert.equal(token.split('.').length, 3)
+    assert.equal(token.split('.').length, 4)
   })
 
   test('정상 토큰은 소문자화된 creatorName 을 돌려준다', () => {
@@ -30,21 +30,21 @@ describe('signSession / verifySession', () => {
   })
 
   test('만료시각 변조(연장) 토큰은 서명 불일치로 거부', () => {
-    const token = signSession('bob')
-    const [name, , sig] = token.split('.')
+    const token = signSession('bob') // bob.0.expiry.sig
+    const parts = token.split('.')
     const farFuture = Date.now() + 10 * SESSION_TTL_MS
-    const forged = `${name}.${farFuture}.${sig}`
+    const forged = `${parts[0]}.${parts[1]}.${farFuture}.${parts[3]}`
     assert.equal(verifySession(forged), null)
   })
 
   test('만료된 토큰은 거부 (음수 TTL)', () => {
-    const expired = signSession('bob', -1000)
+    const expired = signSession('bob', 0, -1000) // version=0, ttl=-1000
     assert.equal(verifySession(expired), null)
   })
 
-  test('구버전 2파트 토큰(name.signature)은 무효 -> 재로그인 유도', () => {
-    // 만료 없는 옛 형식 모사
-    assert.equal(verifySession('alice.somesignature'), null)
+  test('구버전 2/3파트 토큰(버전 없음)은 무효 -> 재로그인 유도', () => {
+    assert.equal(verifySession('alice.somesignature'), null)        // 옛 2파트
+    assert.equal(verifySession('alice.123456789.somesignature'), null) // 옛 3파트(name.expiry.sig)
   })
 
   test('creator_name 에 "."이 있어도 안전하게 라운드트립', () => {
@@ -53,17 +53,24 @@ describe('signSession / verifySession', () => {
   })
 
   test('2FA 임시 토큰 접미사(:temp_2fa) 라운드트립', () => {
-    const token = signSession('alice:temp_2fa', 5 * 60 * 1000)
+    const token = signSession('alice:temp_2fa', 0, 5 * 60 * 1000)
     const decoded = verifySession(token)
     assert.equal(decoded, 'alice:temp_2fa')
     assert.ok(decoded?.endsWith(':temp_2fa'))
   })
 
   test('커스텀 TTL 이 만료 계산에 반영된다', () => {
-    const shortLived = signSession('alice', 1000) // 1s
-    const expiryStr = shortLived.split('.')[1]
-    const expiry = Number(expiryStr)
+    const shortLived = signSession('alice', 0, 1000) // version=0, ttl=1s
+    const expiry = Number(shortLived.split('.')[2]) // name.version.expiry.sig → index 2
     const delta = expiry - Date.now()
     assert.ok(delta > 0 && delta <= 1000, `expiry delta ${delta} 가 (0, 1000] 범위여야 함`)
+  })
+
+  test('token_version 이 라운드트립되고 verifySessionFull 로 노출된다', () => {
+    const token = signSession('alice', 7)
+    const full = verifySessionFull(token)
+    assert.deepEqual(full, { name: 'alice', version: 7 })
+    // 잘못된 토큰은 null
+    assert.equal(verifySessionFull('garbage'), null)
   })
 })

@@ -5,6 +5,7 @@ import Image from 'next/image'
 import PublishSettingsModal from '@/components/editor/PublishSettingsModal'
 import ProjectDetailsViewer from '@/components/creator/ProjectDetailsViewer'
 import { logger } from '@/lib/logger'
+import { trackSessionUpload } from '@/lib/upload-tracker'
 import { useState, useEffect } from 'react'
 import {
   DndContext,
@@ -250,7 +251,7 @@ function ImageGridWidget({ urls, onChange }: { urls: string[], onChange: (urls: 
           throw new Error(errorData.error || '이미지 업로드에 실패했습니다.')
         }
         const data = await response.json()
-        if (data.url) newUrls.push(data.url)
+        if (data.url) { newUrls.push(data.url); trackSessionUpload(data.url) }
       } catch (err: any) {
         console.error(err)
         alert(err?.message || '이미지 업로드에 실패했습니다.')
@@ -387,6 +388,7 @@ function MediaWidget({ url, onChange }: { url: string, onChange: (url: string) =
       }
       const data = await response.json()
       if (data.url) {
+        trackSessionUpload(data.url)
         onChange(data.url)
         setIsEditing(false)
       }
@@ -789,7 +791,7 @@ const GUIDE_ACCORDIONS: GuideAccordionItem[] = [
     id: 5,
     title: "6. 텍스트 애니메이션",
     subtitle: "글자를 드래그하여 버블 메뉴에서 화려한 효과를 입힙니다.",
-    description: "블록 내부의 원하는 글자 범위를 드래그하면 띄워지는 버블 메뉴에서 ✨ 효과를 선택해 타이핑, 펄서 등 효과를 부여합니다.",
+    description: "글자 범위를 드래그하면 뜨는 버블 메뉴의 ✨효과에서 타이핑·스크램블·웨이브·네온·그라데이션·롤링 등 12종의 텍스트 애니메이션을 골라 입힐 수 있습니다.",
     icon: "✨",
     badge: "Text Effects",
     renderVisual: () => (
@@ -820,8 +822,8 @@ const GUIDE_ACCORDIONS: GuideAccordionItem[] = [
   {
     id: 6,
     title: "7. 버튼 스타일 링크",
-    subtitle: "텍스트 범위 선택 후 버튼 스타일의 링크를 생성합니다.",
-    description: "버블 메뉴의 🔗 (링크) 버튼 클릭 시, 아웃링크를 일반 텍스트 대신 화려하고 세련된 박스형 버튼 형태로 꾸밀 수 있습니다.",
+    subtitle: "박스형 버튼 링크를 추가하고 스타일을 입힙니다.",
+    description: "빈 줄에서 뜨는 + 메뉴의 '버튼' 또는 글자 선택 시 버블 메뉴의 버튼 아이콘으로 박스형 버튼 링크를 만듭니다. 기본·플립·리플·리퀴드·글로우·샤인 6가지 스타일과 색상·크기를 지정할 수 있습니다.",
     icon: "⬚",
     badge: "Button Links",
     renderVisual: () => (
@@ -893,6 +895,80 @@ const GUIDE_ACCORDIONS: GuideAccordionItem[] = [
         </div>
         <div className="absolute click-faq-anim z-20">
           <CursorSvg />
+        </div>
+      </div>
+    )
+  },
+  {
+    id: 9,
+    title: "10. 흐르는 텍스트 (마퀴)",
+    subtitle: "여러 문구가 가로로 끊김 없이 흐르는 띠를 추가합니다.",
+    description: "빈 줄에서 뜨는 + 메뉴의 '마퀴'를 눌러 공지·키워드 등 여러 문구가 좌우로 무한히 흐르는 텍스트 띠를 넣습니다. 흐름 속도·방향·글꼴·색상과 표시 스타일(점 구분/알약)을 설정할 수 있습니다.",
+    icon: "🔁",
+    badge: "Marquee",
+    renderVisual: () => (
+      <div className="w-full h-full p-4 relative flex items-center justify-center select-none overflow-hidden">
+        <style>{`
+          @keyframes guide-marquee-roll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+          .guide-marquee-track { display: flex; width: max-content; animation: guide-marquee-roll 7s linear infinite; }
+        `}</style>
+        <div className="w-64 bg-neutral-900 border border-neutral-800 rounded-lg p-3 pt-4 relative shadow-md">
+          <div className="absolute top-[-8px] left-[10px] bg-[#18181b] border border-neutral-800 rounded px-1.5 py-0.5 text-[6px] font-bold text-neutral-400 shadow-sm flex items-center gap-1">
+            <span>⣿</span> MARQUEE BLOCK
+          </div>
+          <div
+            className="relative overflow-hidden mt-1"
+            style={{
+              WebkitMaskImage: 'linear-gradient(to right, transparent, #000 14%, #000 86%, transparent)',
+              maskImage: 'linear-gradient(to right, transparent, #000 14%, #000 86%, transparent)',
+            }}
+          >
+            <div className="guide-marquee-track gap-4 py-1.5 text-[10px] font-bold text-indigo-300 whitespace-nowrap">
+              {['공지사항', 'NEW WORK', '환영합니다', 'PORTFOLIO', '업데이트', '공지사항', 'NEW WORK', '환영합니다', 'PORTFOLIO', '업데이트'].map((t, i) => (
+                <span key={i} className="inline-flex items-center"><span className="opacity-30 mr-4">•</span>{t}</span>
+              ))}
+            </div>
+          </div>
+          <div className="text-[8px] text-neutral-500 font-bold text-center mt-2 uppercase tracking-wider">Infinite Scrolling Text</div>
+        </div>
+      </div>
+    )
+  },
+  {
+    id: 10,
+    title: "11. 발행 & 공개 설정",
+    subtitle: "작성을 마치면 섹션·커버·공개 여부를 정해 발행합니다.",
+    description: "우측 상단 '발행하기'를 누르면 작품을 어느 섹션에 둘지, 대표 커버 이미지, 작성일, 공개/비공개를 정할 수 있습니다. '임시 저장'으로 초안을 보관했다가 나중에 이어서 작성할 수도 있습니다.",
+    icon: "🚀",
+    badge: "Publish",
+    renderVisual: () => (
+      <div className="w-full h-full p-4 relative flex items-center justify-center select-none overflow-hidden">
+        <style>{`
+          @keyframes guide-pub-knob { 0%,40% { transform: translateX(0); } 58%,90% { transform: translateX(14px); } 100% { transform: translateX(0); } }
+          @keyframes guide-pub-track { 0%,40% { background:#3f3f46; } 58%,90% { background:#4338ca; } 100% { background:#3f3f46; } }
+          @keyframes guide-pub-btn { 0%,55% { transform: scale(1); box-shadow: 0 0 0 0 rgba(79,70,229,0); } 70% { transform: scale(1.05); box-shadow: 0 0 0 6px rgba(79,70,229,0.18); } 85%,100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(79,70,229,0); } }
+          .guide-pub-knob { animation: guide-pub-knob 4s infinite cubic-bezier(0.65,0,0.35,1); }
+          .guide-pub-track { animation: guide-pub-track 4s infinite cubic-bezier(0.65,0,0.35,1); }
+          .guide-pub-btn { animation: guide-pub-btn 4s infinite cubic-bezier(0.65,0,0.35,1); }
+        `}</style>
+        <div className="w-60 bg-neutral-900 border border-neutral-800 rounded-lg p-3 pt-3.5 relative shadow-md flex flex-col gap-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[9px] font-extrabold text-white tracking-wide">작품 발행</span>
+            <span className="text-[6px] text-neutral-500 font-mono uppercase tracking-widest">Publish</span>
+          </div>
+          <div className="flex items-center justify-between bg-neutral-950 border border-neutral-850 rounded px-2 py-1.5">
+            <span className="text-[8px] text-neutral-400 font-bold">섹션</span>
+            <span className="text-[8px] text-indigo-300 font-bold">이미지 그리드 ▾</span>
+          </div>
+          <div className="flex items-center justify-between bg-neutral-950 border border-neutral-850 rounded px-2 py-1.5">
+            <span className="text-[8px] text-neutral-400 font-bold">공개 여부</span>
+            <span className="guide-pub-track inline-flex items-center w-7 h-3.5 rounded-full px-0.5">
+              <span className="guide-pub-knob w-2.5 h-2.5 rounded-full bg-white shadow" />
+            </span>
+          </div>
+          <div className="guide-pub-btn mt-0.5 h-7 rounded-md bg-indigo-600 flex items-center justify-center text-[9px] font-extrabold text-white tracking-wide">
+            🚀 발행하기
+          </div>
         </div>
       </div>
     )
@@ -1463,13 +1539,13 @@ export default function EditorCanvas({ creatorName, sectionId, initialProject, i
           <style>{`
             /* Scoped Animation Classes */
             .guide-drawer-scope .mouse-grab-anim {
-              animation: mouse-grab-anim-kf 4s infinite ease-in-out;
+              animation: mouse-grab-anim-kf 4s infinite cubic-bezier(0.65, 0, 0.35, 1);
             }
             .guide-drawer-scope .block-a-anim {
-              animation: block-a-anim-kf 4s infinite ease-in-out;
+              animation: block-a-anim-kf 4s infinite cubic-bezier(0.65, 0, 0.35, 1);
             }
             .guide-drawer-scope .block-b-anim {
-              animation: block-b-anim-kf 4s infinite ease-in-out;
+              animation: block-b-anim-kf 4s infinite cubic-bezier(0.65, 0, 0.35, 1);
             }
             .guide-drawer-scope .typing-text-anim::after {
               content: "";
@@ -1479,16 +1555,16 @@ export default function EditorCanvas({ creatorName, sectionId, initialProject, i
               animation: caret-blink-anim-kf 0.8s infinite step-end;
             }
             .guide-drawer-scope .img-grid-anim-1 {
-              animation: img-grid-anim-1-kf 4s infinite ease-in-out;
+              animation: img-grid-anim-1-kf 4s infinite cubic-bezier(0.65, 0, 0.35, 1);
             }
             .guide-drawer-scope .img-grid-anim-2 {
-              animation: img-grid-anim-2-kf 4s infinite ease-in-out;
+              animation: img-grid-anim-2-kf 4s infinite cubic-bezier(0.65, 0, 0.35, 1);
             }
             .guide-drawer-scope .img-grid-anim-3 {
-              animation: img-grid-anim-3-kf 4s infinite ease-in-out;
+              animation: img-grid-anim-3-kf 4s infinite cubic-bezier(0.65, 0, 0.35, 1);
             }
             .guide-drawer-scope .play-btn-anim {
-              animation: play-btn-anim-kf 4s infinite ease-in-out;
+              animation: play-btn-anim-kf 4s infinite cubic-bezier(0.65, 0, 0.35, 1);
             }
             .guide-drawer-scope .playbar-progress-anim {
               animation: playbar-progress-anim-kf 4s infinite linear;
@@ -1505,73 +1581,74 @@ export default function EditorCanvas({ creatorName, sectionId, initialProject, i
               animation: embed-spinner-anim-kf 4s infinite linear;
             }
             .guide-drawer-scope .embed-player-anim {
-              animation: embed-player-anim-kf 4s infinite ease-in-out;
+              animation: embed-player-anim-kf 4s infinite cubic-bezier(0.65, 0, 0.35, 1);
             }
             .guide-drawer-scope .highlight-sweep-anim {
-              animation: highlight-sweep-anim-kf 4s infinite ease-in-out;
+              animation: highlight-sweep-anim-kf 4s infinite cubic-bezier(0.65, 0, 0.35, 1);
             }
             .guide-drawer-scope .bubble-menu-anim {
-              animation: bubble-menu-anim-kf 4s infinite ease-in-out;
+              animation: bubble-menu-anim-kf 4s infinite cubic-bezier(0.65, 0, 0.35, 1);
             }
             .guide-drawer-scope .shimmer-effect-anim {
-              animation: shimmer-effect-anim-kf 4s infinite ease-in-out;
+              animation: shimmer-effect-anim-kf 4s infinite cubic-bezier(0.65, 0, 0.35, 1);
             }
             .guide-drawer-scope .click-menu-anim {
-              animation: click-menu-anim-kf 4s infinite ease-in-out;
+              animation: click-menu-anim-kf 4s infinite cubic-bezier(0.65, 0, 0.35, 1);
             }
             .guide-drawer-scope .btn-hover-anim {
-              animation: btn-hover-anim-kf 4s infinite ease-in-out;
+              animation: btn-hover-anim-kf 4s infinite cubic-bezier(0.65, 0, 0.35, 1);
             }
             .guide-drawer-scope .btn-tooltip-anim {
-              animation: btn-tooltip-anim-kf 4s infinite ease-in-out;
+              animation: btn-tooltip-anim-kf 4s infinite cubic-bezier(0.65, 0, 0.35, 1);
             }
             .guide-drawer-scope .btn-color-anim {
               animation: btn-color-anim-kf 4s infinite step-end;
             }
             .guide-drawer-scope .click-btn-mod-anim {
-              animation: click-btn-mod-anim-kf 4s infinite ease-in-out;
+              animation: click-btn-mod-anim-kf 4s infinite cubic-bezier(0.65, 0, 0.35, 1);
             }
             .guide-drawer-scope .float-menu-trigger-anim {
-              animation: float-menu-trigger-anim-kf 4s infinite ease-in-out;
+              animation: float-menu-trigger-anim-kf 4s infinite cubic-bezier(0.65, 0, 0.35, 1);
             }
             .guide-drawer-scope .float-menu-options-anim {
-              animation: float-menu-options-anim-kf 4s infinite ease-in-out;
+              animation: float-menu-options-anim-kf 4s infinite cubic-bezier(0.65, 0, 0.35, 1);
             }
             .guide-drawer-scope .col-layout-split-anim {
-              animation: col-layout-split-anim-kf 4s infinite ease-in-out;
+              animation: col-layout-split-anim-kf 4s infinite cubic-bezier(0.65, 0, 0.35, 1);
             }
             .guide-drawer-scope .click-col-menu-anim {
-              animation: click-col-menu-anim-kf 4s infinite ease-in-out;
+              animation: click-col-menu-anim-kf 4s infinite cubic-bezier(0.65, 0, 0.35, 1);
             }
             .guide-drawer-scope .arrow-rotate-anim {
-              animation: arrow-rotate-anim-kf 4s infinite ease-in-out;
+              animation: arrow-rotate-anim-kf 4s infinite cubic-bezier(0.65, 0, 0.35, 1);
             }
             .guide-drawer-scope .faq-content-expand-anim {
-              animation: faq-content-expand-anim-kf 4s infinite ease-in-out;
+              animation: faq-content-expand-anim-kf 4s infinite cubic-bezier(0.65, 0, 0.35, 1);
             }
             .guide-drawer-scope .click-faq-anim {
-              animation: click-faq-anim-kf 4s infinite ease-in-out;
+              animation: click-faq-anim-kf 4s infinite cubic-bezier(0.65, 0, 0.35, 1);
             }
 
             /* Keyframes Declarations */
             @keyframes mouse-grab-anim-kf {
-              0% { transform: translate(60px, 40px); opacity: 0; }
-              10% { transform: translate(30px, -15px); opacity: 1; }
-              25% { transform: translate(30px, -15px); opacity: 1; }
-              45% { transform: translate(30px, 20px); opacity: 1; }
-              65% { transform: translate(30px, 20px); opacity: 1; }
-              75% { transform: translate(60px, 40px); opacity: 0; }
-              100% { transform: translate(60px, 40px); opacity: 0; }
+              0% { transform: translate(44px, 8px) scale(1); opacity: 0; }
+              14% { transform: translate(30px, -15px) scale(1); opacity: 1; }
+              24% { transform: translate(30px, -15px) scale(1); opacity: 1; }
+              30% { transform: translate(30px, -15px) scale(0.86); opacity: 1; }
+              48% { transform: translate(30px, 20px) scale(0.86); opacity: 1; }
+              62% { transform: translate(30px, 20px) scale(1); opacity: 1; }
+              80% { transform: translate(46px, 36px) scale(1); opacity: 0; }
+              100% { transform: translate(46px, 36px) scale(1); opacity: 0; }
             }
             @keyframes block-a-anim-kf {
-              0%, 25% { transform: translateY(0); border-color: #262626; box-shadow: none; }
-              45%, 65% { transform: translateY(44px); border-color: #4f46e5; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25); }
-              75%, 100% { transform: translateY(0); border-color: #262626; box-shadow: none; }
+              0%, 30% { transform: translateY(0); border-color: #262626; box-shadow: none; }
+              48%, 62% { transform: translateY(44px); border-color: #4f46e5; box-shadow: 0 6px 16px rgba(79, 70, 229, 0.28); }
+              78%, 100% { transform: translateY(0); border-color: #262626; box-shadow: none; }
             }
             @keyframes block-b-anim-kf {
-              0%, 25% { transform: translateY(0); }
-              45%, 65% { transform: translateY(-44px); }
-              75%, 100% { transform: translateY(0); }
+              0%, 30% { transform: translateY(0); }
+              48%, 62% { transform: translateY(-44px); }
+              78%, 100% { transform: translateY(0); }
             }
             @keyframes typing-text-anim-kf {
               0%, 10% { content: ""; }
@@ -1818,6 +1895,15 @@ export default function EditorCanvas({ creatorName, sectionId, initialProject, i
                     </svg>
                   </button>
                 </div>
+              </div>
+
+              {/* Intro tip (한눈에 보는 사용법) */}
+              <div className="px-4 pt-3.5 shrink-0">
+                <p className="text-[10px] text-neutral-300 leading-relaxed bg-indigo-950/25 border border-indigo-900/30 rounded-lg px-3 py-2.5">
+                  아래 항목을 펼치면 <span className="text-indigo-300 font-bold">움직이는 예시</span>로 기능을 보여드려요. 핵심은 두 가지 —
+                  빈 줄 왼쪽의 <span className="text-indigo-300 font-bold">＋ 메뉴</span>로 이미지·버튼·마퀴·분할 등 블록을 추가하고,
+                  글자를 <span className="text-indigo-300 font-bold">드래그</span>하면 뜨는 버블 메뉴로 굵게·색상·✨효과를 입힙니다.
+                </p>
               </div>
 
               {/* Accordion Scroll Container */}

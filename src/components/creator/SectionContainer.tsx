@@ -195,13 +195,15 @@ function FaqAccordion({
     // 2. 모던 솔리드 블록: 좌측 시그니처 굵은 블루 바가 박혀 확실한 존재감을 드러내는 위젯 형태
     wrapperClass += "border border-neutral-250 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950/40 rounded-xl pl-6 pr-5 py-4.5 my-3 "
     decorationLeftBar = (
-      <div className="absolute left-0 top-0 bottom-0 w-[5px] bg-blue-600 dark:bg-blue-500" />
+      // 크리에이터 테마 액센트 바 (다크에선 밝은 soft 틴트로 반전해 대비 확보)
+      <div className="absolute left-0 top-0 bottom-0 w-[5px] bg-[color:var(--bc-theme-strong,#2563eb)] dark:bg-[color:var(--bc-theme-soft,#3b82f6)]" />
     )
   } else {
     // 3. Stripe Minimal: 극도로 얇고 깔끔한 하단선에 깜찍한 블루 도트 리스트 지시자가 달린 명품형
     wrapperClass += "border-b border-neutral-200/80 dark:border-neutral-800/60 py-5 "
     listDotIndicator = (
-      <span className="w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-blue-400 mr-2.5 shrink-0 transition-transform duration-300 group-hover/faq:scale-130" />
+      // 크리에이터 테마 리스트 도트 (다크에선 밝은 soft 틴트)
+      <span className="w-1.5 h-1.5 rounded-full bg-[color:var(--bc-theme-strong,#2563eb)] dark:bg-[color:var(--bc-theme-soft,#60a5fa)] mr-2.5 shrink-0 transition-transform duration-300 group-hover/faq:scale-130" />
     )
   }
 
@@ -245,7 +247,7 @@ function FaqAccordion({
           size={16} 
           strokeWidth={2.5}
           className={`text-neutral-450 dark:text-neutral-550 transition-all duration-300 shrink-0 ${
-            isOpen ? 'rotate-180 text-blue-600 dark:text-blue-450 scale-105' : 'group-hover/faq:text-neutral-700 dark:group-hover/faq:text-neutral-300'
+            isOpen ? 'rotate-180 text-[color:var(--bc-theme-strong,#2563eb)] dark:text-[color:var(--bc-theme-soft,#60a5fa)] scale-105' : 'group-hover/faq:text-neutral-700 dark:group-hover/faq:text-neutral-300'
           }`}
         />
       </div>
@@ -590,6 +592,12 @@ function SectionContainer({
 
               {(!showTitle && !isOwner) ? null : (
                 <h2 className={`text-3xl lg:text-4xl 2xl:text-5xl font-black text-neutral-900 tracking-tight transition-opacity ${!showTitle ? 'opacity-30 line-through' : ''}`}>
+                  {/* 크리에이터 테마 블록 틱 — 픽셀 그래머의 사각 블록을 테마 진한색으로 */}
+                  <span
+                    aria-hidden
+                    className="inline-block w-2.5 h-2.5 lg:w-3 lg:h-3 mr-3 lg:mr-4"
+                    style={{ backgroundColor: 'var(--bc-theme-strong, #1E2022)' }}
+                  />
                   {section.name}
                 </h2>
               )}
@@ -719,9 +727,9 @@ function SectionContainer({
                   }}
                 >
                   <SortableContext items={projectIds} strategy={rectSortingStrategy}>
-                    {projects.map((project) => (
+                    {projects.map((project, projectIndex) => (
                       <div key={project.id} className="snap-center shrink-0 w-[85vw] md:w-[75vw] xl:w-[65vw] max-w-[1200px]">
-                        <ProjectCard project={project} creatorName={creatorName} isOwner={isOwner} onOpenProject={onOpenProject} globalIsDragging={globalIsDragging} />
+                        <ProjectCard project={project} creatorName={creatorName} isOwner={isOwner} onOpenProject={onOpenProject} globalIsDragging={globalIsDragging} index={projectIndex} />
                       </div>
                     ))}
                   </SortableContext>
@@ -790,15 +798,15 @@ function SectionContainer({
 
                 <div id={`grid-${section.id}`} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" style={{ gridAutoFlow: 'dense', gap: 'var(--grid-gap, 24px)' }}>
                   <SortableContext items={projectIds} strategy={rectSortingStrategy}>
-                    {projects.map((project) => {
+                    {projects.map((project, projectIndex) => {
                       const { colSpanClass, rowSpanClass } = parseProjectTitleAndSize(project.title)
                       return (
-                        <div 
-                          key={project.id} 
+                        <div
+                          key={project.id}
                           className={`${colSpanClass} ${rowSpanClass} w-full h-full transition-all duration-500`}
                           style={{ borderRadius: 'var(--card-corner-radius, 0px)' }}
                         >
-                          <ProjectCard project={project} creatorName={creatorName} isOwner={isOwner} onOpenProject={onOpenProject} globalIsDragging={globalIsDragging} isGridItem={true} />
+                          <ProjectCard project={project} creatorName={creatorName} isOwner={isOwner} onOpenProject={onOpenProject} globalIsDragging={globalIsDragging} isGridItem={true} index={projectIndex} />
                         </div>
                       )
                     })}

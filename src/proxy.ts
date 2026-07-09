@@ -34,6 +34,17 @@ export function proxy(request: NextRequest) {
     }
   }
 
+  // 3b. 블루프린트 갤러리 — 루트 도메인(craftopia.work/gallery) canonical 전역 공개 라우트.
+  //     서브도메인({creator}.craftopia.work/gallery)으로 접근하면 루트로 리다이렉트(서브도메인/포트폴리오 게이트 우회).
+  //     루트/로컬은 그대로 app/gallery 를 서빙. (공개 둘러보기는 비로그인 허용 — 액션은 각자 회원 게이트)
+  if (path === '/gallery' || path.startsWith('/gallery/')) {
+    const sub = subdomain.toLowerCase()
+    if (!isLocal && sub && sub !== 'www') {
+      return NextResponse.redirect(`https://${rootDomain}${path}${url.search}`)
+    }
+    return NextResponse.next()
+  }
+
   // 4. Skip internal / system / common paths
   if (
     path.startsWith('/api') ||
@@ -42,13 +53,22 @@ export function proxy(request: NextRequest) {
     path.startsWith('/uploads') ||
     path.startsWith('/dynmap-proxy') || // Dynmap 리버스 프록시(next.config rewrites)는 서브도메인 라우팅 우회
     path === '/favicon.ico' ||
-    path.startsWith('/adminpage')
+    path.startsWith('/adminpage') ||
+    path === '/suspended' // 제재 안내 페이지 — 서브도메인에서도 top-level /suspended 가 그대로 노출되도록 리라이트 우회
   ) {
     return NextResponse.next()
   }
 
   // 4b. auth.craftopia.work → 연동 허브(/auth). (/api/* 는 위에서 이미 통과 처리됨)
   if (subdomain.toLowerCase() === 'auth') {
+    // 웹 가입/로그인 흐름(이메일)은 메인 도메인에서 처리한다. auth 서브도메인은 Discord·마크
+    // '연동 허브' 전용 → /login 등은 craftopia.work 로 돌려보낸다(쿼리스트링 보존).
+    const mainDomainPaths = ['/login', '/forgot-password', '/reset-password', '/find-account']
+    if (mainDomainPaths.some((p) => path === p || path.startsWith(p + '/'))) {
+      const protocol = isLocal ? 'http' : 'https'
+      const baseDomain = isLocal ? 'localhost:3000' : rootDomain
+      return NextResponse.redirect(`${protocol}://${baseDomain}${path}${url.search}`)
+    }
     const rewriteUrl = request.nextUrl.clone()
     rewriteUrl.pathname = '/auth'
     return NextResponse.rewrite(rewriteUrl)
@@ -110,7 +130,11 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
+  // 정적 자산은 프록시(서브도메인 리라이트) 대상에서 제외한다. 이미지 확장자만 있던 목록에
+  // 폰트(otf/ttf/woff/woff2)를 추가 — 없으면 {creator}.craftopia.work/fonts/*.otf 가
+  // /sites/{creator}/fonts/* 로 리라이트돼 404 나고, 비즈니스 카드의 Uni Sans 등 커스텀 폰트가
+  // 서브도메인에서만 전부 폴백되던 버그가 있었다(이미지 .png 는 이미 제외돼 정상이었음).
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|otf|ttf|woff|woff2)$).*)',
   ],
 }

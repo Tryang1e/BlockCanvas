@@ -65,62 +65,16 @@ export default function BusinessCardContact({
     setTimeout(() => setCopiedField(null), 2000)
   }
 
-  // Tilt Effect
-  useEffect(() => {
-    const card = cardRef.current
-    if (!card) return
-
-    const handleMouseMove = (e: MouseEvent) => {
-      const rect = card.getBoundingClientRect()
-      const x = e.clientX - rect.left
-      const y = e.clientY - rect.top
-
-      const centerX = rect.width / 2
-      const centerY = rect.height / 2
-
-      // Calculate rotation based on mouse position (reduced to max 5 degrees for subtlety)
-      const rotateX = ((y - centerY) / centerY) * -5
-      const rotateY = ((x - centerX) / centerX) * 5
-
-      gsap.to(card, {
-        rotateX,
-        rotateY,
-        duration: 0.5,
-        ease: 'power2.out',
-        transformPerspective: 1000,
-        transformOrigin: 'center center'
-      })
-    }
-
-    const handleMouseLeave = () => {
-      gsap.to(card, {
-        rotateX: 0,
-        rotateY: 0,
-        duration: 1.0,
-        ease: 'elastic.out(1, 0.3)'
-      })
-    }
-
-    card.addEventListener('mousemove', handleMouseMove)
-    card.addEventListener('mouseleave', handleMouseLeave)
-
-    return () => {
-      card.removeEventListener('mousemove', handleMouseMove)
-      card.removeEventListener('mouseleave', handleMouseLeave)
-    }
-  }, [])
+  // 구(舊) ±5° mousemove 틸트 이펙트 제거 — 아래 quickTo 틸트와 같은 rotationX/Y를 두고 매 프레임 충돌(미세 떨림 원인)
 
   // Refresh ScrollTrigger positions after dynamic image and portfolio layouts finish loading
+  // setTimeout 4연발 대신 rAF 1회(첫 페인트 직후) + 300ms 폴백(이미지·폰트 안정화) 한 번으로 단일화
   useEffect(() => {
-    const t1 = setTimeout(() => ScrollTrigger.refresh(), 100)
-    const t2 = setTimeout(() => ScrollTrigger.refresh(), 500)
-    const t3 = setTimeout(() => ScrollTrigger.refresh(), 1500)
-    const t4 = setTimeout(() => ScrollTrigger.refresh(), 3000)
+    const raf = requestAnimationFrame(() => ScrollTrigger.refresh())
+    const fallback = setTimeout(() => ScrollTrigger.refresh(), 300)
     return () => {
-      clearTimeout(t1)
-      clearTimeout(t2)
-      clearTimeout(t3)
-      clearTimeout(t4)
+      cancelAnimationFrame(raf)
+      clearTimeout(fallback)
     }
   }, [])
 
@@ -183,13 +137,15 @@ export default function BusinessCardContact({
 
   useEffect(() => {
     // Profile Content Animations (triggered when isRevealed becomes true)
-    if (isRevealed && cardRef.current) {
-      const card = cardRef.current
-      const leftContainer = card.querySelector('.left-container')
-      const leftImage = card.querySelector('.left-image')
-      const textLines = card.querySelectorAll('.reveal-text')
-      const avatar = card.querySelector('.avatar-container')
+    if (!isRevealed || !cardRef.current) return
+    const card = cardRef.current
+    const leftContainer = card.querySelector('.left-container')
+    const leftImage = card.querySelector('.left-image')
+    const textLines = card.querySelectorAll('.reveal-text')
+    const avatar = card.querySelector('.avatar-container')
 
+    // 리빌 트윈도 gsap.context로 스코프 — 언마운트 시 이 컴포넌트가 만든 것만 정리
+    const ctx = gsap.context(() => {
       // Set explicit starting positions (GSAP Reversion recovery)
       if (leftContainer) gsap.set(leftContainer, { clipPath: 'inset(0 100% 0 0)' })
       if (leftImage) gsap.set(leftImage, { scale: 1.6, filter: 'blur(20px)', opacity: 0 })
@@ -201,18 +157,27 @@ export default function BusinessCardContact({
       if (leftImage) gsap.to(leftImage, { scale: 1, opacity: 1, filter: 'blur(0px)', duration: 2, ease: 'power3.out', delay: 0.3 })
       if (textLines.length > 0) gsap.to(textLines, { y: 0, opacity: 1, rotationX: 0, duration: 1.2, ease: 'power3.out', stagger: 0.1, delay: 0.5 })
       if (avatar) gsap.to(avatar, { scale: 1, opacity: 1, rotation: 0, duration: 1.5, ease: 'expo.out', delay: 1 })
+    }, card)
 
-      // Notify ScrollTrigger and Lenis of height change and reveal footer
-      setTimeout(() => {
-        window.dispatchEvent(new Event('resize'))
-        ScrollTrigger.refresh()
-      }, 1000)
+    // Notify ScrollTrigger and Lenis of height change and reveal footer
+    const refreshTimer = setTimeout(() => {
+      window.dispatchEvent(new Event('resize'))
+      ScrollTrigger.refresh()
+    }, 1000)
+
+    return () => {
+      clearTimeout(refreshTimer)
+      ctx.revert()
     }
   }, [isRevealed])
 
   useEffect(() => {
     const card = cardRef.current
     if (!card) return
+
+    // 모션 최소화: 마우스 추적 3D 틸트/패럴랙스/워터드롭을 아예 생성하지 않는다
+    // (하우스 룰 — 전역 CSS 규칙은 GSAP 트윈을 막지 못하므로 명시 가드)
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
 
     const leftContainer = card.querySelector('.left-container')
     const rightContainer = card.querySelector('.right-container')
@@ -221,6 +186,7 @@ export default function BusinessCardContact({
     const ghost2 = containerRef.current?.querySelector('.ghost-card-2')
     const grid = containerRef.current?.querySelector('.bg-grid')
     const waterdrop = card.querySelector('.waterdrop-follower')
+    const waterdropAnchor = card.querySelector('.waterdrop-anchor')
 
     // 3. Butter-smooth 3D Hover Interaction with quickTo
     const xTo = gsap.quickTo(card, "rotationY", { ease: "power3", duration: 0.8 })
@@ -237,7 +203,23 @@ export default function BusinessCardContact({
     const gridX = grid ? gsap.quickTo(grid, "x", { ease: "power3", duration: 1 }) : () => { }
     const gridY = grid ? gsap.quickTo(grid, "y", { ease: "power3", duration: 1 }) : () => { }
 
+    // 워터드롭: left/top(매 프레임 레이아웃 유발) 대신 앵커 래퍼의 transform(x/y)을 quickTo로 구동
+    // (내부 요소의 transform은 waterdropMorph 키프레임이 소유하므로 래퍼가 이동을 담당)
+    const dropX = waterdropAnchor ? gsap.quickTo(waterdropAnchor, "x", { ease: "power2.out", duration: 0.6 }) : () => { }
+    const dropY = waterdropAnchor ? gsap.quickTo(waterdropAnchor, "y", { ease: "power2.out", duration: 0.6 }) : () => { }
+    // 기존 정적 위치(플렉스 중앙 배치)와 같은 지점에서 첫 진입이 시작되도록 중앙으로 초기화
+    if (waterdropAnchor) gsap.set(waterdropAnchor, { x: card.offsetWidth / 2, y: card.offsetHeight / 2 })
+
+    // 원근값은 구 틸트 핸들러가 첫 mousemove에 설정하던 것 — 같은 타이밍으로 유지해 정적 상태 시각 변화 방지
+    let perspectiveSet = false
+    let dropVisible = false
+
     const handleMouseMove = (e: MouseEvent) => {
+      if (!perspectiveSet) {
+        perspectiveSet = true
+        gsap.set(card, { transformPerspective: 1000, transformOrigin: 'center center' })
+      }
+
       const rect = card.getBoundingClientRect()
       const x = e.clientX - rect.left
       const y = e.clientY - rect.top
@@ -248,8 +230,9 @@ export default function BusinessCardContact({
       const offsetX = x - centerX
       const offsetY = y - centerY
 
-      const rotateX = (offsetY / centerY) * -12
-      const rotateY = (offsetX / centerX) * 12
+      // 틸트 단일화: 구 ±5° 트윈 제거 후 quickTo ±12°는 과해서 중간값 ±10°로 클램프
+      const rotateX = (offsetY / centerY) * -10
+      const rotateY = (offsetX / centerX) * 10
 
       xTo(rotateY)
       yTo(rotateX)
@@ -267,16 +250,14 @@ export default function BusinessCardContact({
       gridX(offsetX * 0.05)
       gridY(offsetY * 0.05)
 
-      // Smoothly update waterdrop follower position
+      // Smoothly update waterdrop follower position (transform 기반 — 레이아웃 스래시 없음)
       if (waterdrop) {
-        gsap.to(waterdrop, {
-          left: x,
-          top: y,
-          opacity: 1,
-          scale: 1,
-          duration: 0.6,
-          ease: 'power2.out'
-        })
+        dropX(x)
+        dropY(y)
+        if (!dropVisible) {
+          dropVisible = true
+          gsap.to(waterdrop, { opacity: 1, scale: 1, duration: 0.6, ease: 'power2.out' })
+        }
       }
     }
 
@@ -290,6 +271,7 @@ export default function BusinessCardContact({
 
       // Hide waterdrop smoothly
       if (waterdrop) {
+        dropVisible = false
         gsap.to(waterdrop, {
           opacity: 0,
           scale: 0.7,
@@ -303,9 +285,13 @@ export default function BusinessCardContact({
     card.addEventListener('mouseleave', handleMouseLeave)
 
     return () => {
-      ScrollTrigger.getAll().forEach(t => t.kill())
       card.removeEventListener('mousemove', handleMouseMove)
       card.removeEventListener('mouseleave', handleMouseLeave)
+      // 전역 ScrollTrigger.getAll() 몰살 제거 — 이 훅은 트리거를 만들지 않으므로 자기 대상 트윈만 정리
+      // (스크롤 트리거들은 각자 gsap.context/ctx.revert()로 스코프 정리됨)
+      gsap.killTweensOf(
+        [card, leftContainer, rightContainer, avatar, ghost1, ghost2, grid, waterdrop, waterdropAnchor].filter(Boolean) as Element[]
+      )
     }
   }, [])
 
@@ -350,7 +336,11 @@ export default function BusinessCardContact({
           {/* Outline State Placeholder (Text Fill) */}
           {!isRevealed && (
             <div className="absolute inset-0 flex flex-col items-center justify-center z-50 text-neutral-400 pointer-events-none overflow-hidden rounded-[3rem]">
-              <div className="text-[4rem] sm:text-[6rem] md:text-[8rem] lg:text-[9rem] font-black tracking-tighter uppercase leading-[0.85] text-center w-full break-words select-none z-10">
+              {/* 브랜드 디스플레이 서체 — Uni Sans Heavy는 라틴 대문자 전용이라 한글(이름 줄)은 Pretendard로 자동 폴백 */}
+              <div
+                className="text-[4rem] sm:text-[6rem] md:text-[8rem] lg:text-[9rem] font-black tracking-tighter uppercase leading-[0.85] text-center w-full break-words select-none z-10"
+                style={{ fontFamily: "'Uni Sans Heavy', 'Pretendard Variable', Pretendard, sans-serif" }}
+              >
                 {/* Keyword 1 */}
                 <div className="relative block w-full">
                   <span className="text-transparent" style={{ WebkitTextStroke: '2px #d4d4d8' }}>{keywords[0]}</span>
@@ -394,15 +384,18 @@ export default function BusinessCardContact({
               </div>
 
               {/* Morphing Liquid Waterdrop (Mouse-Follower, shows on hover) */}
-              <div
-                className="waterdrop-follower absolute w-[260px] h-[260px] blur-[24px] pointer-events-none opacity-0 scale-75 select-none hidden md:block z-20"
-                style={{
-                  borderRadius: '50%',
-                  transform: 'translate(-50%, -50%)',
-                  animation: 'waterdropMorph 8s infinite alternate ease-in-out',
-                  background: `linear-gradient(to top right, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.25), rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.1), transparent)`
-                }}
-              />
+              {/* 앵커 래퍼: 이동을 transform(x/y)으로 구동하기 위한 레이어 — 내부 transform은 morph 키프레임 소유라 직접 못 움직임 */}
+              <div className="waterdrop-anchor absolute left-0 top-0 z-20 pointer-events-none hidden md:block">
+                <div
+                  className="waterdrop-follower absolute w-[260px] h-[260px] blur-[24px] pointer-events-none opacity-0 scale-75 select-none"
+                  style={{
+                    borderRadius: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    animation: 'waterdropMorph 8s infinite alternate ease-in-out',
+                    background: `linear-gradient(to top right, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.25), rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.1), transparent)`
+                  }}
+                />
+              </div>
 
               {/* Pulse style for dashed border & water animations */}
               <style>{`
@@ -558,9 +551,9 @@ export default function BusinessCardContact({
                   </div>
 
                   {/* Discord */}
-                  {profileData.sns_settings?.discord && profileData.discord_id && (
+                  {profileData.sns_settings?.discord && profileData.sns_settings?.discordHandle && (
                     <div
-                      onClick={() => handleCopy(profileData.discord_id, 'discord')}
+                      onClick={() => handleCopy(profileData.sns_settings.discordHandle, 'discord')}
                       className="reveal-text flex items-center gap-5 group cursor-pointer hover:-translate-y-1 transition-transform relative w-max"
                       title="디스코드 ID 복사하기"
                     >
@@ -578,7 +571,7 @@ export default function BusinessCardContact({
                         )}
                       </div>
                       <span className="text-xl font-medium text-neutral-600 group-hover:text-neutral-900 dark:text-neutral-50 transition-colors">
-                        {profileData.discord_id}
+                        {profileData.sns_settings.discordHandle}
                       </span>
                     </div>
                   )}

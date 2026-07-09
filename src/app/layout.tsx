@@ -1,19 +1,11 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+// 한글 본문 폰트: Pretendard Variable (OFL) — dynamic-subset이라 쓰인 글리프의 슬라이스만 다운로드됨
+import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 import "./globals.css";
 import SmoothScroll from "@/components/ui/SmoothScroll";
 import { ThemeProvider } from "@/components/theme-provider";
+import { PixelTransitionProvider } from "@/components/ui/PixelTransition";
 import Script from "next/script";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   // 상대 경로 메타데이터(OG 이미지/사이트맵 등)의 기준이 되는 절대 URL.
@@ -25,14 +17,8 @@ export const metadata: Metadata = {
     description: "BlockCanvas는 드래그 앤 드롭으로 블록을 자유롭게 배치하여 만드는 크리에이터 전용 매직 캔버스 포트폴리오 플랫폼입니다.",
     url: "https://craftopia.work",
     siteName: "BlockCanvas",
-    images: [
-      {
-        url: "http://craftopia.work:9000/logo/white/logo.png",
-        width: 1200,
-        height: 630,
-        alt: "BlockCanvas 로고",
-      }
-    ],
+    // og:image 는 app/opengraph-image.tsx(파일 컨벤션, 동적 브랜드 카드)가 담당 —
+    // 예전 http://…:9000 로고 하드코딩은 mixed content 라 Discord 등에서 거부됐다.
     type: "website",
   }
 };
@@ -82,7 +68,7 @@ export default async function RootLayout({
   // If maintenance mode is active and user is not admin, show maintenance screen
   if (isMaintenance && !isAdmin) {
     return (
-      <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+      <html lang="ko" className="h-full antialiased">
         <body className="min-h-full flex items-center justify-center bg-neutral-900 text-white p-6">
           <div className="text-center max-w-md">
             <h1 className="text-4xl font-black mb-4 tracking-tight">서버 점검 중입니다 🛠️</h1>
@@ -101,11 +87,20 @@ export default async function RootLayout({
 
   return (
     <html
-      lang="en"
+      lang="ko"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className="h-full antialiased"
     >
       <head>
+        {/* 에디터 콘텐츠 폰트(전부 무료 상업용, 저장된 글이 리터럴 family명을 참조하므로 family명 유지 필수):
+            기존 4종(주아/명조/손글씨/고딕) + 확장 4종(검은고딕/도현/구기/고운바탕).
+            셀프호스트 확장(네오둥근모/갈무리/Uni Sans/BC Pixel)은 globals.css @font-face 참조. */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Jua&family=Nanum+Myeongjo:wght@400;700;800&family=Nanum+Pen+Script&family=Noto+Sans+KR:wght@300;400;500;700;900&family=Black+Han+Sans&family=Do+Hyeon&family=Gugi&family=Gowun+Batang:wght@400;700&display=swap"
+        />
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -151,7 +146,9 @@ export default async function RootLayout({
           </div>
         )}
         <ThemeProvider>
-          {children}
+          <PixelTransitionProvider>
+            {children}
+          </PixelTransitionProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { useLenis } from '@studio-freight/react-lenis'
+import { useLenis } from 'lenis/react'
 
 interface ImageCropperModalProps {
   isOpen: boolean

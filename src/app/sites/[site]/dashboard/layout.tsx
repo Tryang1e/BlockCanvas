@@ -1,13 +1,16 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { LayoutDashboard, FolderKanban, Settings, UserCircle, Link as LinkIcon, Globe, Activity, Mail, Boxes } from 'lucide-react'
+import { LayoutDashboard, FolderKanban, Settings, UserCircle, Link as LinkIcon, Globe, Activity, Mail, Boxes, ShoppingBag } from 'lucide-react'
 import Image from 'next/image'
 
 import UserSidebar from '@/components/layout/UserSidebar'
 import { prisma } from '@/lib/prisma'
 import { verifySession } from '@/lib/session'
+import { isAdminPanelAccess } from '@/lib/roles'
+import { getModerationState } from '@/lib/moderation'
 import PrivacyConsentModal from '@/components/dashboard/PrivacyConsentModal'
+import { PRIVACY_POLICY_VERSION } from '@/lib/privacy-policy'
 
 export default async function DashboardLayout({
   children,
@@ -32,7 +35,7 @@ export default async function DashboardLayout({
     sessionProfile = await prisma.profile.findUnique({
       where: { creator_name: session }
     })
-    if (sessionProfile?.role === 'admin') {
+    if (isAdminPanelAccess(sessionProfile?.role)) {
       isAuthorized = true
     }
   }
@@ -48,6 +51,12 @@ export default async function DashboardLayout({
   const isOwner = session === creator_name
 
   const currentUser = isOwner ? profile : sessionProfile
+
+  // 제재 게이트: 로그인한 본인(세션 유저)이 이용정지/차단 상태면 안내 페이지로.
+  if (currentUser && getModerationState(currentUser).isBlocked) {
+    redirect('/suspended')
+  }
+
   let hasUnread = false
 
   if (currentUser) {
@@ -74,20 +83,29 @@ export default async function DashboardLayout({
       }
     })
 
-    hasUnread = unreadReceivedCount > 0 || unreadRepliesCount > 0
+    // 관리자 공지/DM 등 개인 알림함 미읽음
+    const unreadNotifications = await prisma.notification.count({
+      where: { recipient_id: currentUser.id, is_read: false }
+    })
+
+    hasUnread = unreadReceivedCount > 0 || unreadRepliesCount > 0 || unreadNotifications > 0
   }
 
   return (
     <div className="flex min-h-screen bg-neutral-50 font-sans text-neutral-900 pb-16 md:pb-0">
-      {isOwner && !profile?.privacy_consented && (
-        <PrivacyConsentModal creatorName={creator_name} />
+      {isOwner && profile?.privacy_consent_version !== PRIVACY_POLICY_VERSION && (
+        <PrivacyConsentModal
+          creatorName={creator_name}
+          previouslyConsented={!!profile?.privacy_consented}
+        />
       )}
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex w-64 bg-white border-r border-neutral-200 flex-col shadow-sm fixed inset-y-0 z-10">
         <div className="h-16 flex items-center px-6 border-b border-neutral-200">
           <Link href="/" className="flex items-center gap-2">
             <Image src="/logo_icon.png" alt="Logo" width={24} height={24} className="object-contain w-auto h-auto" />
-            <span className="font-black text-lg tracking-tighter">BlockCanvas</span>
+            {/* 타이핑 워드마크 → 브랜드 로고 이미지 */}
+            <Image src="/logo_text.png" alt="BLOCK CANVAS" width={133} height={16} className="h-4 w-auto object-contain" />
           </Link>
         </div>
 
@@ -182,16 +200,23 @@ export default async function DashboardLayout({
               </Link>
             </>
           )}
-          {profile?.role === 'admin' && (
+          {isAdminPanelAccess(currentUser?.role) && (
             <div className="pt-4 mt-4 border-t border-neutral-200">
-              <Link 
-                href="/adminpage" 
+              <Link
+                href="/adminpage"
                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-purple-700 bg-purple-50 hover:bg-purple-100 font-bold text-sm transition-colors"
               >
                 <span>👑 어드민 페이지 이동</span>
               </Link>
             </div>
           )}
+          <Link
+            href={`/dashboard/shop`}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-neutral-600 hover:text-black hover:bg-neutral-100 font-medium text-sm transition-colors"
+          >
+            <ShoppingBag size={18} />
+            <span>상점</span>
+          </Link>
           <div className="pt-4 mt-4 border-t border-neutral-200">
             <div className="px-3 mb-2 text-xs font-bold text-neutral-400 uppercase tracking-wider">외부 연동</div>
             <Link
@@ -229,7 +254,8 @@ export default async function DashboardLayout({
         <header className="h-16 border-b border-neutral-200 bg-white flex items-center justify-between md:justify-end px-4 md:px-8 sticky top-0 z-[60]">
           <div className="flex items-center gap-2 md:hidden">
             <Image src="/logo_icon.png" alt="Logo" width={24} height={24} className="object-contain w-auto h-auto" />
-            <span className="font-black text-lg tracking-tighter">BlockCanvas</span>
+            {/* 타이핑 워드마크 → 브랜드 로고 이미지 */}
+            <Image src="/logo_text.png" alt="BLOCK CANVAS" width={133} height={16} className="h-4 w-auto object-contain" />
           </div>
           <UserSidebar 
             userName={profile?.display_name || creator_name} 

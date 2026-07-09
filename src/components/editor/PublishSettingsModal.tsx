@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { publishProjectAction } from '@/app/actions/publish'
+import { trackSessionUpload, getSessionUploads, clearSessionUploads } from '@/lib/upload-tracker'
 
 
 export default function PublishSettingsModal({ 
@@ -29,6 +30,8 @@ export default function PublishSettingsModal({
   
   const [coverUrl, setCoverUrl] = useState<string | null>(initialProject?.thumbnail_url || null)
   const [uploading, setUploading] = useState(false)
+  // 발행 공개 여부(기본 공개). 수정 시엔 기존 게시물 상태를 따른다.
+  const [isPublic, setIsPublic] = useState(initialProject?.is_published !== false)
 
   // Parse [SIZE:WxH] or [SIZE:W] and clean title from initialProject
   const getInitialSizeAndCleanTitle = () => {
@@ -93,7 +96,7 @@ export default function PublishSettingsModal({
         throw new Error(errorData.error || '이미지 업로드에 실패했습니다.')
       }
       const data = await response.json()
-      if (data.url) setCoverUrl(data.url)
+      if (data.url) { setCoverUrl(data.url); trackSessionUpload(data.url) }
     } catch (err) {
       console.error(err)
     }
@@ -111,18 +114,28 @@ export default function PublishSettingsModal({
 
       {isOpen && (
         <div className="fixed inset-0 bg-black/60 z-[999999] flex items-center justify-center p-2 sm:p-4 backdrop-blur-[2px]">
-          <form 
-            action={publishProjectAction} 
+          <form
+            action={publishProjectAction}
             onSubmit={() => {
               if (onPublishStart) onPublishStart();
+              // FormData는 이미 직렬화된 뒤이므로 여기서 세션 추적을 비워도 안전하다.
+              clearSessionUploads();
             }}
             className="bg-[#f8f8f8] w-full max-w-[1000px] max-h-[90vh] rounded-xl shadow-2xl flex flex-col overflow-hidden relative animate-in fade-in zoom-in-95 duration-200"
           >
             {/* Hidden fields mapped for Server Action Payload */}
             {initialProject?.id && <input type="hidden" name="project_id" value={initialProject.id} />}
+            {/* 이번 세션에 올린 업로드 목록 — 서버가 최종 본문에 없는 잉여 이미지를 정리하는 데 사용 */}
+            <input type="hidden" name="session_uploads" value={JSON.stringify(getSessionUploads())} />
+            {/* 공개/비공개 발행 여부 */}
+            <input type="hidden" name="is_published" value={isPublic ? 'true' : 'false'} />
             <input type="hidden" name="creator_name" value={creatorName} />
             <input type="hidden" name="widgets_json" value={JSON.stringify(widgets)} />
-            {sectionId && <input type="hidden" name="section_id" value={sectionId} />}
+            {/* 섹션 보존: 생성 시엔 URL의 sectionId, 수정 시엔 기존 프로젝트의 섹션을 유지한다.
+                (수정은 /editor?project_id=… 로 들어와 sectionId가 없어 예전엔 섹션이 null로 풀리던 버그 수정) */}
+            {(sectionId || initialProject?.section_id) && (
+              <input type="hidden" name="section_id" value={sectionId || initialProject?.section_id} />
+            )}
             {finalCoverUrl && <input type="hidden" name="thumbnail_url" value={finalCoverUrl} />}
             {isDateChanged && (
               <input type="hidden" name="created_at" value={`${projectYear}-${String(projectMonth).padStart(2, '0')}-${String(projectDay).padStart(2, '0')}T00:00:00.000Z`} />
@@ -367,9 +380,23 @@ export default function PublishSettingsModal({
               <button type="button" onClick={() => setIsOpen(false)} className="text-sm font-bold text-neutral-500 hover:text-neutral-800 transition-colors">
                 취소
               </button>
-              <button type="submit" className="bg-[#00c853] hover:bg-green-600 text-white font-bold text-sm px-8 py-2.5 rounded-full transition-colors shadow">
-                게시
-              </button>
+              <div className="flex items-center gap-4">
+                {/* 공개/비공개 토글 */}
+                <button
+                  type="button"
+                  onClick={() => setIsPublic(v => !v)}
+                  className="flex items-center gap-2 text-sm font-bold text-neutral-600 hover:text-neutral-900 transition-colors"
+                  title={isPublic ? '발행 시 모두에게 공개됩니다' : '비공개 — 나만 볼 수 있습니다(방문자·explore·직접URL 모두 차단)'}
+                >
+                  <span className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isPublic ? 'bg-blue-600' : 'bg-neutral-300'}`}>
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isPublic ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </span>
+                  <span className={isPublic ? '' : 'text-amber-700'}>{isPublic ? '공개' : '비공개'}</span>
+                </button>
+                <button type="submit" className="bg-[#00c853] hover:bg-green-600 text-white font-bold text-sm px-8 py-2.5 rounded-full transition-colors shadow">
+                  게시
+                </button>
+              </div>
             </div>
           </form>
         </div>

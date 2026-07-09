@@ -93,7 +93,7 @@ export default function ScrollSpyNav({ sections }: ScrollSpyNavProps) {
             >
               <div
                 className={`transition-all duration-300 rounded-full shadow border-2 border-white dark:border-neutral-800 ${isActive
-                    ? 'w-4 h-4 bg-black dark:bg-white scale-110'
+                    ? 'w-4 h-4 bg-[color:var(--bc-theme-strong,#000000)] dark:bg-white scale-110'
                     : 'w-3 h-3 bg-neutral-400 dark:bg-neutral-500 hover:bg-neutral-800 dark:hover:bg-neutral-300 hover:scale-125 opacity-70'
                   }`}
               />

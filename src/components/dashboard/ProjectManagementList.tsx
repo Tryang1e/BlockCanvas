@@ -23,7 +23,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { ExternalLink, Trash2, GripVertical, CheckSquare, Square, Settings2, Eye, EyeOff, Globe, Lock, Sparkles, Type } from 'lucide-react'
-import { updateProjectOrderAction } from '@/app/actions/projects'
+import { updateProjectOrderAction, toggleProjectPublishAction } from '@/app/actions/projects'
 import { 
   updateSectionOrderAction, 
   updateSectionVisibilityAction, 
@@ -88,6 +88,24 @@ function SortableProjectRow({
   const isSimpleVideo = parsedContent.url && !parsedContent.html
   const typeLabel = isSimpleVideo ? '비디오' : '커스텀 캔버스'
 
+  // 게시물 공개/비공개 토글(낙관적 업데이트)
+  const [published, setPublished] = useState(project.is_published !== false)
+  const [toggling, setToggling] = useState(false)
+  const handleTogglePublish = async () => {
+    if (toggling) return
+    const next = !published
+    setPublished(next)
+    setToggling(true)
+    try {
+      await toggleProjectPublishAction(project.id, creatorName, next)
+    } catch (e) {
+      setPublished(!next)
+      alert('공개 상태 변경에 실패했습니다.')
+    } finally {
+      setToggling(false)
+    }
+  }
+
   return (
     <div 
       ref={isOverlay ? undefined : setNodeRef} 
@@ -129,7 +147,12 @@ function SortableProjectRow({
               <span className="text-[8px] text-neutral-400 font-bold uppercase">No Img</span>
             </div>
           )}
-          <div className="font-bold text-neutral-900 truncate pr-4">{cleanProjectTitle(project.title)}</div>
+          <div className="font-bold text-neutral-900 truncate pr-4 flex items-center gap-2 min-w-0">
+            <span className="truncate">{cleanProjectTitle(project.title)}</span>
+            {!published && (
+              <span className="shrink-0 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">비공개</span>
+            )}
+          </div>
         </div>
 
         {/* Type */}
@@ -147,7 +170,17 @@ function SortableProjectRow({
 
       {/* Actions */}
       <div className="flex items-center justify-end gap-2 shrink-0">
-        <a 
+        {!isOverlay && (
+          <button
+            onClick={handleTogglePublish}
+            disabled={toggling}
+            className={`p-2 rounded-md shadow-sm border transition-colors disabled:opacity-50 ${published ? 'text-neutral-400 hover:text-neutral-800 bg-white hover:bg-neutral-50 border-neutral-100' : 'text-amber-700 bg-amber-50 hover:bg-amber-100 border-amber-200'}`}
+            title={published ? '공개됨 — 클릭하면 비공개로 전환' : '비공개 — 클릭하면 공개로 전환'}
+          >
+            {published ? <Eye size={16} /> : <EyeOff size={16} />}
+          </button>
+        )}
+        <a
           href={`/project/${project.id}`}
           className="p-2 text-neutral-400 hover:text-blue-600 transition-colors bg-white hover:bg-blue-50 rounded-md shadow-sm border border-neutral-100"
           title="게시글 사이트 보러 가기"

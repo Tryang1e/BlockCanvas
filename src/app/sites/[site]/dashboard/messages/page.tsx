@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { notFound } from 'next/navigation'
 import MessagesDashboardClient from '@/components/creator/MessagesDashboardClient'
+import InboxNotifications from '@/components/dashboard/InboxNotifications'
 import { formatDistanceToNow } from 'date-fns'
 import { ko } from 'date-fns/locale'
 
@@ -30,6 +31,23 @@ export default async function DashboardMessagesPage({
   if (!profile) {
     notFound()
   }
+
+  // 개인 알림함(공지·DM·제재·코인) — 이 프로필 수신분, 최신순.
+  const notifications = await prisma.notification.findMany({
+    where: { recipient_id: profile.id },
+    orderBy: { created_at: 'desc' },
+    take: 100,
+  })
+  const initialNotifications = notifications.map((n) => ({
+    id: n.id,
+    category: n.category,
+    title: n.title,
+    body: n.body,
+    sender_name: n.sender_name,
+    is_read: n.is_read,
+    created_at: n.created_at.toISOString(),
+    time: formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: ko }),
+  }))
 
   // Fetch support inquiries submitted by this user (matched by sender_name or registered email)
   const supportInquiries = await prisma.contactMessage.findMany({
@@ -96,8 +114,12 @@ export default async function DashboardMessagesPage({
         </p>
       </div>
 
-      <MessagesDashboardClient 
-        initialMessages={initialMessages} 
+      <div className="mb-8">
+        <InboxNotifications initial={initialNotifications} />
+      </div>
+
+      <MessagesDashboardClient
+        initialMessages={initialMessages}
         initialSupportInquiries={initialSupportInquiries}
         creatorName={creator_name}
         userRole={profile.role}

@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { cookies, headers } from 'next/headers'
 import { verifySession } from '@/lib/session'
+import { checkMuted } from '@/lib/moderation'
 
 // ───── 입력 검증 & 남용 방지 헬퍼 (#19) ─────
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -63,6 +64,16 @@ export async function submitContactMessage(
     const _v = cleanContactInput(data)
     if ('error' in _v) {
       return { success: false, error: _v.error }
+    }
+
+    // 제재 게이트: 로그인한 발신자가 뮤트/정지 상태면 타인에게 메시지 발송 차단(게스트·고객센터 항소는 영향 없음).
+    const _session = verifySession((await cookies()).get('session')?.value)
+    if (_session && _session !== 'admin') {
+      const _sender = await prisma.profile.findUnique({ where: { creator_name: _session }, select: { id: true } })
+      if (_sender) {
+        const _muted = await checkMuted(_sender.id)
+        if (_muted) return { success: false, error: _muted }
+      }
     }
 
     // IP 기준 도배 방지: 시간당 10건

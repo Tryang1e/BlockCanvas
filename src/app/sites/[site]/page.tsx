@@ -15,11 +15,11 @@ import CustomCursor from '@/components/ui/CustomCursor'
 import CustomScrollbar from '@/components/ui/CustomScrollbar'
 import MagneticEffect from '@/components/ui/MagneticEffect'
 import { verifySession } from '@/lib/session'
+import { getBlurPlaceholders } from '@/lib/blurPlaceholder'
 import ScrollFillText from '@/components/ui/ScrollFillText'
 import CreatorNavbar from '@/components/layout/CreatorNavbar'
 import ThemeColorEditor from '@/components/creator/ThemeColorEditor'
 import ThemeEffectEditor from '@/components/creator/ThemeEffectEditor'
-import ScrollSpyNav from '@/components/creator/ScrollSpyNav'
 import { PreviewLinkCard } from '@/components/ui/preview-link-card'
 import DynamicBackground from '@/components/ui/backgrounds/DynamicBackground'
 import { ScrollProgressProvider, ScrollProgress } from '@/components/ui/ScrollProgress'
@@ -178,18 +178,23 @@ export default async function CreatorPortfolioPage({
 
   // 2. Fetch Projects associated with this creator
   const projectsData = await prisma.project.findMany({
-    where: { creator_id: profile.id },
+    // 방문자에겐 공개 게시물만 노출, 소유자는 비공개 포함 전체(관리·배지 표시용)
+    where: { creator_id: profile.id, ...(isOwner ? {} : { is_published: true }) },
     orderBy: [
       { sort_order: 'asc' },
       { created_at: 'desc' }
     ]
   })
 
+  // 픽셀 블러업: 카드 썸네일(로컬 /uploads 만)의 16px 플레이스홀더 data URI 를 동봉(ProjectCard 가 사용).
+  const projectBlurs = await getBlurPlaceholders(projectsData.map(p => p.thumbnail_url))
+
   // Map Prisma projects to expected format (if needed)
-  const projects = projectsData.map(p => ({
+  const projects = projectsData.map((p, i) => ({
     ...p,
     category: { name: p.category_id || 'Uncategorized' },
-    likes_count: 0
+    likes_count: 0,
+    blur_data_url: projectBlurs[i]
   }))
 
   // 3. Fetch Portfolio Sections
@@ -305,6 +310,20 @@ export default async function CreatorPortfolioPage({
           ['--section-corner-radius' as any]: designConfig.sectionRound ? '16px' : '0px',
           ['--editor-image-corner-radius' as any]: designConfig.imageRound ? '16px' : '0px',
           ['--grid-gap' as any]: `${designConfig.gridGap}px`,
+          // 크리에이터 테마 토큰: theme_bg_color 한 색에서 CSS color-mix 로 파생 팔레트를 자동 생성.
+          // (JS 색상 계산 없음 — 기본값 #222222 이면 전 토큰이 뉴트럴로 수렴해 기존 룩을 해치지 않는다)
+          // ⚠hex 검증 필수(icon.tsx 와 동일 게이트): 비-hex 쓰레기 값이 들어오면 color-mix 전체가
+          // invalid 가 되고 이때는 소비측 var() 폴백도 동작하지 않아 액센트가 통째로 사라진다.
+          // (CSS 주입 위생도 겸함 — 인라인 style 문자열에 임의 문자열을 넣지 않는다)
+          ['--bc-theme' as any]: /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(profileData.theme_bg_color || '')
+            ? profileData.theme_bg_color
+            : '#222222',
+          // strong: 잉크 비중을 60%로 — 밝은 테마색(#FFFFFF·파스텔, 배경색이라 흔함)에서도
+          // 텍스트/도트 액센트의 대비가 살아남는다(#222222 기본값은 여전히 잉크로 수렴 = 기존 룩 불변)
+          ['--bc-theme-strong' as any]: 'color-mix(in oklch, var(--bc-theme) 40%, #1E2022)', // 텍스트/액센트용 진한 변형
+          ['--bc-theme-soft' as any]: 'color-mix(in oklch, var(--bc-theme) 16%, #FFFFFF)', // 칩/배경 틴트
+          // border: 밝은 베이스 대신 중간톤과 혼합 — 흰 테마여도 룰/스파인이 지워지지 않게
+          ['--bc-theme-border' as any]: 'color-mix(in oklch, var(--bc-theme) 30%, #A8A29E)', // 보더 틴트
         }}
       >
       {/* Site-wide fixed background layer */}
@@ -314,8 +333,9 @@ export default async function CreatorPortfolioPage({
       <DynamicBackground effect={designConfig.effect} />
       
       {/* Navigation Buttons */}
+      {/* ScrollSpyNav는 DraggablePortfolio가 visibleSections(노출 섹션만)으로 렌더하므로 여기서는 제거.
+          (여기서 중복 렌더하면 숨김 섹션이 있을 때 점이 어긋나 두 줄로 겹쳐 보이는 버그가 생김) */}
       <JumpingScrollButton />
-      <ScrollSpyNav sections={sections} />
 
       {customCursorEnabled && <CustomCursor />}
       {customScrollbarEnabled && <CustomScrollbar />}
@@ -415,7 +435,7 @@ export default async function CreatorPortfolioPage({
 
           <div className="hero-details text-xs md:text-sm font-medium text-neutral-400 space-y-1 mb-6 tracking-wider">
             <p>Contact : {profileData.contact_email}</p>
-            {profile.discord_id && <p>Discord ID : {profile.discord_id}</p>}
+            {(profile.discord_username || profile.discord_id) && <p>Discord ID : {profile.discord_username || profile.discord_id}</p>}
           </div>
 
           {/* SNS Buttons */}

@@ -1,7 +1,8 @@
 'use client'
 
 import React, { useEffect, useRef } from 'react'
-import { ReactLenis, useLenis } from '@studio-freight/react-lenis'
+import { ReactLenis, useLenis } from 'lenis/react'
+import 'lenis/dist/lenis.css'
 import { usePathname } from 'next/navigation'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
@@ -38,15 +39,18 @@ export default function SmoothScroll({ children, isRoot = true, className }: { c
       document.documentElement.style.overflow = ''
     }
     
+    // 직전 경로를 먼저 확보하고 즉시 갱신 — 기존에는 lenis 존재 시 cleanup return에 가로막혀
+    // 갱신 라인이 영원히 실행되지 않아 prevPath가 항상 빈 문자열이던 버그가 있었음
+    const prevPath = prevPathnameRef.current
+    prevPathnameRef.current = pathname
+
     if (lenis) {
       if (typeof window !== 'undefined') {
         (window as any).lenis = lenis
       }
       // 페이지 이동 즉시 정지 상태였을 수 있는 스크롤러를 강제 깨워 동작 보증
       lenis.start()
-      
-      const prevPath = prevPathnameRef.current
-      
+
       // 브라우저 실시간 window.location.pathname 및 넥스트 pathname, 직전 경로를 전방위 입체 센싱!
       const currentRealLocation = typeof window !== 'undefined' ? window.location.pathname : ''
       const isProjectModalTransition = 
@@ -71,23 +75,19 @@ export default function SmoothScroll({ children, isRoot = true, className }: { c
 
       return () => clearTimeout(timer)
     }
-    
-    // 직전 경로 저장하여 다음 렌더링에 참조
-    prevPathnameRef.current = pathname
   }, [pathname, lenis])
 
   useEffect(() => {
-    // Synchronize Lenis with GSAP ScrollTrigger
-    const updateScrollTrigger = (time: number) => {
-      ScrollTrigger.update()
-    }
+    // Lenis 공식 권장 패턴: 스크롤 이벤트 시에만 ScrollTrigger 갱신
+    // (기존: gsap.ticker로 매 프레임 무조건 update — 스크롤이 없어도 상시 비용 발생)
+    if (!lenis) return
 
-    gsap.ticker.add(updateScrollTrigger)
+    lenis.on('scroll', ScrollTrigger.update)
 
     return () => {
-      gsap.ticker.remove(updateScrollTrigger)
+      lenis.off('scroll', ScrollTrigger.update)
     }
-  }, [])
+  }, [lenis])
 
   if (!isMounted || isAdminPage || reducedMotion) {
     return <div className={className}>{children}</div>

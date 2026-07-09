@@ -57,6 +57,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { TextRotate, TextMorph, TypingText, SplittingText, SlidingText, ShimmeringText, RollingText, HighlightText, GradientText, ScrambleText, WaveText, NeonText } from '@/components/ui/animate-ui'
 import { DefaultButton, FlipButton, RippleButton, LiquidButton, GlowButton, ShineButton } from '@/components/ui/animate-ui'
 import MarqueeBlock from '@/components/ui/MarqueeBlock'
+import { trackSessionUpload } from '@/lib/upload-tracker'
 import Tooltip from '@/components/ui/Tooltip'
 
 const ImageSizeInputs = ({ editor }: { editor: Editor }) => {
@@ -708,6 +709,32 @@ export const ButtonLinkNodeView = (props: NodeViewProps) => {
             </div>
           </div>
 
+          <div className="flex items-center gap-3 mt-1">
+            <span className="text-[10px] text-neutral-400 font-bold shrink-0">버튼 크기(px)</span>
+            <div className="flex items-center gap-1">
+              <span className="text-[9px] text-neutral-500">너비</span>
+              <input
+                type="number"
+                value={editButtonWidth}
+                onChange={e => { setEditButtonWidth(e.target.value); updateAttributes({ buttonWidth: e.target.value }); }}
+                placeholder="자동"
+                min="0"
+                className="w-16 px-1.5 py-0.5 text-[10px] font-bold border border-neutral-700/60 bg-[#1e1e1e] text-neutral-300 rounded outline-none focus:border-neutral-500 placeholder:text-neutral-600"
+              />
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[9px] text-neutral-500">높이</span>
+              <input
+                type="number"
+                value={editButtonHeight}
+                onChange={e => { setEditButtonHeight(e.target.value); updateAttributes({ buttonHeight: e.target.value }); }}
+                placeholder="자동"
+                min="0"
+                className="w-16 px-1.5 py-0.5 text-[10px] font-bold border border-neutral-700/60 bg-[#1e1e1e] text-neutral-300 rounded outline-none focus:border-neutral-500 placeholder:text-neutral-600"
+              />
+            </div>
+          </div>
+
           <div className="flex justify-between items-center mt-1 gap-2 border-t border-neutral-800 pt-2">
             <div className="flex gap-1.5 items-center">
               <select value={editFontFamily} onChange={e => { setEditFontFamily(e.target.value); updateAttributes({ fontFamily: e.target.value }); }} className="px-1.5 py-1 text-[11px] font-bold border border-neutral-700/60 bg-[#1e1e1e] text-neutral-300 rounded outline-none cursor-pointer max-w-[80px] truncate">
@@ -716,6 +743,7 @@ export const ButtonLinkNodeView = (props: NodeViewProps) => {
                 <option value="'Nanum Myeongjo', serif">명조체</option>
                 <option value="'Nanum Pen Script', cursive">손글씨</option>
                 <option value="'Noto Sans KR', sans-serif">고딕체</option>
+                {EXTRA_FONTS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
               </select>
 
               <button type="button" onClick={() => { setEditIsBold(!editIsBold); updateAttributes({ isBold: !editIsBold }); }} className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-serif font-bold ${editIsBold ? 'bg-blue-600 text-white' : 'bg-[#1e1e1e] text-neutral-400 border border-neutral-700/60'} transition-colors`}>B</button>
@@ -1081,6 +1109,7 @@ const AnimatedTextGroupNodeView = ({ node, updateAttributes, selected, deleteNod
                 <option value='"Nanum Myeongjo", serif'>명조</option>
                 <option value='"Nanum Pen Script", cursive'>손글씨</option>
                 <option value='"Jua", sans-serif'>주아</option>
+                {EXTRA_FONTS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
               </select>
               <button type="button" onClick={() => { setEditBold(!editBold); updateAttributes({ isBold: !editBold }); }} className={`p-1 rounded flex items-center justify-center transition-colors ${editBold ? 'bg-blue-600 text-white border-blue-600' : 'bg-[#1e1e1e] text-neutral-400 hover:text-white border-neutral-700/60'} border`}><Bold size={12} /></button>
               <button type="button" onClick={() => { setEditItalic(!editItalic); updateAttributes({ isItalic: !editItalic }); }} className={`p-1 rounded flex items-center justify-center transition-colors ${editItalic ? 'bg-blue-600 text-white border-blue-600' : 'bg-[#1e1e1e] text-neutral-400 hover:text-white border-neutral-700/60'} border`}><Italic size={12} /></button>
@@ -1551,6 +1580,7 @@ const FaqBlockNodeView = (props: NodeViewProps) => {
                   <option value='"Nanum Myeongjo", serif'>명조</option>
                   <option value='"Nanum Pen Script", cursive'>손글씨</option>
                   <option value='"Jua", sans-serif'>주아</option>
+                  {EXTRA_FONTS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
                 </select>
 
                 {/* 사이즈 셀렉트 & 자유형 기입 인풋 */}
@@ -1645,6 +1675,7 @@ const FaqBlockNodeView = (props: NodeViewProps) => {
                   <option value='"Nanum Myeongjo", serif'>명조</option>
                   <option value='"Nanum Pen Script", cursive'>손글씨</option>
                   <option value='"Jua", sans-serif'>주아</option>
+                  {EXTRA_FONTS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
                 </select>
 
                 {/* 사이즈 셀렉트 & 자유형 기입 인풋 */}
@@ -2079,6 +2110,7 @@ const MarqueeNodeView = (props: NodeViewProps) => {
                 <option value='"Nanum Myeongjo", serif'>명조</option>
                 <option value='"Nanum Pen Script", cursive'>손글씨</option>
                 <option value='"Jua", sans-serif'>주아</option>
+                {EXTRA_FONTS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
               </select>
               <button
                 type="button"
@@ -2328,12 +2360,28 @@ interface RichTextEditorProps {
   onInsertBlock?: (type: 'text' | 'image_grid' | 'video' | 'embed') => void;
 }
 
+// 무료 상업용 폰트 확장(구글 4종=OFL, 셀프호스트 4종=OFL/Fontfabric free).
+// value 문자열은 콘텐츠에 리터럴로 저장되므로 절대 변경 금지.
+// '(영문)' 표기 = 한글 글리프가 없어 한글은 기본 폰트로 폴백되는 서체.
+// 모든 폰트 드롭다운(메인 툴바 + 위젯 NodeView 5곳)이 이 상수를 공유한다.
+export const EXTRA_FONTS = [
+  { label: '검은고딕', value: '"Black Han Sans", sans-serif' },
+  { label: '도현', value: '"Do Hyeon", sans-serif' },
+  { label: '구기', value: '"Gugi", sans-serif' },
+  { label: '고운바탕', value: '"Gowun Batang", serif' },
+  { label: '둥근모 픽셀', value: '"NeoDunggeunmo", sans-serif' },
+  { label: '갈무리 픽셀', value: '"Galmuri11", sans-serif' },
+  { label: '유니 산스 (영문)', value: '"Uni Sans Heavy", sans-serif' },
+  { label: '마인크래프트 (영문/숫자)', value: '"BC Pixel", monospace' },
+]
+
 const FONTS = [
   { label: '기본 폰트', value: 'inherit' },
   { label: '고딕 (Noto Sans)', value: '"Noto Sans KR", sans-serif' },
   { label: '명조 (Myeongjo)', value: '"Nanum Myeongjo", serif' },
   { label: '손글씨 (Pen Script)', value: '"Nanum Pen Script", cursive' },
   { label: '주아 (Jua)', value: '"Jua", sans-serif' },
+  ...EXTRA_FONTS,
 ]
 
 const SIZES = [
@@ -2848,6 +2896,7 @@ export default function RichTextEditor({ content, onChange, blueprintMode = true
       }
       const data = await response.json()
       const url = data.url
+      trackSessionUpload(url)
 
       editor.chain().focus().setImage({ src: url }).run()
     } catch (error: any) {

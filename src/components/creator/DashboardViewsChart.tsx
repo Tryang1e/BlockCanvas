@@ -12,10 +12,10 @@ import {
 } from 'recharts'
 
 export default function DashboardViewsChart({ totalViews = 0 }: { totalViews?: number }) {
-  // Generate a plausible week distribution that sums roughly to totalViews
+  // 누적 조회수를 요일별 추정 분포로 시각화한다(실제 일자별 기록이 아님 — 방문 시각 로깅 추가 시 정밀화).
   const data = React.useMemo(() => {
     const days = ['월', '화', '수', '목', '금', '토', '일'];
-    
+
     if (totalViews === 0) {
       return days.map(name => ({ name, views: 0 }));
     }
@@ -29,13 +29,13 @@ export default function DashboardViewsChart({ totalViews = 0 }: { totalViews?: n
       if (i === days.length - 1) {
         return { name, views: remaining };
       }
-      
+
       // Calculate a rough proportion and add some slight randomization
       const baseShare = Math.floor((weights[i] / sumWeights) * totalViews);
       // Randomize by +/- 20%
       const jitter = baseShare * (0.8 + Math.random() * 0.4);
       const views = Math.min(remaining, Math.floor(jitter));
-      
+
       remaining -= views;
       return { name, views };
     });
@@ -44,7 +44,7 @@ export default function DashboardViewsChart({ totalViews = 0 }: { totalViews?: n
   }, [totalViews]);
 
   return (
-    <div className="w-full h-80">
+    <div className="w-full h-56">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart
           data={data}
@@ -52,18 +52,19 @@ export default function DashboardViewsChart({ totalViews = 0 }: { totalViews?: n
         >
           <defs>
             <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#8884d8" stopOpacity={0.3} />
-              <stop offset="95%" stopColor="#8884d8" stopOpacity={0} />
+              <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
+              <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
             </linearGradient>
           </defs>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e5e5" />
           <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#888', fontSize: 12 }} dy={10} />
-          <YAxis axisLine={false} tickLine={false} tick={{ fill: '#888', fontSize: 12 }} dx={-10} />
-          <Tooltip 
-            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}
-            cursor={{ stroke: '#8884d8', strokeWidth: 1, strokeDasharray: '4 4' }}
+          <YAxis axisLine={false} tickLine={false} tick={{ fill: '#888', fontSize: 12 }} dx={-10} allowDecimals={false} />
+          <Tooltip
+            formatter={(v: any) => [`${Number(v).toLocaleString()} 회`, '조회수']}
+            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', fontSize: 12 }}
+            cursor={{ stroke: '#6366f1', strokeWidth: 1, strokeDasharray: '4 4' }}
           />
-          <Area type="monotone" dataKey="views" name="조회수" stroke="#8884d8" strokeWidth={3} fillOpacity={1} fill="url(#colorViews)" />
+          <Area type="monotone" dataKey="views" name="조회수" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorViews)" />
         </AreaChart>
       </ResponsiveContainer>
     </div>

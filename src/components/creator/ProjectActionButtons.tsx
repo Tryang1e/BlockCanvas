@@ -1,16 +1,32 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { deleteProjectAction } from '@/app/actions/projects'
+import { deleteProjectAction, toggleProjectPublishAction } from '@/app/actions/projects'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Tooltip from '@/components/ui/Tooltip'
+import { Eye, EyeOff } from 'lucide-react'
 
-export default function ProjectActionButtons({ projectId, creatorName, isOwner }: { projectId: string, creatorName: string, isOwner?: boolean }) {
+export default function ProjectActionButtons({ projectId, creatorName, isOwner, isPublished = true }: { projectId: string, creatorName: string, isOwner?: boolean, isPublished?: boolean }) {
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isToggling, setIsToggling] = useState(false)
+
+  const handleTogglePublish = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (isToggling) return
+    try {
+      setIsToggling(true)
+      await toggleProjectPublishAction(projectId, creatorName, !isPublished)
+      router.refresh()
+    } catch (err) {
+      alert('공개 상태 변경에 실패했습니다.')
+      console.error(err)
+      setIsToggling(false)
+    }
+  }
 
   useEffect(() => {
     setMounted(true)
@@ -65,6 +81,16 @@ export default function ProjectActionButtons({ projectId, creatorName, isOwner }
 
   return (
     <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2 z-10 pointer-events-auto">
+      <Tooltip text={isPublished ? '비공개로 전환' : '공개로 전환'} position="bottom">
+        <button
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={handleTogglePublish}
+          disabled={isToggling}
+          className={`${isPublished ? 'bg-white/90 hover:bg-white text-neutral-800' : 'bg-amber-500/90 hover:bg-amber-500 text-white'} p-2 rounded-full shadow-md text-xs font-bold w-8 h-8 flex items-center justify-center transition-all cursor-pointer hover:scale-110 disabled:opacity-50`}
+        >
+          {isPublished ? <Eye size={15} /> : <EyeOff size={15} />}
+        </button>
+      </Tooltip>
       <Tooltip text="수정하기" position="bottom">
         <Link 
           href={`/editor?project_id=${projectId}`}

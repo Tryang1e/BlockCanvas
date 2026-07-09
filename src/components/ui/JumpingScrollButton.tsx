@@ -177,7 +177,7 @@ export default function JumpingScrollButton() {
       <button 
         ref={buttonRef}
         onClick={handleClick}
-        className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[60] w-14 h-14 bg-white dark:bg-neutral-800 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(0,0,0,0.15)] border border-neutral-200 dark:border-neutral-700 text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100 cursor-pointer transition-colors"
+        className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[60] w-14 h-14 bg-white dark:bg-neutral-800 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(0,0,0,0.15)] border border-neutral-200 hover:border-[color:var(--bc-theme-border,#e5e5e5)] dark:border-neutral-700 text-neutral-500 hover:text-[color:var(--bc-theme-strong,#171717)] dark:text-neutral-400 dark:hover:text-neutral-100 cursor-pointer transition-colors"
       >
         {isAtBottom ? (
           <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>

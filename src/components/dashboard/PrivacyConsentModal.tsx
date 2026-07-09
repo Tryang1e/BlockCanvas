@@ -50,7 +50,7 @@ export default function PrivacyConsentModal({ creatorName, previouslyConsented =
             <h2 className="text-lg font-black text-neutral-900 tracking-tight">개인정보 수집 및 이용 동의</h2>
             <p className="text-xs text-neutral-500 font-medium mt-0.5">
               {previouslyConsented
-                ? '개인정보 처리방침이 개정(v2)되었습니다. 서비스를 계속 이용하시려면 변경된 내용에 대한 동의가 필요합니다.'
+                ? '개인정보 처리방침이 개정(v4)되었습니다. 서비스를 계속 이용하시려면 변경된 내용에 대한 동의가 필요합니다.'
                 : 'BlockCanvas 서비스를 원활히 이용하기 위해 최초 1회 필수 동의가 필요합니다.'}
             </p>
           </div>
@@ -60,10 +60,10 @@ export default function PrivacyConsentModal({ creatorName, previouslyConsented =
         <div className="p-6 overflow-y-auto space-y-6 flex-1 text-sm text-neutral-700 leading-relaxed scrollbar-thin">
           
           <div className="bg-amber-50 border border-amber-200/80 rounded-xl p-4 text-xs text-amber-800 font-medium space-y-1.5">
-            <span className="font-bold text-amber-900">⚠️ 고지사항 및 안내 (개인정보처리방침 v2 · 2026. 06. 20 시행)</span>
+            <span className="font-bold text-amber-900">⚠️ 고지사항 및 안내 (개인정보처리방침 v4 · 2026. 07. 10 시행)</span>
             <p>
               대한민국 개인정보 보호법(제15조 등)에 따라 서비스 운영자가 제공하는 개인정보 수집·이용 동의 안내입니다.
-              본 동의는 마인크래프트 서버 연동, Discord/Microsoft 계정 연동, 월드 클라우드·영토(플롯) 기능을 반영한 개정판(v2)을 기준으로 합니다.
+              본 동의는 공식 Discord 서버 가입 여부 확인을 통한 건축 이용 자격 부여·회수, Patreon 후원 연동(후원자 인증·구독 혜택), 마인크래프트 서버 연동, Discord/Microsoft 계정 연동, 월드 클라우드·영토(플롯) 기능을 반영한 개정판(v4)을 기준으로 합니다.
               아래 요약 외 전체 항목·국외 이전·보유기간 등 상세 내용은{' '}
               <a href="/privacy" target="_blank" rel="noopener noreferrer" className="font-bold text-amber-900 underline underline-offset-2 hover:text-amber-950">개인정보처리방침 전문</a>에서 확인하실 수 있으며,
               동의 내역은 대시보드 [계정 및 보안 관리] 메뉴에서 상시 열람할 수 있습니다.
@@ -101,9 +101,9 @@ export default function PrivacyConsentModal({ creatorName, previouslyConsented =
                     <td className="p-3">로그인 및 크리에이터 본인 식별·인증, 보안 통지</td>
                   </tr>
                   <tr>
-                    <td className="p-3 bg-neutral-50/30 font-bold">Discord 로그인·연동</td>
-                    <td className="p-3">Discord 계정 고유 ID, Discord 사용자명 <span className="text-red-500 font-bold">[필수]</span></td>
-                    <td className="p-3">Discord 계정 연동·로그인, 인게임-웹 신원 연결</td>
+                    <td className="p-3 bg-neutral-50/30 font-bold">Discord 연동</td>
+                    <td className="p-3">Discord 계정 고유 ID, Discord 사용자명, 공식 Discord 서버 가입 여부 <span className="text-red-500 font-bold">[필수]</span></td>
+                    <td className="p-3">Discord 계정 연동·신원 연결, 서버 가입 여부에 따른 건축 이용 자격 부여·회수</td>
                   </tr>
                   <tr>
                     <td className="p-3 bg-neutral-50/30 font-bold">마인크래프트 정품 인증·연동</td>
@@ -157,7 +157,8 @@ export default function PrivacyConsentModal({ creatorName, previouslyConsented =
                 <li><span className="font-bold text-neutral-700">Resend, Inc. (미국)</span> — 수신자 이메일·인증 메일 내용 / 회원가입·서비스 통지 메일 발송</li>
                 <li><span className="font-bold text-neutral-700">Cloudflare, Inc. (미국 등 글로벌)</span> — 접속 트래픽(IP 포함)·DB 백업 파일 / 접속 중계·보안 및 재해 복구 백업</li>
                 <li><span className="font-bold text-neutral-700">Microsoft / Mojang Studios (미국 등)</span> — 이용자 본인이 직접 로그인하는 제3자 인증 / OAuth 토큰·회신 UUID·닉네임 / 마인크래프트 정품 본인 인증(토큰 미저장)</li>
-                <li><span className="font-bold text-neutral-700">Discord, Inc. (미국)</span> — OAuth 인가 코드·회신 Discord ID·사용자명 / Discord 계정 본인 인증·연동</li>
+                <li><span className="font-bold text-neutral-700">Discord, Inc. (미국)</span> — OAuth 인가 코드·회신 Discord ID·사용자명, 서버 가입 여부 확인용 Discord ID 조회 / Discord 계정 본인 인증·연동 및 공식 서버 가입 여부 확인</li>
+                <li><span className="font-bold text-neutral-700">Patreon, Inc. (미국)</span> — OAuth 인가 코드·회신 Patreon 사용자 ID·표시 이름·후원 상태 / 후원자 본인 인증 및 구독 혜택 부여(이메일·후원 금액 미저장)</li>
               </ul>
               <p className="text-neutral-500">
                 이용자는 국외 이전을 거부할 수 있으며, 이 경우 이메일 인증·계정 연동·백업 등 해당 기능 이용이 제한될 수 있습니다.
@@ -171,7 +172,7 @@ export default function PrivacyConsentModal({ creatorName, previouslyConsented =
           <div className="space-y-4 pt-2">
             <h3 className="font-bold text-neutral-900 flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-black"></span>
-              개인정보 보유·이용 기간 및 권리 안내 (2026. 06. 20 기준, v2)
+              개인정보 보유·이용 기간 및 권리 안내 (2026. 07. 10 기준, v4)
             </h3>
 
             <div className="space-y-3 pl-2.5 border-l border-neutral-200 text-xs text-neutral-600">
@@ -221,7 +222,7 @@ export default function PrivacyConsentModal({ creatorName, previouslyConsented =
               {isChecked && <Check size={14} className="text-black stroke-[3]" />}
             </button>
             <div className="text-xs text-neutral-600 font-bold select-none cursor-pointer" onClick={() => setIsChecked(!isChecked)}>
-              <span>위 개인정보 수집·이용 및 국외 이전 안내(개인정보처리방침 v2 · 2026. 06. 20)를 충분히 확인하였으며, 이에 동의합니다. (필수)</span>
+              <span>위 개인정보 수집·이용 및 국외 이전 안내(개인정보처리방침 v4 · 2026. 07. 10)를 충분히 확인하였으며, 이에 동의합니다. (필수)</span>
             </div>
           </div>
 

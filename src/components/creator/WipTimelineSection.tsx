@@ -374,9 +374,10 @@ export default function WipTimelineSection({
   return (
     <div className="w-full max-w-6xl mx-auto px-6 py-20 relative bg-transparent">
       {/* 절제된 미니멀리즘 헤더 */}
-      <div className="relative flex flex-col md:flex-row md:items-end justify-between gap-6 mb-16 pb-6 border-b-2 border-neutral-350 dark:border-neutral-700 z-10">
+      <div className="relative flex flex-col md:flex-row md:items-end justify-between gap-6 mb-16 pb-6 border-b-2 border-[color:var(--bc-theme-border,#b3b3b3)] dark:border-neutral-700 z-10">
         <div>
-          <span className="text-[10px] font-mono tracking-[0.25em] text-neutral-500 dark:text-neutral-400 uppercase font-black">
+          {/* 모노 텔레메트리 서브라벨 — 크리에이터 테마 진한색 액센트 */}
+          <span className="text-[10px] font-mono tracking-[0.25em] text-[color:var(--bc-theme-strong,#737373)] dark:text-neutral-400 uppercase font-black">
             PROCESS & REASONING ARCHIVE
           </span>
           <h2 className="text-3xl font-bold tracking-tight text-neutral-950 dark:text-neutral-5 mt-2 font-sans">
@@ -636,7 +637,7 @@ export default function WipTimelineSection({
           ) : (
             
             /* 세로형 리스트 모드 - 칼처럼 뚜렷하고 선명한 타임라인 */
-            <div className="relative border-l-2 border-neutral-400 dark:border-neutral-700 ml-4 md:ml-6 space-y-10 py-2">
+            <div className="relative border-l-2 border-[color:var(--bc-theme-border,#a3a3a3)] dark:border-neutral-700 ml-4 md:ml-6 space-y-10 py-2">
               {logs.map((log, index) => {
                 const metaConfig = parseDescriptionAndMeta(log.description)
                 const stepNumber = String(logs.length - index).padStart(2, '0')
@@ -644,8 +645,8 @@ export default function WipTimelineSection({
                 return (
                   <div key={log.id} className="relative pl-6 md:pl-10 group/item">
                     {/* 단정하고 얇으며 고대비인 노드 포인트 */}
-                    <div 
-                      className="absolute -left-[7px] top-4.5 w-3 h-3 rounded-full bg-neutral-950 dark:bg-neutral-100 border-2 border-white dark:border-[#0a0a0a] transition-all duration-300 group-hover/item:scale-110 shadow-sm"
+                    <div
+                      className="absolute -left-[7px] top-4.5 w-3 h-3 rounded-full bg-[color:var(--bc-theme-strong,#0a0a0a)] dark:bg-neutral-100 border-2 border-white dark:border-[#0a0a0a] transition-all duration-300 group-hover/item:scale-110 shadow-sm"
                     />
 
                     {/* 세로형 미니멀리스트 갤러리 카드 */}

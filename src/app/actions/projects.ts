@@ -31,6 +31,33 @@ export async function deleteProjectAction(projectId: string, creatorName: string
   return { success: true }
 }
 
+export async function toggleProjectPublishAction(projectId: string, creatorName: string, is_published: boolean) {
+  // 세션이 본인(또는 관리자)인지 검증하고, 검증된 프로필 ID 소유 게시물만 변경한다.
+  const authCreatorId = await requireAuth(creatorName)
+  try {
+    const updated = await prisma.project.updateMany({
+      where: { id: projectId, creator_id: authCreatorId },
+      data: { is_published }
+    })
+    if (updated.count === 0) throw new Error('Project not found or access denied')
+
+    await prisma.creatorLog.create({
+      data: {
+        creator_name: creatorName,
+        action: is_published ? 'PUBLISH_PROJECT' : 'HIDE_PROJECT',
+        target_id: projectId,
+        details: `게시물 ${is_published ? '공개' : '비공개'} 전환`
+      }
+    }).catch(() => {})
+  } catch (error) {
+    console.error('Toggle Project Publish Error:', error)
+    throw new Error('게시물 공개 상태 변경에 실패했습니다.')
+  }
+
+  revalidatePath(`/sites/${creatorName}`)
+  return { success: true }
+}
+
 export async function updateProjectOrderAction(
   updates: { id: string; section_id: string | null; sort_order: number }[],
   creatorName: string

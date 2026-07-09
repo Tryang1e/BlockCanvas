@@ -1,7 +1,25 @@
 import { prisma } from '@/lib/prisma'
+import { headers } from 'next/headers'
 import DashboardViewsChart from '@/components/creator/DashboardViewsChart'
+import PatreonSubscribeCard from '@/components/dashboard/PatreonSubscribeCard'
+import { isPatreonOAuthConfigured } from '@/lib/patreonOAuth'
+import { isOfficialOrAbove } from '@/lib/roles'
 import { Activity, ShieldCheck, ShieldAlert, Mail, Calendar, User, ArrowRight, Sparkles } from 'lucide-react'
 import Link from 'next/link'
+
+/**
+ * OAuth 중앙화(connections/page.tsx 와 동일 규칙): Patreon 연결/재동기화 시작 URL 을
+ * 단일 auth 호스트(auth.<base>) 기준 절대경로로 만든다(redirect_uri 1개 공유).
+ */
+async function authHostUrl(path: string): Promise<string> {
+  const h = await headers()
+  const host = h.get('x-forwarded-host') || h.get('host') || 'craftopia.work'
+  const isLocal = host.includes('localhost') || host.includes('127.0.0.1')
+  const proto = !isLocal || h.get('x-forwarded-proto') === 'https' ? 'https' : 'http'
+  const base = isLocal ? host : host.split('.').slice(-2).join('.')
+  const authHost = isLocal ? host : `auth.${base}`
+  return `${proto}://${authHost}${path}`
+}
 
 export default async function DashboardOverviewPage({
   params,
@@ -20,6 +38,14 @@ export default async function DashboardOverviewPage({
   })
 
   if (!profile) return null
+
+  // Patreon 구독 CTA 노출 여부 — 미설정(CLIENT_ID/SECRET 없음)이거나 official 이상(공식·매니저·관리자)이면 숨긴다.
+  //   official+ 는 이미 크리에이터 권한을 보유해 구독 CTA 가 무의미. user·creator 에게만 노출.
+  //   patreonLoginUrl 이 null 이면 카드 자체를 렌더하지 않는다(연결/재동기화 공용 시작 URL).
+  const patreonLoginUrl =
+    isPatreonOAuthConfigured() && !isOfficialOrAbove(profile.role)
+      ? await authHostUrl('/api/auth/patreon/start')
+      : null
 
   // If the role is 'user', render the personalized USER dashboard
   if (profile.role === 'user') {
@@ -55,7 +81,7 @@ export default async function DashboardOverviewPage({
             <div>
               <h3 className="text-neutral-500 text-sm font-bold tracking-tight mb-1">내 활동 로그 기록</h3>
               <p className="text-3xl font-black text-neutral-900">{activityCount}개</p>
-              <Link 
+              <Link
                 href={`/dashboard/activity`}
                 className="inline-flex items-center gap-1 text-xs font-bold text-neutral-400 hover:text-black mt-3 transition-colors group"
               >
@@ -76,7 +102,7 @@ export default async function DashboardOverviewPage({
                   {profile.two_factor_enabled ? '보안 활성화됨' : '비활성화 상태'}
                 </span>
               </div>
-              <Link 
+              <Link
                 href={`/dashboard/account`}
                 className="inline-flex items-center gap-1 text-xs font-bold text-neutral-400 hover:text-black mt-3 transition-colors group"
               >
@@ -139,15 +165,20 @@ export default async function DashboardOverviewPage({
                 <Sparkles size={18} />
               </div>
               <h2 className="text-lg font-bold mb-3 tracking-tight text-neutral-900">
-                공식 크리에이터가 되세요!
+                크리에이터가 되세요!
               </h2>
               <p className="text-sm text-neutral-500 leading-relaxed font-medium">
                 일반 사용자 계정은 외부 공개용 포트폴리오를 제공하지 않습니다. <br /><br />
-                구독 멤버십에 가입하거나 공식 크리에이터로 등록되면, 드래그 앤 드롭 빌더를 이용해 멋진 캔버스 페이지를 개설할 수 있습니다!
+                <strong>구독 멤버십</strong>에 가입시 크리에이터로 등록되며, 드래그 앤 드롭 빌더를 이용해 멋진 캔버스 페이지를 개설할 수 있습니다!
               </p>
             </div>
-            <div className="mt-6 pt-4 border-t border-neutral-200/60 text-xs text-neutral-400 font-semibold leading-relaxed">
-              💡 권한 업그레이드 신청 및 변경 문의는 관리자 고객센터로 메일 주시기 바랍니다.
+            <div className="mt-6 pt-4 border-t border-neutral-200/60 space-y-3">
+              {patreonLoginUrl && (
+                <PatreonSubscribeCard patreonLoginUrl={patreonLoginUrl} />
+              )}
+              <p className="text-[11px] text-neutral-400 font-semibold leading-relaxed">
+                💡 그 밖의 권한 문의는 관리자 고객센터로 메일 주시기 바랍니다.
+              </p>
             </div>
           </div>
         </div>
@@ -155,61 +186,85 @@ export default async function DashboardOverviewPage({
     )
   }
 
-  // Creator/PRO role dashboard overview
-  const projectCount = profile.projects.length
-  const totalViews = profile.projects.reduce((sum, p) => sum + p.view_count, 0)
-  const hasPortfolio = !!profile.portfolios
+  // ── Creator/PRO role dashboard: 간소화한 조회수 요약(그래프 중심) ──
+  const cleanTitle = (t: string | null) =>
+    (t || '').replace(/\[\s*SIZE\s*:\s*[1-3]\s*(?:[xX]\s*[1-3])?\s*\]/gi, '').trim() || '제목 없음'
+
+  const projects = profile.projects
+  const projectCount = projects.length
+  const publishedCount = projects.filter((p) => p.is_published).length
+  const totalViews = projects.reduce((sum, p) => sum + p.view_count, 0)
+  const avgViews = projectCount ? Math.round(totalViews / projectCount) : 0
+
+  const topWorks = [...projects]
+    .sort((a, b) => b.view_count - a.view_count)
+    .slice(0, 5)
+    .map((p) => ({ id: p.id, title: cleanTitle(p.title), views: p.view_count, isPublished: p.is_published }))
+
+  const statCards = [
+    { label: '총 작품', value: projectCount.toLocaleString() },
+    { label: '공개 작품', value: publishedCount.toLocaleString() },
+    { label: '누적 조회수', value: totalViews.toLocaleString() },
+    { label: '평균 조회', value: avgViews.toLocaleString() },
+  ]
 
   return (
-    <div className="animate-in fade-in zoom-in-95 duration-500">
-      <div className="mb-8">
-        <h1 className="text-3xl font-black text-neutral-900 tracking-tight mb-2">대시보드 요약</h1>
-        <p className="text-neutral-500 font-medium">포트폴리오 현황과 주요 통계를 한눈에 확인하세요.</p>
+    <div className="animate-in fade-in zoom-in-95 duration-500 max-w-3xl">
+      {patreonLoginUrl && (
+        <div className="mb-6">
+          <PatreonSubscribeCard patreonLoginUrl={patreonLoginUrl} />
+        </div>
+      )}
+      <div className="mb-6">
+        <h1 className="text-2xl font-black text-neutral-900 tracking-tight mb-1">방문자 통계</h1>
+        <p className="text-sm text-neutral-500 font-medium">포트폴리오 조회 현황 요약</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-2xl border border-neutral-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
-          <h3 className="text-neutral-500 text-sm font-bold tracking-tight mb-2">총 게시물 수</h3>
-          <p className="text-4xl font-black text-neutral-900">{projectCount}개</p>
-        </div>
-        <div className="bg-white p-6 rounded-2xl border border-neutral-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
-          <h3 className="text-neutral-500 text-sm font-bold tracking-tight mb-2">누적 조회수</h3>
-          <p className="text-4xl font-black text-neutral-900">{totalViews.toLocaleString()}</p>
-        </div>
+      {/* 간단 수치 */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        {statCards.map((c) => (
+          <div key={c.label} className="bg-white px-4 py-3 rounded-xl border border-neutral-200">
+            <p className="text-[11px] font-bold text-neutral-400 truncate">{c.label}</p>
+            <p className="text-xl font-black text-neutral-900 mt-0.5">{c.value}</p>
+          </div>
+        ))}
       </div>
 
-      <div className="bg-white p-8 rounded-2xl border border-neutral-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)] mb-8">
-        <h2 className="text-xl font-bold mb-6 tracking-tight text-neutral-900">주간 조회수 추이</h2>
+      {/* 메인: 주간 조회수 추이 (작게) */}
+      <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)] mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-bold text-neutral-700 flex items-center gap-2">
+            <Activity size={15} className="text-indigo-500" /> 주간 조회수 추이
+          </h2>
+          <span className="text-[10px] text-neutral-300 font-medium">추정 분포</span>
+        </div>
         <DashboardViewsChart totalViews={totalViews} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white p-8 rounded-2xl border border-neutral-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
-          <h2 className="text-xl font-bold mb-6 tracking-tight text-neutral-900">포트폴리오 상태</h2>
-          <div className="flex items-center justify-between p-4 bg-neutral-50 rounded-xl border border-neutral-100">
-            <div>
-              <p className="font-bold text-neutral-900">인사이트 포트폴리오 생성 여부</p>
-              <p className="text-sm text-neutral-500 mt-1">포트폴리오 정보(배너, 소개글 등)가 초기화되어 있는지 여부입니다.</p>
-            </div>
-            <div className={`px-4 py-2 rounded-full font-bold text-sm ${hasPortfolio ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-              {hasPortfolio ? '생성 완료' : '미생성'}
-            </div>
-          </div>
+      {/* 조회수 순위 (차분하게) */}
+      {topWorks.length > 0 && (
+        <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+          <h2 className="text-xs font-bold text-neutral-400 mb-2">조회수 순위</h2>
+          <ul className="divide-y divide-neutral-100">
+            {topWorks.map((w, i) => (
+              <li key={w.id}>
+                <Link href={`/project/${w.id}`} className="flex items-center gap-3 py-2 group">
+                  <span className="w-4 text-xs font-bold text-neutral-300 tabular-nums shrink-0">{i + 1}</span>
+                  <span className="text-sm text-neutral-600 truncate flex-1 group-hover:text-neutral-900 transition-colors">
+                    {w.title}
+                    {!w.isPublished && <span className="ml-1.5 text-[10px] text-neutral-400">(비공개)</span>}
+                  </span>
+                  <span className="text-xs font-semibold text-neutral-400 tabular-nums shrink-0">{w.views.toLocaleString()}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
         </div>
+      )}
 
-        <div className="bg-white p-8 rounded-2xl border border-neutral-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
-          <h2 className="text-xl font-bold mb-6 tracking-tight text-neutral-900">시스템 연동 현황</h2>
-          <div className="flex items-center justify-between p-4 bg-neutral-50 rounded-xl border border-neutral-100 opacity-60">
-            <div>
-              <p className="font-bold text-neutral-900">마인크래프트 계정 및 건축 서버</p>
-              <p className="text-sm text-neutral-500 mt-1">인게임 플러그인을 통해 건축물 메타데이터를 연동합니다.</p>
-            </div>
-            <div className="px-4 py-2 rounded-full font-bold text-sm bg-neutral-200 text-neutral-600">
-              지원 예정
-            </div>
-          </div>
-        </div>
-      </div>
+      <p className="text-[11px] text-neutral-400 mt-5 leading-relaxed">
+        ※ &quot;주간 조회수 추이&quot;는 누적 조회수를 요일별 분포로 추정·시각화한 것입니다(실제 일자별 기록 아님). 수치(누적 조회수·순위)는 실제 값입니다.
+      </p>
     </div>
   )
 }

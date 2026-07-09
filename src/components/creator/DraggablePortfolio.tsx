@@ -328,81 +328,12 @@ export default function DraggablePortfolio({
     setActiveType(active.data.current?.type as 'Section' | 'Project')
   }
 
-  const handleDragOver = (event: DragOverEvent) => {
-    const { active, over } = event
-    if (!over) return
-
-    const activeId = active.id
-    const overId = over.id
-
-    if (activeId === overId) return
-
-    const isActiveProject = active.data.current?.type === 'Project'
-    const isOverProject = over.data.current?.type === 'Project'
-    const isOverSection = over.data.current?.type === 'Section'
-
-    if (!isActiveProject) return // We only care about Project moving between sections
-
-    // Helper to safely group and re-insert items to prevent global array interleaving
-    const moveItemAcrossSections = (items: any[], activeId: string, overId: string | null, targetSectionId: string) => {
-      const activeItem = items.find(p => p.id === activeId)
-      if (!activeItem) return items
-      
-      const updatedActive = { ...activeItem, section_id: targetSectionId }
-      const filteredItems = items.filter(p => p.id !== activeId)
-      
-      const allSectionIds = Array.from(new Set(items.map(p => p.section_id)))
-      if (!allSectionIds.includes(targetSectionId)) allSectionIds.push(targetSectionId)
-
-      const newProjects: any[] = []
-      
-      for (const sId of allSectionIds) {
-        const sectionProjects = filteredItems.filter(p => p.section_id === sId)
-        
-        if (sId === targetSectionId) {
-          if (overId) {
-            const overLocalIndex = sectionProjects.findIndex(p => p.id === overId)
-            if (overLocalIndex !== -1) {
-              sectionProjects.splice(overLocalIndex, 0, updatedActive)
-            } else {
-              sectionProjects.push(updatedActive)
-            }
-          } else {
-            sectionProjects.push(updatedActive)
-          }
-        }
-        newProjects.push(...sectionProjects)
-      }
-      return newProjects
-    }
-
-    // Dropping a Project over another Project
-    if (isActiveProject && isOverProject) {
-      setProjects((items) => {
-        const activeItem = items.find((t) => t.id === activeId)
-        const overItem = items.find((t) => t.id === overId)
-
-        if (activeItem && overItem && activeItem.section_id !== overItem.section_id) {
-          return moveItemAcrossSections(items, activeId as string, overId as string, overItem.section_id as string)
-        }
-        return items
-      })
-    }
-
-    // Dropping a Project into an empty Section
-    if (isActiveProject && isOverSection) {
-      const targetSectionData = sections.find(s => s.id === overId)
-      if (targetSectionData?.section_type === 'text') return
-
-      setProjects((items) => {
-        const activeItem = items.find((t) => t.id === activeId)
-        if (activeItem && activeItem.section_id !== overId) {
-          return moveItemAcrossSections(items, activeId as string, null, overId as string)
-        }
-        return items
-      })
-    }
-  }
+  // 섹션 간 이동 신뢰성을 위해 드래그 '중' 실시간 이동(리플로우)은 하지 않는다.
+  // → 영상 슬라이더/타임라인 등 여러 종류의 섹션을 가로질러도 레이아웃이 출렁이지 않아
+  //   먼 섹션까지 안정적으로 드롭할 수 있다.
+  // 같은 섹션 내 순서 미리보기는 SortableContext가 자동 처리하고,
+  // 실제 이동/저장은 handleDragEnd가 단일 책임으로 수행한다.
+  const handleDragOver = (_event: DragOverEvent) => {}
 
   const handleDragEnd = async (event: DragEndEvent) => {
     setActiveId(null)
@@ -430,51 +361,65 @@ export default function DraggablePortfolio({
 
     const isActiveProject = active.data.current?.type === 'Project'
     if (isActiveProject) {
-      let newProjects = [...projects]
-      const activeProject = newProjects.find(p => p.id === activeId)
-      const overProject = newProjects.find(p => p.id === overId)
+      if (activeId === overId) return
 
-      if (activeProject && overProject) {
-        const sectionId = overProject.section_id
+      // 상태 객체를 직접 변형하지 않도록 얕은 복제 후 작업한다.
+      const base: Project[] = projects.map(p => ({ ...p }))
+      const activeProject = base.find(p => p.id === activeId)
+      if (!activeProject) return
 
-        // Ensure activeProject's section_id is updated if it moved across sections
-        if (activeProject.section_id !== sectionId) {
-          activeProject.section_id = sectionId
-        }
+      // 드롭 대상으로부터 목표 섹션을 직접 도출한다.
+      //  - 다른 게시글 위에 드롭 → 그 게시글의 섹션
+      //  - 섹션(빈 영역/헤더) 위에 드롭 → 그 섹션
+      //  - 그 외 → 현재(원래) 섹션 유지
+      const originalSectionId = activeProject.section_id as string
+      const overProject = base.find(p => p.id === overId)
+      const overIsSection = sections.some(s => s.id === overId)
+      const targetSectionId = overProject
+        ? (overProject.section_id as string)
+        : (overIsSection ? (overId as string) : originalSectionId)
 
-        // Extract projects only for this target section
-        const sectionProjects = newProjects.filter(p => p.section_id === sectionId)
-        
-        const activeSectionIndex = sectionProjects.findIndex(p => p.id === activeId)
-        const overSectionIndex = sectionProjects.findIndex(p => p.id === overId)
+      // 다른 섹션으로의 이동은 게시글을 표시하는 섹션(이미지 그리드·영상 슬라이더)으로만 허용한다.
+      // (타임라인/텍스트 섹션은 게시글을 표시하지 않으므로 드롭 대상 아님 → 원위치 유지)
+      // 같은 섹션 내 순서 변경은 섹션 종류와 무관하게 허용.
+      const PROJECT_SECTION_TYPES = ['image_grid', 'video_slider']
+      const targetSection = sections.find(s => s.id === targetSectionId)
+      if (targetSectionId !== originalSectionId && !PROJECT_SECTION_TYPES.includes(targetSection?.section_type || '')) return
 
-        if (activeSectionIndex !== -1 && overSectionIndex !== -1 && activeSectionIndex !== overSectionIndex) {
-          const reorderedSectionProjects = arrayMove(sectionProjects, activeSectionIndex, overSectionIndex)
-          
-          // Re-insert into the global newProjects array at the same indices they were found
-          let replaceIdx = 0
-          newProjects = newProjects.map(p => {
-            if (p.section_id === sectionId) {
-              return reorderedSectionProjects[replaceIdx++]
-            }
-            return p
-          })
-          
-          setProjects(newProjects)
-        } else if (activeId !== overId) {
-          // Fallback if something weird happened
-          setProjects(newProjects)
-        }
+      activeProject.section_id = targetSectionId
+
+      // 섹션 순서대로 그룹화하여 전역 배열을 재구성한다(섹션 간 순서 뒤섞임/유실 방지).
+      const orderedSectionIds = sections.map(s => s.id)
+      for (const p of base) {
+        const sid = (p.section_id as string)
+        if (!orderedSectionIds.includes(sid)) orderedSectionIds.push(sid)
       }
 
-      // Group by section and update sort_order properly
-      const updates = newProjects.map((p) => {
-        const sectionProjects = newProjects.filter(sp => sp.section_id === p.section_id)
-        const localIndex = sectionProjects.findIndex(sp => sp.id === p.id)
+      const rebuilt: Project[] = []
+      for (const sId of orderedSectionIds) {
+        let items = base.filter(p => p.section_id === sId)
+        if (sId === targetSectionId) {
+          if (overProject) {
+            const ai = items.findIndex(p => p.id === activeId)
+            const oi = items.findIndex(p => p.id === overId)
+            if (ai !== -1 && oi !== -1 && ai !== oi) items = arrayMove(items, ai, oi)
+          } else {
+            // 섹션 빈 영역에 드롭: 해당 섹션 맨 뒤로 배치
+            items = [...items.filter(p => p.id !== activeId), activeProject]
+          }
+        }
+        rebuilt.push(...items)
+      }
+
+      setProjects(rebuilt)
+
+      // 섹션별 sort_order 재계산 후 영속화
+      const updates = rebuilt.map((p) => {
+        const sectionProjects = rebuilt.filter(sp => sp.section_id === p.section_id)
         return {
           id: p.id,
           section_id: p.section_id,
-          sort_order: localIndex
+          sort_order: sectionProjects.findIndex(sp => sp.id === p.id)
         }
       })
 
@@ -557,11 +502,12 @@ export default function DraggablePortfolio({
             <span className="text-xl shrink-0 mt-0.5">💡</span>
             <div>
               <h4 className="text-xs font-bold text-neutral-800 dark:text-neutral-200 uppercase tracking-wide">
-                섹션 드래그앤드롭 순서 재조정 및 가이드라인
+                섹션 &amp; 게시글 정렬 가이드
               </h4>
               <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-1.5 leading-relaxed font-medium">
-                각 섹션 헤더 좌측에 있는 **⠿ 손잡이 핸들**에 마우스 커서를 대고 원하는 위치로 위아래로 드래그하면, 메인 홈페이지에 노출되는 작품 목록의 순서가 실시간으로 재정렬되어 저장됩니다.
-                보다 편리하고 빠르게 일괄적으로 변경하려면 우측 상단의 **&quot;섹션 순서 관리&quot;** 버튼을 눌러 계층 리스트 모드로 조절할 수도 있습니다.
+                <strong className="text-neutral-700 dark:text-neutral-300">섹션 순서</strong> — 각 섹션 헤더의 ⠿ 손잡이 핸들을 잡고 위아래로 드래그하면 섹션 순서가 바뀌어 저장됩니다. 우측 상단 &quot;섹션 순서 관리&quot; 버튼으로 한 번에 정리할 수도 있습니다.
+                <br />
+                <strong className="text-neutral-700 dark:text-neutral-300">게시글 이동</strong> — 작품 카드를 드래그해 같은 섹션 안에서 순서를 바꾸거나 다른 섹션으로 옮길 수 있습니다. 목표 섹션 위에 카드를 놓는 순간 이동·저장됩니다. (이미지 그리드·영상 슬라이더 섹션끼리만 이동되며, 타임라인·텍스트 섹션에는 들어가지 않습니다.)
               </p>
             </div>
           </div>

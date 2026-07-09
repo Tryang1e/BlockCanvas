@@ -16,17 +16,17 @@ export default function SettingsForm({ profile, allCreators = [] }: { profile: a
   }
 
   const [snsSettings, setSnsSettings] = useState<Record<string, any>>(
-    profile.sns_settings && Object.keys(profile.sns_settings).length > 0 
-      ? profile.sns_settings 
+    profile.sns_settings && Object.keys(profile.sns_settings).length > 0
+      ? profile.sns_settings
       : defaultSns
   )
 
   const [searchQuery, setSearchQuery] = useState('')
   const recommendedCreators: string[] = snsSettings.recommended_creators || []
 
-  const peerCandidates = allCreators.filter((c: any) => 
+  const peerCandidates = allCreators.filter((c: any) =>
     !recommendedCreators.includes(c.creator_name) &&
-    (searchQuery === '' || 
+    (searchQuery === '' ||
       c.display_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       c.creator_name?.toLowerCase().includes(searchQuery.toLowerCase())
     )
@@ -69,7 +69,7 @@ export default function SettingsForm({ profile, allCreators = [] }: { profile: a
       const formData = new FormData(e.currentTarget)
       formData.append('creator_name', profile.creator_name)
       formData.append('sns_settings', JSON.stringify(snsSettings))
-      
+
       await updateProfileAction(formData)
       setSuccessMsg('설정이 성공적으로 저장되었습니다.')
       setTimeout(() => setSuccessMsg(''), 3000)
@@ -82,7 +82,7 @@ export default function SettingsForm({ profile, allCreators = [] }: { profile: a
 
   return (
     <form onSubmit={handleSubmit} className="p-8 space-y-10">
-      
+
       {/* Section: Basic Info */}
       <section>
         <h2 className="text-lg font-bold border-b border-neutral-100 pb-3 mb-5">기본 정보</h2>
@@ -114,7 +114,7 @@ export default function SettingsForm({ profile, allCreators = [] }: { profile: a
             <label className="block text-[11px] font-bold mb-1.5 text-neutral-500 uppercase tracking-wide">배경 색상 (Background Color)</label>
             <div className="flex items-center gap-4">
               <input type="color" name="theme_bg_color" defaultValue={profile.theme_bg_color} className="w-10 h-10 rounded cursor-pointer border border-neutral-200 p-0" title="배경 색상" />
-              <span className="text-xs text-neutral-500">배너 이미지 아래 메인 배경 색상입니다.<br/>기본값은 #222222 입니다.</span>
+              <span className="text-xs text-neutral-500">배너 이미지 아래 메인 배경 색상입니다.<br />기본값은 #222222 입니다.</span>
             </div>
           </div>
           <div>
@@ -319,13 +319,18 @@ export default function SettingsForm({ profile, allCreators = [] }: { profile: a
           <h2 className="text-lg font-bold">SNS 및 외부 링크 연결</h2>
           <p className="text-xs text-neutral-500 font-medium">우측의 체크박스를 해제하면 포트폴리오에서 임시로 숨길 수 있습니다.</p>
         </div>
-        
+
         <div className="space-y-3">
           {/* Discord */}
           <div className="flex items-center gap-4 p-3 border border-neutral-200 rounded-lg bg-white shadow-sm">
             <div className="flex-1">
-              <label className="block text-[11px] font-bold mb-1 text-neutral-500 uppercase tracking-wider">Discord ID</label>
-              <input name="discord_id" defaultValue={profile.discord_id} placeholder="User#1234" className="w-full bg-transparent focus:outline-none font-medium text-sm" />
+              <label className="block text-[11px] font-bold mb-1 text-neutral-500 uppercase tracking-wider">Discord 연락처 (표시용)</label>
+              <input
+                value={snsSettings.discordHandle || ''}
+                onChange={(e) => setSnsSettings(prev => ({ ...prev, discordHandle: e.target.value }))}
+                placeholder="디스코드 아이디 (ex: tryangle)"
+                className="w-full bg-transparent focus:outline-none font-medium text-sm"
+              />
             </div>
             <div className="flex flex-col items-center gap-1 border-l pl-4 border-neutral-100">
               <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">노출</span>
@@ -389,8 +394,8 @@ export default function SettingsForm({ profile, allCreators = [] }: { profile: a
         {successMsg && (
           <span className="text-sm font-bold text-green-600 animate-in fade-in slide-in-from-right-4">{successMsg}</span>
         )}
-        <button 
-          type="submit" 
+        <button
+          type="submit"
           disabled={isLoading}
           className="bg-black text-white px-8 py-3 rounded-lg font-bold hover:bg-neutral-800 hover:shadow-md disabled:opacity-50 transition-all text-sm"
         >

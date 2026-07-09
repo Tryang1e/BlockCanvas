@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { requireAuth } from '@/lib/server-auth'
 import { cookies, headers } from 'next/headers'
 import { signSession } from '@/lib/session'
+import { PRIVACY_POLICY_VERSION } from '@/lib/privacy-policy'
 
 function parseThemeDesignConfig(themeBgEffect: string | null | undefined) {
   let effect = 'none'
@@ -69,7 +70,6 @@ export async function updateProfileAction(formData: FormData) {
   const authCreatorId = await requireAuth(creatorName)
 
   const displayName = formData.get('display_name') as string
-  const discordId = formData.get('discord_id') as string
   const headline = formData.get('headline') as string
   const aboutText = formData.get('about_text') as string
   const contactEmail = formData.get('contact_email') as string
@@ -85,12 +85,14 @@ export async function updateProfileAction(formData: FormData) {
   
   const snsSettingsRaw = formData.get('sns_settings') as string
   
-  // Update profiles table
+  // Update profiles table.
+  // ⚠ discord_id 는 OAuth 연동 전용 컬럼이므로 프로필 설정 폼에서 덮어쓰지 않는다.
+  //   (예전엔 자유입력값을 여기에 써서 OAuth 신원/역할 동기화가 깨졌음. 연락처용 Discord 핸들은
+  //    sns_settings.discordHandle 로 분리 저장한다 — 클라이언트가 sns_settings JSON 에 직렬화.)
   await prisma.profile.update({
     where: { id: authCreatorId },
     data: {
-      display_name: displayName,
-      discord_id: discordId
+      display_name: displayName
     }
   })
 
@@ -150,6 +152,12 @@ export async function updateProfileAction(formData: FormData) {
 
 export async function updateThemeBgColorAction(creatorName: string, themeBgColor: string) {
   const authCreatorId = await requireAuth(creatorName)
+
+  // 저장 지점에서 hex 형식 강제 — 이 값은 인라인 style(배경 레이어·--bc-theme 토큰)로
+  // 흘러가므로 임의 문자열을 허용하면 CSS 주입·color-mix invalid 문제가 생긴다.
+  if (!/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(themeBgColor)) {
+    return { success: false, error: '올바른 색상 형식(#RGB 또는 #RRGGBB)이 아닙니다.' }
+  }
 
   await prisma.portfolio.update({
     where: { creator_id: authCreatorId },
@@ -247,10 +255,11 @@ export async function updateSubdomainAction(currentSubdomain: string, newSubdoma
     return { error: '데이터베이스 업데이트 중 오류가 발생했습니다.' }
   }
 
-  // 6. Update session cookie
+  // 6. Update session cookie — token_version 은 이름 변경과 무관하므로 현재 값을 담아 즉시 무효화되지 않게 한다.
   const { protocol, baseDomain, cookieDomain, isDev } = await getDynamicConfig()
   const cookieStore = await cookies()
-  const signedToken = signSession(normalizedSubdomain)
+  const me = await prisma.profile.findUnique({ where: { id: authCreatorId }, select: { token_version: true } })
+  const signedToken = signSession(normalizedSubdomain, me?.token_version ?? 0)
   cookieStore.set('session', signedToken, { 
     httpOnly: true, 
     secure: isDev ? false : (protocol === 'https'),
@@ -322,7 +331,8 @@ export async function acceptPrivacyPolicyAction(creatorName: string) {
     where: { id: authCreatorId },
     data: {
       privacy_consented: true,
-      privacy_consented_at: new Date()
+      privacy_consented_at: new Date(),
+      privacy_consent_version: PRIVACY_POLICY_VERSION
     }
   })
 

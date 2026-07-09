@@ -1,7 +1,9 @@
 import { prisma } from '@/lib/prisma'
 import { notFound } from 'next/navigation'
+import { cookies } from 'next/headers'
 import ProjectDetailsViewer from '@/components/creator/ProjectDetailsViewer'
 import ProjectModal from '@/components/creator/ProjectModal'
+import { verifySession } from '@/lib/session'
 import { logger } from '@/lib/logger'
 
 export default async function InterceptedProjectDetailPage({ params }: { params: Promise<{ site: string, project_id: string }> }) {
@@ -30,6 +32,7 @@ export default async function InterceptedProjectDetailPage({ params }: { params:
           }
         }
       },
+      section: { select: { is_visible: true } },
       widgets: {
         orderBy: { sort_order: 'asc' }
       }
@@ -45,6 +48,11 @@ export default async function InterceptedProjectDetailPage({ params }: { params:
   }
   if (project.creator.creator_name.toLowerCase() !== normalizedName.toLowerCase()) {
     logger.debug(`Creator mismatch! project.creator: ${project.creator.creator_name}, params: ${normalizedName}`)
+    return notFound()
+  }
+  // 비공개 글/숨긴 섹션 글은 소유자만 열람 가능
+  const isOwner = verifySession((await cookies()).get('session')?.value) === project.creator.creator_name.toLowerCase()
+  if (!isOwner && (!project.is_published || project.section?.is_visible === false)) {
     return notFound()
   }
 
@@ -74,38 +82,35 @@ export default async function InterceptedProjectDetailPage({ params }: { params:
   let otherProjects: any[] = []
   let relatedType = 'creator'
 
-  if (project.category_id) {
+  // 섹션 우선 그룹화: 같은 섹션에 속한 게시물만 "이 섹션의 다른 게시물"로 보여준다.
+  // 섹션에 속하지 않은(미배정) 게시물만 카테고리로 폴백한다.
+  if (project.section_id) {
     otherProjects = await prisma.project.findMany({
-      where: { 
+      where: {
+        creator_id: project.creator_id,
+        section_id: project.section_id,
+        id: { not: project.id },
+        is_published: true,
+        section: { section_type: { not: 'video_slider' }, is_visible: true }
+      },
+      orderBy: { sort_order: 'asc' }
+    })
+    if (otherProjects.length > 0) relatedType = 'section'
+  } else if (project.category_id) {
+    otherProjects = await prisma.project.findMany({
+      where: {
         creator_id: project.creator_id,
         category_id: project.category_id,
         id: { not: project.id },
         is_published: true,
         OR: [
           { section_id: null },
-          { section: { section_type: { not: 'video_slider' } } }
+          { section: { section_type: { not: 'video_slider' }, is_visible: true } }
         ]
       },
       orderBy: { created_at: 'desc' }
     })
     if (otherProjects.length > 0) relatedType = 'category'
-  }
-
-  if (otherProjects.length === 0 && project.section_id) {
-    otherProjects = await prisma.project.findMany({
-      where: { 
-        creator_id: project.creator_id,
-        section_id: project.section_id,
-        id: { not: project.id },
-        is_published: true,
-        OR: [
-          { section_id: null },
-          { section: { section_type: { not: 'video_slider' } } }
-        ]
-      },
-      orderBy: { sort_order: 'asc' }
-    })
-    if (otherProjects.length > 0) relatedType = 'section'
   }
 
   return (

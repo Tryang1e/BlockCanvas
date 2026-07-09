@@ -1,9 +1,16 @@
 import { prisma } from '@/lib/prisma'
 import { notFound } from 'next/navigation'
+import { cookies } from 'next/headers'
 import Link from 'next/link'
 import ProjectDetailsViewer from '@/components/creator/ProjectDetailsViewer'
+import { verifySession } from '@/lib/session'
 import { cache } from 'react'
 import type { Metadata } from 'next'
+
+// 게시물이 공개적으로 열람 가능한지: 발행 상태 + 숨긴 섹션이 아님
+function isPubliclyViewable(project: { is_published?: boolean; section?: { is_visible: boolean } | null }) {
+  return project.is_published === true && project.section?.is_visible !== false
+}
 
 const getProject = cache(async (project_id: string) => {
   return prisma.project.findUnique({
@@ -33,6 +40,7 @@ const getProject = cache(async (project_id: string) => {
           }
         }
       },
+      section: { select: { is_visible: true } },
       widgets: {
         orderBy: { sort_order: 'asc' }
       }
@@ -56,6 +64,10 @@ export async function generateMetadata({ params }: { params: Promise<{ site: str
   if (!project) return {}
   if (project.creator.role === 'user') return {}
   if (project.creator.creator_name.toLowerCase() !== normalizedName.toLowerCase()) return {}
+
+  // 비공개 글/숨긴 섹션 글은 소유자에게만 메타 노출(외부 미리보기·임베드 차단)
+  const metaIsOwner = verifySession((await cookies()).get('session')?.value) === project.creator.creator_name.toLowerCase()
+  if (!metaIsOwner && !isPubliclyViewable(project)) return {}
 
   const creator = project.creator
   const displayName = creator.display_name || creator.creator_name
@@ -105,6 +117,10 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   if (project.creator.role === 'user') return notFound()
   if (project.creator.creator_name.toLowerCase() !== normalizedName.toLowerCase()) return notFound()
 
+  // 비공개 글/숨긴 섹션 글은 소유자만 직접 URL로 열람 가능
+  const isOwner = verifySession((await cookies()).get('session')?.value) === project.creator.creator_name.toLowerCase()
+  if (!isOwner && !isPubliclyViewable(project)) return notFound()
+
   const widgets = project.widgets.map(w => {
     let parsedContent = {}
     if (w.content) {
@@ -131,38 +147,35 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   let otherProjects: any[] = []
   let relatedType = 'creator'
 
-  if (project.category_id) {
+  // 섹션 우선 그룹화: 같은 섹션에 속한 게시물만 "이 섹션의 다른 게시물"로 보여준다.
+  // 섹션에 속하지 않은(미배정) 게시물만 카테고리로 폴백한다.
+  if (project.section_id) {
     otherProjects = await prisma.project.findMany({
-      where: { 
+      where: {
+        creator_id: project.creator_id,
+        section_id: project.section_id,
+        id: { not: project.id },
+        is_published: true,
+        section: { section_type: { not: 'video_slider' }, is_visible: true }
+      },
+      orderBy: { sort_order: 'asc' }
+    })
+    if (otherProjects.length > 0) relatedType = 'section'
+  } else if (project.category_id) {
+    otherProjects = await prisma.project.findMany({
+      where: {
         creator_id: project.creator_id,
         category_id: project.category_id,
         id: { not: project.id },
         is_published: true,
         OR: [
           { section_id: null },
-          { section: { section_type: { not: 'video_slider' } } }
+          { section: { section_type: { not: 'video_slider' }, is_visible: true } }
         ]
       },
       orderBy: { created_at: 'desc' }
     })
     if (otherProjects.length > 0) relatedType = 'category'
-  }
-
-  if (otherProjects.length === 0 && project.section_id) {
-    otherProjects = await prisma.project.findMany({
-      where: { 
-        creator_id: project.creator_id,
-        section_id: project.section_id,
-        id: { not: project.id },
-        is_published: true,
-        OR: [
-          { section_id: null },
-          { section: { section_type: { not: 'video_slider' } } }
-        ]
-      },
-      orderBy: { sort_order: 'asc' }
-    })
-    if (otherProjects.length > 0) relatedType = 'section'
   }
 
   const profileData = {

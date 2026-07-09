@@ -3,9 +3,10 @@
 import React from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, EyeOff } from 'lucide-react'
 import ProjectActionButtons from './ProjectActionButtons'
 import ScrollReveal from '@/components/ui/ScrollReveal'
+import BlockImage from '@/components/ui/BlockImage'
 
 // Helper to extract first image from widgets or Tiptap JSON content
 const getFirstImageFromContent = (contentStr: string | null): string | null => {
@@ -55,6 +56,8 @@ interface ProjectCardProps {
   onOpenProject?: (projectId: string) => void
   globalIsDragging?: boolean
   isGridItem?: boolean
+  /** 도록(카탈로그) 번호용 카드 순번 — 목록 map 인덱스(0-base). 없으면 № 표기를 생략 */
+  index?: number
 }
 
 // YouTube URL to Embed URL converter
@@ -92,7 +95,7 @@ export function parseProjectTitleAndSize(title: string) {
   return { displayTitle: title, colSpanClass: 'lg:col-span-1', rowSpanClass: 'row-span-1', w: 1, h: 1 }
 }
 
-function ProjectCard({ project, creatorName, isOwner, isOverlay, onOpenProject, globalIsDragging, isGridItem }: ProjectCardProps) {
+function ProjectCard({ project, creatorName, isOwner, isOverlay, onOpenProject, globalIsDragging, isGridItem, index }: ProjectCardProps) {
   const {
     attributes,
     listeners,
@@ -111,6 +114,12 @@ function ProjectCard({ project, creatorName, isOwner, isOverlay, onOpenProject, 
 
   const embedUrl = getYouTubeEmbedUrl(project.youtube_url)
   const { displayTitle, w, h } = parseProjectTitleAndSize(project.title)
+
+  // 도록 캡션용 날짜(YYYY.MM, 월 제로패딩) — 기존 "2026 7 7" 구분자 누락 렌더 버그 수정
+  const createdAt = new Date(project.created_at)
+  const dateLabel = `${createdAt.getFullYear()}.${String(createdAt.getMonth() + 1).padStart(2, '0')}`
+  // 도록 번호(№ 01) — index prop이 있을 때만 표기(0-base → 1-base, 2자리 제로패딩)
+  const indexLabel = typeof index === 'number' && index >= 0 ? String(index + 1).padStart(2, '0') : null
   const fallbackGradient = premiumGradients[Math.abs(project.id.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0)) % 4]
   const projectThumbnail = project.thumbnail_url || getFirstImageFromContent(project.content)
 
@@ -144,12 +153,19 @@ function ProjectCard({ project, creatorName, isOwner, isOverlay, onOpenProject, 
       <ScrollReveal animationClass="opacity-0 translate-y-12 scale-95" className="w-full h-full" disableAnimation={globalIsDragging || isOverlay}>
         {/* 이미지/미디어 자체가 단 1px의 오차나 잘림 여백 없이 카드의 물리 WxH 전체를 100% 꽉 채우도록 구성 */}
         <div
-          className="w-full h-full relative border border-neutral-100 dark:border-neutral-800/80 overflow-hidden shadow-sm transition-all duration-500 bg-neutral-100 dark:bg-neutral-900"
+          className={`w-full h-full relative border border-neutral-100 dark:border-neutral-800/80 overflow-hidden shadow-sm transition-all duration-500 bg-neutral-100 dark:bg-neutral-900 ${isOwner && project.is_published === false ? 'opacity-55' : ''}`}
           style={{ borderRadius: 'var(--card-corner-radius, 0px)' }}
         >
+          {/* 소유자에게만: 비공개 게시물 배지(항상 노출). 방문자에겐 비공개 글 자체가 안 보임. */}
+          {isOwner && project.is_published === false && (
+            <div className="absolute top-3 left-3 z-40 bg-black/75 text-white text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 pointer-events-none shadow-md">
+              <EyeOff size={11} /> 비공개
+            </div>
+          )}
+
           {/* Hover Overlay Action Buttons */}
           <div className="absolute inset-0 z-30 pointer-events-none">
-             <ProjectActionButtons projectId={project.id} creatorName={creatorName} isOwner={isOwner} />
+             <ProjectActionButtons projectId={project.id} creatorName={creatorName} isOwner={isOwner} isPublished={project.is_published !== false} />
           </div>
 
           {/* Media Layer (w-full h-full object-cover를 통해 이미지 왜곡 없이 가로/세로 영역 가득 채움) */}
@@ -168,8 +184,13 @@ function ProjectCard({ project, creatorName, isOwner, isOverlay, onOpenProject, 
             // Standard Image Thumbnail (100% image-fill & object-cover)
             <div onClick={() => onOpenProject?.(project.id)} className="absolute inset-0 z-10 block cursor-pointer w-full h-full">
               {projectThumbnail ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={projectThumbnail} alt={displayTitle} className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]" draggable={false} />
+                <BlockImage
+                  src={projectThumbnail}
+                  alt={displayTitle}
+                  blurDataURL={project.blur_data_url}
+                  className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]"
+                  draggable={false}
+                />
               ) : (
                 <div className={`w-full h-full bg-gradient-to-br ${fallbackGradient} flex flex-col items-center justify-center p-6 text-center select-none relative overflow-hidden`}>
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.05)_0%,transparent_70%)] pointer-events-none" />
@@ -189,19 +210,37 @@ function ProjectCard({ project, creatorName, isOwner, isOverlay, onOpenProject, 
             </div>
           )}
 
-          {/* Clean Overlay information (Only shown on Hover over the media area) */}
+          {/* Clean Overlay information — 미술관 도록(카탈로그) 3단 캡션, 60ms 계단식 등장(호버 시에만).
+              터치 기기(hover:none)에는 호버가 없어 캡션이 영영 안 보이므로 상시 노출 폴백:
+              전체 딤 대신 하단 그라디언트 스크림만 깔아 썸네일 시인성을 지킨다(데스크톱 동작 불변). */}
           {!embedUrl && (
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex flex-col justify-end p-6 pointer-events-none z-20">
-              <div className="pointer-events-auto transform translate-y-4 group-hover:translate-y-0 transition-transform duration-500 ease-out">
-                {/* Clickable title link */}
-                <div onClick={() => onOpenProject?.(project.id)} className="inline-block hover:opacity-80 transition-opacity cursor-pointer">
-                  <h3 className="text-white font-extrabold text-2xl tracking-tight leading-tight drop-shadow-md">{displayTitle}</h3>
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex flex-col justify-end p-6 pointer-events-none z-20 [@media(hover:none)]:opacity-100 [@media(hover:none)]:from-black/70 [@media(hover:none)]:via-transparent">
+              {/* 래퍼는 pointer-events-none — 라벨/칩 등 비인터랙티브 영역 탭이 아래 미디어 레이어로 통과해 카드 탭 내비게이션 유지 */}
+              <div className="pointer-events-none">
+                {/* Tier 1 — 모노 마이크로 라벨: № {순번} — {YYYY.MM} (№·—는 Minecraft.ttf에 없으므로 픽셀폰트 스팬 밖에 유지) */}
+                <div className="flex items-baseline gap-2 mb-2 text-neutral-300 font-mono text-[10px] uppercase tracking-[0.25em] drop-shadow-md opacity-0 translate-y-3 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-500 ease-out [@media(hover:none)]:opacity-100 [@media(hover:none)]:translate-y-0">
+                  {indexLabel && (
+                    <>
+                      <span aria-hidden="true">№</span>
+                      <span className="bc-pixel-num text-[11px]">{indexLabel}</span>
+                      <span aria-hidden="true" className="text-white/40">—</span>
+                    </>
+                  )}
+                  <span className="bc-pixel-num text-[11px]">{dateLabel}</span>
                 </div>
-                
-                <div className="flex justify-between items-center mt-3">
-                  <p className="text-neutral-300 text-sm font-medium drop-shadow-md line-clamp-1 tracking-wider">
-                    {new Date(project.created_at).getFullYear()} {new Date(project.created_at).getMonth() + 1} {new Date(project.created_at).getDate()}
-                  </p>
+
+                {/* Tier 2 — 제목(기존 타이포 유지, 클릭 시 프로젝트 열기) */}
+                <div className="opacity-0 translate-y-3 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-500 ease-out delay-0 group-hover:delay-[60ms] [@media(hover:none)]:opacity-100 [@media(hover:none)]:translate-y-0">
+                  <div onClick={() => onOpenProject?.(project.id)} className="pointer-events-auto inline-block hover:opacity-80 transition-opacity cursor-pointer">
+                    <h3 className="text-white font-extrabold text-2xl tracking-tight leading-tight drop-shadow-md">{displayTitle}</h3>
+                  </div>
+                </div>
+
+                {/* Tier 3 — 작가(크리에이터) 칩: 프로젝트 데이터에 카테고리명이 없어(category_id만 존재) 크리에이터명으로 표기 */}
+                <div className="mt-3 opacity-0 translate-y-3 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-500 ease-out delay-0 group-hover:delay-[120ms] [@media(hover:none)]:opacity-100 [@media(hover:none)]:translate-y-0">
+                  <span className="inline-flex items-center border border-white/30 rounded-full px-2.5 py-[3px] text-[9px] font-semibold uppercase tracking-[0.2em] text-neutral-200 drop-shadow-md backdrop-blur-[2px]">
+                    {creatorName}
+                  </span>
                 </div>
               </div>
             </div>

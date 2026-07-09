@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState } from 'react';
 import parse, { attributesToProps, domToReact, Element } from 'html-react-parser';
 import { sanitizeRichHtml } from '@/lib/sanitize-html';
@@ -25,6 +27,7 @@ import {
 } from '@/components/ui/animate-ui';
 import { PreviewLinkCard } from '@/components/ui/preview-link-card';
 import MarqueeBlock from '@/components/ui/MarqueeBlock';
+import Lightbox from '@/components/ui/Lightbox';
 
 // HTMLRenderer 내부 전용 고품격 아코디언 컴포넌트
 function FaqAccordion({ 
@@ -155,6 +158,11 @@ export default function HTMLRenderer({ html }: HTMLRendererProps) {
     'data-a-font', 'data-a-size', 'data-a-color', 'data-a-bold', 'data-a-italic', 'data-border-style', 'data-hover-bg',
     'data-items', 'data-speed', 'data-reverse', 'data-variant'
   ]);
+
+  // 본문 내 인라인 이미지를 클릭하면 라이트박스로 크게 볼 수 있게 한다(이미지 그리드와 동일 경험).
+  const [lightbox, setLightbox] = useState<{ images: string[]; index: number } | null>(null);
+  // 등장 순서대로 이미지 src를 모아 라이트박스 좌우 이동에 사용
+  const allImages = Array.from(cleanHtml.matchAll(/<img\b[^>]*?\bsrc=["']([^"']+)["']/gi)).map((m) => m[1]);
 
   const options = {
     replace: (domNode: any) => {
@@ -325,6 +333,20 @@ export default function HTMLRenderer({ html }: HTMLRendererProps) {
           </div>
         );
       }
+      if (domNode instanceof Element && domNode.name === 'img' && domNode.attribs?.src) {
+        // 링크로 감싼 이미지는 링크 동작을 우선하여 라이트박스에서 제외
+        if ((domNode.parent as any)?.name === 'a') return undefined;
+        const src = domNode.attribs.src;
+        const props: any = attributesToProps(domNode.attribs);
+        const idx = Math.max(0, allImages.indexOf(src));
+        return (
+          <img
+            {...props}
+            onClick={() => setLightbox({ images: allImages.length ? allImages : [src], index: idx })}
+            className={`${props.className ? props.className + ' ' : ''}cursor-zoom-in`}
+          />
+        );
+      }
       if (domNode instanceof Element && domNode.name === 'a') {
         const href = domNode.attribs?.href;
         if (href && href.startsWith('http')) {
@@ -341,5 +363,16 @@ export default function HTMLRenderer({ html }: HTMLRendererProps) {
     }
   };
 
-  return <>{parse(cleanHtml, options)}</>;
+  return (
+    <>
+      {parse(cleanHtml, options)}
+      <Lightbox
+        open={!!lightbox}
+        images={lightbox?.images || []}
+        index={lightbox?.index || 0}
+        onClose={() => setLightbox(null)}
+        onIndexChange={(i) => setLightbox((lb) => (lb ? { ...lb, index: i } : lb))}
+      />
+    </>
+  );
 }

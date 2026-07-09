@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useLenis } from '@studio-freight/react-lenis'
+import { useLenis } from 'lenis/react'
 import SmoothScroll from '@/components/ui/SmoothScroll'
 
 export default function ProjectModal({ children, onClose, title, description, createdAt }: { children: React.ReactNode, onClose?: () => void, title?: string, description?: string, createdAt?: string | Date }) {
