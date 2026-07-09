@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyInboundSignature } from "@/lib/minecraft";
-
-const DISCORD_API_SECRET = process.env.DISCORD_API_SECRET || "blockcanvas-discord-secret";
+import { DISCORD_API_SECRET } from "@/lib/discordApiSecret";
 
 function jsonArrayLength(value: string | null): number {
   if (!value) return 0;
@@ -40,15 +39,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const plot = await prisma.minecraftPlot.findUnique({ where: { id: String(plot_id) } });
+    // 봇은 바레 plotId 만 보내므로 (plot_id, owner_id) 로 조회한다(복합 PK 와 무관, 본인 소유 플롯 한정).
+    const plot = await prisma.minecraftPlot.findFirst({ where: { plot_id: String(plot_id), owner_id: profile.id } });
     if (!plot) {
       return NextResponse.json(
-        { error: "플롯을 찾을 수 없습니다. 웹 대시보드에서 플롯을 동기화했는지 확인하세요." },
+        { error: "본인이 소유한 플롯을 찾을 수 없습니다. 웹 대시보드에서 플롯을 동기화했는지 확인하세요." },
         { status: 404 }
       );
-    }
-    if (plot.owner_id !== profile.id) {
-      return NextResponse.json({ error: "본인이 소유한 플롯만 홍보/판매할 수 있습니다." }, { status: 403 });
     }
 
     // Dynmap 링크(서버측 env 로 구성 → 봇은 맵 설정을 몰라도 됨)
@@ -62,7 +59,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       plot: {
-        id: plot.id,
+        id: plot.plot_id || plot.id,
         alias: plot.alias,
         world: plot.world,
         ownerName: profile.minecraft_username || profile.display_name || profile.creator_name,

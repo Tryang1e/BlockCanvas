@@ -1,22 +1,24 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { MessageCircle, RefreshCw, UserCheck, UserMinus, ShieldAlert, CheckCircle2, UserPlus, Hash } from "lucide-react";
-import { getDiscordStatus, generateDiscordCode, unlinkDiscord } from "@/app/actions/discord";
+import { MessageCircle, RefreshCw, UserCheck, UserMinus, ShieldAlert, CheckCircle2, LogIn } from "lucide-react";
+import { getDiscordStatus, unlinkDiscord } from "@/app/actions/discord";
 
 interface DiscordStatus {
   linked: boolean;
   discordId: string | null;
   discordUsername: string | null;
-  verificationCode: string | null;
 }
 
-export default function DiscordIntegration() {
+export default function DiscordIntegration({
+  discordLoginUrl = "/api/auth/discord/start",
+}: {
+  discordLoginUrl?: string;
+}) {
   const [status, setStatus] = useState<DiscordStatus>({
     linked: false,
     discordId: null,
     discordUsername: null,
-    verificationCode: null,
   });
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -30,7 +32,6 @@ export default function DiscordIntegration() {
         linked: res.linked || false,
         discordId: res.discordId || null,
         discordUsername: res.discordUsername || null,
-        verificationCode: res.verificationCode || null,
       });
     }
     setLoading(false);
@@ -38,20 +39,15 @@ export default function DiscordIntegration() {
 
   useEffect(() => {
     fetchStatus();
-  }, []);
-
-  const handleGenerateCode = async () => {
-    setActionLoading(true);
-    setMessage(null);
-    const res = await generateDiscordCode();
-    if (res.success && res.code) {
-      setStatus((prev) => ({ ...prev, verificationCode: res.code as string }));
-      setMessage({ type: "success", text: "새로운 디스코드 연동 코드가 발급되었습니다." });
-    } else {
-      setMessage({ type: "error", text: res.error || "코드 발급 중 오류가 발생했습니다." });
+    // Discord OAuth 콜백 결과 메시지 처리(/auth 에서 ?connected=discord 로 복귀 시)
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("connected") === "discord") {
+        setMessage({ type: "success", text: "디스코드 계정이 연동되었습니다!" });
+        window.history.replaceState({}, "", window.location.pathname);
+      }
     }
-    setActionLoading(false);
-  };
+  }, []);
 
   const handleUnlink = async () => {
     if (!confirm("정말로 디스코드 계정 연동을 해제하시겠습니까?")) return;
@@ -59,7 +55,7 @@ export default function DiscordIntegration() {
     setMessage(null);
     const res = await unlinkDiscord();
     if (res.success) {
-      setStatus({ linked: false, discordId: null, discordUsername: null, verificationCode: null });
+      setStatus({ linked: false, discordId: null, discordUsername: null });
       setMessage({ type: "success", text: "디스코드 계정이 성공적으로 연동 해제되었습니다." });
     } else {
       setMessage({ type: "error", text: res.error || "연동 해제 중 오류가 발생했습니다." });
@@ -85,7 +81,7 @@ export default function DiscordIntegration() {
             디스코드 계정 연동
           </h2>
           <p className="text-xs text-neutral-500 mt-1 font-medium">
-            디스코드 봇과 계정을 연결하면 봇에서 <code className="text-indigo-600">/홍보</code>·<code className="text-indigo-600">/판매</code> 로 내 영토를 홍보할 수 있습니다.
+            디스코드 계정을 연결하면 봇에서 <code className="text-indigo-600">/홍보</code>·<code className="text-indigo-600">/판매</code> 로 내 영토를 홍보할 수 있습니다.
           </p>
         </div>
         {status.linked && (
@@ -134,44 +130,21 @@ export default function DiscordIntegration() {
           </div>
         </div>
       ) : (
-        <div className="space-y-4">
-          <div className="bg-neutral-50 border border-neutral-100 rounded-2xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-            <div className="space-y-1">
-              <span className="font-bold text-neutral-800 text-sm">연동 코드를 발급하여 디스코드 계정을 연결하세요</span>
-              <p className="text-xs text-neutral-500 font-medium">
-                연동 버튼을 누르면 6자리 코드가 생성됩니다. 디스코드에서 봇에게 코드를 입력하여 연동을 마칩니다.
-              </p>
-            </div>
-            <button
-              onClick={handleGenerateCode}
-              disabled={actionLoading}
-              className="flex items-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition-all shadow-sm disabled:opacity-50 whitespace-nowrap"
-            >
-              <UserPlus size={15} />
-              연동 코드 발급하기
-            </button>
+        <div className="bg-neutral-50 border border-neutral-100 rounded-2xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+          <div className="space-y-1">
+            <span className="font-bold text-neutral-800 text-sm">Discord 계정으로 즉시 연동</span>
+            <p className="text-xs text-neutral-500 font-medium">
+              Discord 로그인 한 번으로 연동됩니다. 코드 입력이 필요 없습니다.
+            </p>
           </div>
-
-          {status.verificationCode && (
-            <div className="bg-neutral-900 text-white rounded-2xl p-8 flex flex-col items-center text-center space-y-4 shadow-md border border-neutral-800 animate-in zoom-in-95 duration-300">
-              <div className="p-3 bg-neutral-800 rounded-full text-indigo-400">
-                <Hash size={24} />
-              </div>
-              <div>
-                <span className="text-xs text-neutral-400 font-bold uppercase tracking-wider">디스코드 연동 코드</span>
-                <div className="text-4xl font-black text-white tracking-widest mt-2 select-all font-mono">
-                  {status.verificationCode}
-                </div>
-              </div>
-              <div className="max-w-md text-xs text-neutral-400 leading-relaxed font-medium">
-                디스코드에서 봇에게 아래 명령어를 입력해 주세요:<br />
-                <span className="inline-block mt-2 px-3 py-1.5 bg-neutral-800 text-indigo-300 rounded font-mono text-xs font-bold border border-neutral-700">
-                  /연동 {status.verificationCode}
-                </span>
-              </div>
-              <p className="text-[10px] text-neutral-500 font-medium">* 인증번호는 10분간 유효합니다.</p>
-            </div>
-          )}
+          <a
+            href={discordLoginUrl}
+            className="flex items-center gap-1.5 px-4 py-2.5 text-white text-xs font-bold rounded-lg transition-all shadow-sm whitespace-nowrap hover:opacity-90"
+            style={{ backgroundColor: "#5865F2" }}
+          >
+            <LogIn size={15} />
+            Discord로 연결
+          </a>
         </div>
       )}
     </section>
