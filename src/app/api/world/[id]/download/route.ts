@@ -4,10 +4,12 @@ import { promises as fs } from "fs";
 import { Readable } from "stream";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
-import { verifySession } from "@/lib/session";
+import { verifySessionFull } from "@/lib/session";
 import { backupWorld } from "@/app/actions/worlds";
 import { parseBackupList } from "@/lib/worldLifecycle";
 import { hasCapability } from "@/lib/worldPerms";
+import { openDownloadSession, throttledReadable } from "@/lib/uploadThrottle";
+import { transferMultiplier } from "@/lib/transferEta";
 
 export const runtime = "nodejs";
 
@@ -17,11 +19,12 @@ export const runtime = "nodejs";
 //   → 압축본을 보내 outbound 용량을 줄이고, 라이브 월드 폴더를 직접 노출하지 않는다.
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const session = verifySession((await cookies()).get("session")?.value);
-  if (!session) return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
+  const full = verifySessionFull((await cookies()).get("session")?.value);
+  if (!full) return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
 
-  const profile = await prisma.profile.findUnique({ where: { creator_name: session.toLowerCase() } });
+  const profile = await prisma.profile.findUnique({ where: { creator_name: full.name.toLowerCase() } });
   if (!profile) return NextResponse.json({ error: "프로필을 찾을 수 없습니다." }, { status: 403 });
+  if (profile.token_version !== full.version) return NextResponse.json({ error: "세션이 만료되었습니다. 다시 로그인해 주세요." }, { status: 401 });
 
   const world = await prisma.minecraftWorld.findUnique({ where: { id } });
   if (!world) {
@@ -69,11 +72,19 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: "백업 파일을 찾을 수 없습니다." }, { status: 502 });
   }
 
+  // 위 backupWorld 가 수 분 걸릴 수 있다 — 대기 중 클라이언트가 취소/이탈했으면 fd·스로틀 세션을
+  // 열기 전에 여기서 끝낸다(백업 자체는 이미 완료돼 다음 다운로드가 재사용).
+  if (request.signal.aborted) return NextResponse.json({ error: "요청이 취소되었습니다." }, { status: 499 });
+
   const safeName = (world.name || "world").replace(/[^\w가-힣 .-]/g, "_");
   const dateSuffix = chosenTs ? "_" + new Date(chosenTs).toISOString().slice(0, 10) : "";
   const filename = `${safeName}${dateSuffix}.zip`;
   const nodeStream = createReadStream(/* turbopackIgnore: true */ zipPath);
-  const webStream = Readable.toWeb(nodeStream) as unknown as ReadableStream<Uint8Array>;
+  // 아웃바운드 속도 제한(공평 큐잉) — cloudflared 가 서버 회선을 포화시켜 MC 를 끊지 않도록.
+  // 총합은 env 값으로 고정, **유저 단위** 가중 배분(creator 이상 2배 지분, 같은 유저 다중 연결은 몫 분할).
+  // request.signal 전달 필수 — 클라 이탈 시 세션/fd 정리(throttledReadable 참고).
+  const throttle = openDownloadSession(transferMultiplier(profile.role), profile.id);
+  const webStream = Readable.toWeb(throttledReadable(nodeStream, throttle, request.signal)) as unknown as ReadableStream<Uint8Array>;
 
   return new NextResponse(webStream, {
     status: 200,

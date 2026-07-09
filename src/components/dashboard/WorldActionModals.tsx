@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Archive, PowerOff, Trash2, Download, Loader2, CheckCircle2, ShieldAlert, X } from "lucide-react";
+import { Archive, PowerOff, Trash2, Download, Loader2, CheckCircle2, ShieldAlert, ShieldCheck, AlertTriangle, Compass, X } from "lucide-react";
 import { formatBytes } from "@/lib/worldQuota";
+import { etaRangeText, DOWNLOAD_ETA_BPS } from "@/lib/transferEta";
 
 export type ConfirmType = "backup" | "deactivate" | "delete";
 
@@ -90,6 +91,8 @@ export function DownloadModal({
   worldName,
   active,
   backups,
+  worldSizeBytes,
+  speedMultiplier = 1,
   onClose,
   onRefresh,
 }: {
@@ -98,6 +101,8 @@ export function DownloadModal({
   worldName: string;
   active: boolean;
   backups: { ts: number; bytes: number }[];
+  worldSizeBytes?: number;
+  speedMultiplier?: number; // 등급 배수(creator 이상 2) — ETA 표시에 반영
   onClose: () => void;
   onRefresh?: () => void;
 }) {
@@ -174,12 +179,23 @@ export function DownloadModal({
             </div>
             <div className="p-4 space-y-3">
               {active && (
-                <button
-                  onClick={() => start(null)}
-                  className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-black hover:bg-neutral-800 text-white text-sm font-bold"
-                >
-                  <Archive size={15} /> 지금 백업 후 다운로드
-                </button>
+                <div>
+                  <button
+                    onClick={() => start(null)}
+                    className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-black hover:bg-neutral-800 text-white text-sm font-bold"
+                  >
+                    <Archive size={15} /> 지금 백업 후 다운로드
+                  </button>
+                  {(() => {
+                    const est = worldSizeBytes ?? backups[0]?.bytes ?? 0;
+                    return est > 0 ? (
+                      <p className="text-[11px] text-neutral-400 text-center mt-1.5">
+                        예상 다운로드 시간 {etaRangeText(est, DOWNLOAD_ETA_BPS, speedMultiplier)}
+                        {speedMultiplier > 1 ? " (혼잡 시 크리에이터 2배 지분)" : ""}
+                      </p>
+                    ) : null;
+                  })()}
+                </div>
               )}
               <div>
                 <div className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1.5">백업 목록 (최대 5개)</div>
@@ -199,7 +215,7 @@ export function DownloadModal({
                           <span className="block text-xs font-semibold text-neutral-800 truncate">
                             {fmtTs(b.ts)} {i === 0 && <span className="text-[10px] text-emerald-600 font-bold">최신</span>}
                           </span>
-                          <span className="block text-[11px] text-neutral-400">{formatBytes(b.bytes)}</span>
+                          <span className="block text-[11px] text-neutral-400">{formatBytes(b.bytes)} · 예상 {etaRangeText(b.bytes, DOWNLOAD_ETA_BPS, speedMultiplier)}</span>
                         </span>
                         <Download size={14} className="text-neutral-400 shrink-0" />
                       </button>
@@ -249,6 +265,96 @@ export function DownloadModal({
             </div>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 탐방 공유를 "켤 때"만 뜨는 사전 안내/경고 모달.
+ * 무엇이 보호되고(서버 측 수정·편집·복사 차단) 무엇을 막을 수 없는지(클라이언트 측 월드 다운로더·리트매티카)를
+ * 정직하게 고지한다. 실제 공유 토글은 onConfirm 이 수행하고 busy 로 진행을 표시한다. 끄기는 이 모달을 거치지 않는다.
+ */
+export function ExploreShareWarningModal({
+  open,
+  worldName,
+  busy,
+  onConfirm,
+  onClose,
+}: {
+  open: boolean;
+  worldName: string;
+  busy: boolean;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !busy && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, busy, onClose]);
+
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => !busy && onClose()}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="explore-share-warning-title"
+        className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-5 pt-5 pb-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-emerald-50 text-emerald-600">
+              <Compass size={18} />
+            </div>
+            <div className="min-w-0">
+              <h2 id="explore-share-warning-title" className="text-base font-bold text-neutral-900">탐방 공유를 켜기 전에</h2>
+              <p className="text-xs text-neutral-400 mt-0.5 truncate">{worldName}</p>
+            </div>
+          </div>
+
+          <p className="text-sm text-neutral-600 mt-3 leading-relaxed">
+            탐방 공유를 켜면 초대하지 않은 다른 유저도 인게임 <b>/탐방</b> 에서 이 월드를 둘러볼 수 있어요.
+          </p>
+
+          {/* 보호되는 것 — 서버가 강제로 막아 주는 범위(일반 방문자 기준, OP 제외) */}
+          <div className="mt-3 rounded-xl bg-emerald-50 border border-emerald-100 px-3.5 py-3">
+            <div className="flex items-center gap-1.5 text-[13px] font-bold text-emerald-700">
+              <ShieldCheck size={15} /> 이건 안전해요
+            </div>
+            <p className="text-[12px] leading-relaxed text-emerald-900/80 mt-1">
+              초대하지 않은 방문자는 이 월드의 블록을 <b>수정하거나 편집할 수 없어요.</b> 서버 안에서 지형을 복사하는 도구(WorldEdit <b>//copy</b>·Axiom 복사)도 차단됩니다. 방문자는 오직 <b>둘러보기</b>만 할 수 있어요.
+            </p>
+          </div>
+
+          {/* 막을 수 없는 것 — 클라이언트에서 동작해 서버가 통제할 수 없는 범위. 리트매티카가 대표 예시(WDL은 AntiWorldDownloader로 차단됨). */}
+          <div className="mt-2.5 rounded-xl bg-amber-50 border border-amber-100 px-3.5 py-3">
+            <div className="flex items-center gap-1.5 text-[13px] font-bold text-amber-700">
+              <AlertTriangle size={15} /> 이건 막을 수 없어요
+            </div>
+            <p className="text-[12px] leading-relaxed text-amber-900/80 mt-1">
+              다만 <b>리트매티카(Litematica)</b>처럼 화면에 이미 보이는 지형을 클라이언트에서 그대로 저장하는 도구나 스크린샷·미니맵 캡처는 서버에서 <b>기술적으로 막을 수 없습니다.</b> (구형 월드 다운로더(WDL) 모드는 서버가 감지해 차단하지만, 우회 변종까지 전부 막지는 못해요.) 원치 않는 복제 위험이 있으니 공개 여부를 신중히 결정해 주세요.
+            </p>
+          </div>
+
+          <p className="text-[11px] text-neutral-400 mt-2.5 leading-snug">※ 서버 관리자(OP)는 위 제한에서 예외입니다.</p>
+        </div>
+        <div className="px-5 py-4 border-t border-neutral-100 flex justify-end gap-2">
+          <button autoFocus onClick={() => !busy && onClose()} disabled={busy} className="px-3 py-2 rounded-lg text-sm font-bold text-neutral-500 hover:bg-neutral-100 disabled:opacity-40">
+            취소
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={busy}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50"
+          >
+            {busy && <Loader2 size={15} className="animate-spin" />}
+            이해했어요, 공유하기
+          </button>
+        </div>
       </div>
     </div>
   );

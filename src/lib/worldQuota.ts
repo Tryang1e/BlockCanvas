@@ -22,6 +22,39 @@ export function getWorldQuotaBytes(role: string | null | undefined): number {
   }
 }
 
+/**
+ * 유효 쿼터(바이트) = 역할 기본 + 보너스(예: 구독 혜택). 무제한(admin) 역할은 보너스와 무관하게 무제한.
+ * bonusBytes 0 이면 역할 기본과 동일(미구독자 동작 무변경). 보너스 출처는 호출측이 계산(subscriptionQuotaBonus 등).
+ */
+export function effectiveQuotaBytes(role: string | null | undefined, bonusBytes: number): number {
+  const base = getWorldQuotaBytes(role);
+  if (!Number.isFinite(base)) return base; // 무제한
+  return base + Math.max(0, Number.isFinite(bonusBytes) ? bonusBytes : 0);
+}
+
+/**
+ * 역할별 월드 총 보유 한도(전체 한도 — 하루 레이트리밋이 아니라 동시 보유 상한).
+ *  - user(LP builder) 7 / creator 14 / official·manager·admin 무제한(Infinity).
+ * "동시에 보유할 수 있는 (비보관) 월드 수"의 상한. 기존 MAX_WORLDS(20 고정)를 역할별로 대체한다.
+ * getWorldQuotaBytes 와 같은 역할 매핑을 쓰며, 무제한(Infinity)은 액션 경계에서 검사를 생략한다(디스크 쿼터로만 제한).
+ * 생성·삽입·등록·양도수락·복구 모든 경로에서 이 한도를 적용해 "N개 초과 보유 불가" 불변식을 유지한다. 조정은 이 함수만 수정.
+ */
+export function getMaxWorlds(role: string | null | undefined): number {
+  switch ((role || "").toLowerCase()) {
+    case "admin":
+    case "manager": // LP manager = 웹 admin
+    case "official": // 공식 크리에이터 — 무제한(디스크 쿼터로만 제한)
+      return Infinity;
+    case "creator":
+    case "pro": // Premium 폐지 → creator 이관. 잔존 행 안전망(동일 14)
+      return 14; // 일반 크리에이터 (LP creator)
+    case "user":
+      return 7; // 일반 사용자 (LP builder)
+    default:
+      return 7; // 알 수 없는 역할 → 보수적으로 builder 한도
+  }
+}
+
 // 쿼터 경고 임계치(90% 사용 = 10% 남음).
 export const QUOTA_WARN_RATIO = 0.9;
 

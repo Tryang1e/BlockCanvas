@@ -1,15 +1,19 @@
 "use server";
 
 import { promises as fs } from "fs";
-import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
-import { verifySession } from "@/lib/session";
-import { getWorldQuotaBytes } from "@/lib/worldQuota";
+import { sessionProfile, resolveViewProfile } from "@/lib/server-auth";
+import { effectiveQuotaBytes, getMaxWorlds } from "@/lib/worldQuota";
+import { subscriptionQuotaBonus } from "@/lib/subscription";
+import { canModerate } from "@/lib/roles";
 import { WORLD_ICON_KEYS } from "@/lib/worldIcons";
 import { computeWorldKey, worldFolderFromKey } from "@/lib/worldNaming";
 import { parseTrusted, hasCapability, emptyPerms, permsFor, PERM_KEYS, type MemberPerms } from "@/lib/worldPerms";
 import { archiveWorld as archiveWorldLifecycle, recordBackup, unlinkAllBackups, parseBackupList } from "@/lib/worldLifecycle";
 import { evaluateQuota } from "@/lib/worldQuotaEnforcement";
+import { resolveInvitedWorldIds, isInviteBlockedByName } from "@/lib/worldInvites";
+import { resolveMinecraftUuid } from "@/lib/minecraftResolve";
+import { playerSchematicsBytes } from "@/lib/schematics";
 import {
   createMinecraftWorld,
   getMinecraftWorldInfo,
@@ -25,13 +29,8 @@ import {
 // 메타데이터는 DB, 실제 프로비저닝(Multiverse 생성)은 BlockCanvasLink 플러그인이 수행.
 
 async function getAuthenticatedProfile() {
-  const cookieStore = await cookies();
-  const creatorName = verifySession(cookieStore.get("session")?.value);
-  if (!creatorName) throw new Error("Unauthorized: Please log in first.");
-  const profile = await prisma.profile.findUnique({
-    where: { creator_name: creatorName.toLowerCase() },
-  });
-  if (!profile) throw new Error("Profile not found.");
+  const profile = await sessionProfile(); // 서명·만료·token_version 대조까지 (무효화 세션 거부)
+  if (!profile) throw new Error("Unauthorized: Please log in first.");
   return profile;
 }
 
@@ -47,8 +46,6 @@ function parseFlags(value: string | null): Record<string, unknown> {
   }
 }
 
-const MAX_WORLDS = 20; // 골격 단계 남용 방지
-
 // 웹 대시보드에서 토글 가능한 boolean 게임룰(플러그인 WORLD_GAMERULES 화이트리스트와 일치해야 함).
 const GAMERULE_KEYS = ["doMobSpawning", "doWeatherCycle", "doDaylightCycle", "doFireTick", "mobGriefing", "doTileDrops", "doTraderSpawning"];
 // 게임룰이 아닌 월드 설정(별도 엔드포인트). difficulty 는 4단계 enum.
@@ -57,14 +54,21 @@ const DIFFICULTIES = ["peaceful", "easy", "normal", "hard"];
 const GAMEMODES = ["creative", "survival", "adventure", "spectator"];
 
 /** 현재 사용자의 월드 목록 + 쿼터 사용량 조회. */
-export async function getMyWorlds() {
+export async function getMyWorlds(viewAs?: string) {
   try {
-    const profile = await getAuthenticatedProfile();
+    const { profile, readOnly } = await resolveViewProfile(viewAs);
     const ownerName = profile.minecraft_username || profile.creator_name;
     const rows = await prisma.minecraftWorld.findMany({
       where: { owner_id: profile.id },
       orderBy: { created_at: "desc" },
     });
+
+    // 양도 대기중 월드의 받는 사람 이름 일괄 조회(소유자 UI "양도 대기중 → {닉}" 표시용)
+    const pendingIds = [...new Set(rows.filter((r) => r.pending_transfer_to).map((r) => r.pending_transfer_to as string))];
+    const recipients = pendingIds.length
+      ? await prisma.profile.findMany({ where: { id: { in: pendingIds } }, select: { id: true, creator_name: true, minecraft_username: true } })
+      : [];
+    const recipientName = new Map(recipients.map((r) => [r.id, r.minecraft_username || r.creator_name]));
 
     const worlds = rows.map((w) => ({
       id: w.id,
@@ -85,17 +89,25 @@ export async function getMyWorlds() {
       archivedAt: w.archived_at ? w.archived_at.toISOString() : null,
       createdAt: w.created_at.toISOString(),
       backups: parseBackupList(w.backups).map((b) => ({ ts: b.ts, bytes: b.bytes })), // 날짜별 다운로드용(경로 비노출)
+      pendingTransfer: w.pending_transfer_to ? { name: recipientName.get(w.pending_transfer_to) || "?" } : null,
+      exploreShared: w.explore_shared,        // 탐방 공유 ON 여부(소유자 토글)
+      exploreSuspended: w.explore_suspended,  // 관리자 정지 여부
     }));
 
-    // 쿼터 사용량 = 모든 월드(활성+비활성). 비활성화로는 안 줄고 삭제해야 줄어든다(잠금이 의미를 갖도록).
-    const usedBytes = worlds.reduce((s, w) => s + w.sizeBytes, 0);
-    const totalRaw = getWorldQuotaBytes(profile.role);
+    // 쿼터 사용량 = 모든 월드(활성+비활성) + 스키매틱 폴더(공동 풀). 비활성화로는 안 줄고 삭제해야 줄어든다(잠금이 의미를 갖도록).
+    const worldBytes = worlds.reduce((s, w) => s + w.sizeBytes, 0);
+    const schemBytes = profile.minecraft_uuid ? await playerSchematicsBytes(profile.minecraft_uuid) : 0;
+    const usedBytes = worldBytes + schemBytes;
+    const totalRaw = effectiveQuotaBytes(profile.role, subscriptionQuotaBonus(profile.subscription_until));
 
     // 대시보드 진입 시 쿼터 재평가(경고/잠금 enforcement) — 상태를 배너용으로 반환.
+    // 읽기 전용(어드민 조회) 시엔 enforcement(자동 비활성화 등 부수효과)를 일으키지 않고 현재 상태만 표시.
     let quotaState = profile.world_quota_state;
-    try {
-      quotaState = (await evaluateQuota(profile.id)).state;
-    } catch { /* 평가 실패는 무시 */ }
+    if (!readOnly) {
+      try {
+        quotaState = (await evaluateQuota(profile.id)).state;
+      } catch { /* 평가 실패는 무시 */ }
+    }
 
     return {
       success: true as const,
@@ -104,6 +116,8 @@ export async function getMyWorlds() {
         usedBytes,
         totalBytes: Number.isFinite(totalRaw) ? totalRaw : null, // null = 무제한
         worldCount: worlds.length,
+        worldBytes, // 분해 표시용(월드 / 스키매틱 공동 풀)
+        schemBytes,
       },
       quotaState,
     };
@@ -113,17 +127,21 @@ export async function getMyWorlds() {
 }
 
 /** 내가 초대(trusted)된 다른 사람의 월드 목록. */
-export async function getInvitedWorlds() {
+export async function getInvitedWorlds(viewAs?: string) {
   try {
-    const profile = await getAuthenticatedProfile();
+    const { profile } = await resolveViewProfile(viewAs);
     if (!profile.minecraft_uuid) return { success: true as const, worlds: [] };
 
+    // uuid 또는 닉네임(초대 당시 미연동으로 uuid 가 빈 항목)으로 매칭 + uuid 자가치유 백필
+    const ids = await resolveInvitedWorldIds({
+      profileId: profile.id,
+      uuid: profile.minecraft_uuid,
+      username: profile.minecraft_username,
+    });
+    if (ids.size === 0) return { success: true as const, worlds: [] };
+
     const rows = await prisma.minecraftWorld.findMany({
-      where: {
-        status: { not: "archived" },
-        owner_id: { not: profile.id },
-        trusted_players: { contains: profile.minecraft_uuid },
-      },
+      where: { id: { in: [...ids] }, status: { not: "archived" } },
       include: { owner: { select: { creator_name: true, minecraft_username: true } } },
       orderBy: { created_at: "desc" },
     });
@@ -165,10 +183,48 @@ async function reserveWorldKey(profileId: string, nick: string, name: string) {
   return { worldKey, folder, dup };
 }
 
+/**
+ * 같은 (닉, 이름)이 이미 있으면 "이름 (2)", "이름 (3)" … 으로 자동 번호를 붙여 충돌 없는
+ * 표시 이름 + world_key(해시) + 폴더를 찾는다. 이름이 달라지면 sha256 해시(폴더)도 자연히 고유해진다.
+ * → 같은 맵을 여러 번 삽입할 수 있게 한다. 폴더(해시) 충돌은 보관 포함 전 상태로, 표시 이름 충돌은 활성 월드 기준으로 검사.
+ * 한도(100) 초과 시 null (호출부에서 에러 처리).
+ */
+async function reserveUniqueWorld(
+  profileId: string,
+  nick: string,
+  baseName: string
+): Promise<{ name: string; worldKey: string; folder: string } | null> {
+  for (let n = 1; n <= 100; n++) {
+    const name = n === 1 ? baseName : `${baseName} (${n})`;
+    const worldKey = computeWorldKey(nick, name);
+    const folder = worldFolderFromKey(worldKey);
+    const keyDup = await prisma.minecraftWorld.findFirst({ where: { owner_id: profileId, world_key: worldKey }, select: { id: true } });
+    const nameDup = await prisma.minecraftWorld.findFirst({ where: { owner_id: profileId, name, status: { not: "archived" } }, select: { id: true } });
+    if (!keyDup && !nameDup) return { name, worldKey, folder };
+  }
+  return null;
+}
+
 async function logWorld(creatorName: string, action: string, details: string) {
   try {
     await prisma.creatorLog.create({ data: { creator_name: creatorName, action, details } });
   } catch { /* 로그 실패는 무시 */ }
+}
+
+/**
+ * 역할별 월드 총 보유 한도 검사(전체 한도 — 하루 레이트리밋이 아니라 동시 보유 상한).
+ * builder(user) 7 / creator 14 / official+ 무제한. 활성(비보관) 월드 수 기준(= 기존 MAX_WORLDS 의미).
+ * 새 월드를 보유하게 되는 모든 경로(생성·삽입·등록·양도수락·복구)에서 호출해 "N개 초과 보유 불가" 불변식을 유지한다.
+ * 통과면 null, 초과면 차단 응답 반환. (보관 월드는 서버에서 내려가 활성 슬롯을 차지하지 않지만 디스크 쿼터에는 계속 포함된다.)
+ */
+async function worldCountLimitError(profile: { id: string; role: string | null }) {
+  const limit = getMaxWorlds(profile.role);
+  if (!Number.isFinite(limit)) return null; // 무제한(official/staff)
+  const activeCount = await prisma.minecraftWorld.count({ where: { owner_id: profile.id, status: { not: "archived" } } });
+  if (activeCount >= limit) {
+    return { success: false as const, error: `월드는 최대 ${limit}개까지 보유할 수 있습니다. 기존 월드를 삭제하거나 정리한 뒤 다시 시도해주세요.` };
+  }
+  return null;
 }
 
 const QUOTA_LOCKED_MSG = "클라우드 용량 초과로 잠겨 있습니다. 월드를 삭제해 용량을 확보하면 다시 사용할 수 있습니다. (지금은 다운로드/삭제만 가능)";
@@ -186,23 +242,7 @@ async function displayNameTaken(profileId: string, name: string, exceptId?: stri
   return !!dup;
 }
 
-/** 닉네임 → 마인크래프트 UUID 해석(등록/연동된 유저, 대소문자 무시). 못 찾으면 null — 이름만 기록되고 추후 연동 시 매칭. */
-async function resolveMinecraftUuid(name: string): Promise<string | null> {
-  const n = name.trim().toLowerCase();
-  if (!n) return null;
-  const profs = await prisma.profile.findMany({
-    where: { minecraft_username: { not: null }, minecraft_uuid: { not: null } },
-    select: { minecraft_username: true, minecraft_uuid: true },
-  });
-  const pm = profs.find((p) => (p.minecraft_username || "").toLowerCase() === n);
-  if (pm?.minecraft_uuid) return pm.minecraft_uuid;
-  const las = await prisma.linkedAccount.findMany({
-    where: { minecraft_username: { not: null }, minecraft_uuid: { not: null } },
-    select: { minecraft_username: true, minecraft_uuid: true },
-  });
-  const lm = las.find((l) => (l.minecraft_username || "").toLowerCase() === n);
-  return lm?.minecraft_uuid ?? null;
-}
+// 닉네임 → 마크 UUID 해석은 @/lib/minecraftResolve 로 분리(스키매틱 공유와 공용).
 
 /** 월드 편집 권한(소유자 + 초대자 uuid)을 플러그인에 동기화(베스트에포트). 인게임 빌드 보호가 이걸 참조. */
 async function pushWorldAccess(mvWorld: string | null, ownerUuid: string | null, trustedJson: string | null) {
@@ -211,7 +251,7 @@ async function pushWorldAccess(mvWorld: string | null, ownerUuid: string | null,
   if (ownerUuid) editors.push(ownerUuid);
   for (const t of parseTrusted(trustedJson)) if (t.uuid && t.perms.edit) editors.push(t.uuid); // 편집 권한 멤버만
   try {
-    await setMinecraftWorldAccess(mvWorld, editors);
+    await setMinecraftWorldAccess(mvWorld, editors, ownerUuid); // owner = 소유자 전용 동작(/setworldspawn) 게이트 기준
   } catch { /* best-effort */ }
 }
 
@@ -223,7 +263,7 @@ async function ownerUuidOf(world: { owner_id: string }, profile: { id: string; m
 }
 
 /** 기본 월드 생성(평지/야생). DB 레코드 + 서버 프로비저닝(베스트에포트). 폴더명은 {닉}_{이름} 해시. */
-export async function createWorld(name: string, generator: string, icon?: string) {
+export async function createWorld(name: string, generator: string, icon?: string, generateStructures: boolean = true) {
   try {
     const profile = await getAuthenticatedProfile();
     const locked = lockedResponse(profile);
@@ -235,12 +275,8 @@ export async function createWorld(name: string, generator: string, icon?: string
     const validIcon = icon && WORLD_ICON_KEYS.includes(icon) ? icon : null;
     const nick = profile.minecraft_username || profile.creator_name;
 
-    const activeCount = await prisma.minecraftWorld.count({
-      where: { owner_id: profile.id, status: { not: "archived" } },
-    });
-    if (activeCount >= MAX_WORLDS) {
-      return { success: false as const, error: `월드는 최대 ${MAX_WORLDS}개까지 만들 수 있습니다.` };
-    }
+    const cap = await worldCountLimitError(profile);
+    if (cap) return cap;
 
     const { worldKey, folder, dup } = await reserveWorldKey(profile.id, nick, cleanName);
     if (dup) {
@@ -267,7 +303,7 @@ export async function createWorld(name: string, generator: string, icon?: string
       },
     });
 
-    const provision = await createMinecraftWorld(folder, gen, 3000);
+    const provision = await createMinecraftWorld(folder, gen, 3000, generateStructures);
     if (provision.success) {
       await prisma.minecraftWorld.update({
         where: { id: world.id },
@@ -277,7 +313,7 @@ export async function createWorld(name: string, generator: string, icon?: string
     }
     await pushWorldAccess(folder, profile.minecraft_uuid, null); // 소유자 빌드 권한 등록
 
-    await logWorld(profile.creator_name, "WORLD_CREATE", `월드 생성: ${cleanName} (${gen})`);
+    await logWorld(profile.creator_name, "WORLD_CREATE", `월드 생성: ${cleanName} (${gen}, 구조물 ${generateStructures ? "ON" : "OFF"})`);
     try { await evaluateQuota(profile.id); } catch { /* 평가 실패는 무시 */ }
     return { success: true as const, worldId: world.id, provisioned: provision.success };
   } catch (e: unknown) {
@@ -289,53 +325,89 @@ export async function createWorld(name: string, generator: string, icon?: string
  * .zip 업로드로 월드 삽입. 업로드 라우트가 디스크에 zip 을 저장한 뒤 호출한다(stagingPath=절대경로).
  * 쿼터는 라우트에서 1차 검사 후 여기서 레코드를 만든다. 서버 삽입 실패 시 레코드를 롤백한다.
  */
-export async function importWorld(name: string, icon: string | undefined, stagingPath: string, sizeBytes: number) {
-  const cleanup = () => fs.unlink(stagingPath).catch(() => {});
+export async function importWorld(
+  name: string,
+  icon: string | undefined,
+  stagingPath: string,
+  sizeBytes: number,
+  opts?: { keepStaging?: boolean; importKey?: string }
+) {
+  // keepStaging=true 면 스테이징 파일을 여기서 지우지 않는다(청크 라우트가 재시도 위해 수명주기를 직접 관리).
+  const cleanup = () => (opts?.keepStaging ? Promise.resolve() : fs.unlink(stagingPath).catch(() => {}));
   try {
     const profile = await getAuthenticatedProfile();
     const locked = lockedResponse(profile);
     if (locked) { await cleanup(); return locked; }
+
+    // 멱등: 같은 importKey(=업로드 uploadId)로 이미 삽입된 월드가 있으면 재삽입하지 않고 그 결과를 반환한다.
+    // 응답 유실·재시도·재클릭이 겹쳐도 중복 월드가 생기지 않게 하는 최종 방어선(파일 마커보다 견고).
+    if (opts?.importKey) {
+      const existing = await prisma.minecraftWorld.findFirst({ where: { import_key: opts.importKey, owner_id: profile.id } });
+      if (existing && existing.status !== "provisioning") {
+        // 이미 삽입 완료 — 재삽입하지 않고 기존 결과를 반환(멱등).
+        await cleanup();
+        return { success: true as const, worldId: existing.id, name: existing.name };
+      }
+      if (existing) {
+        // 프로비저닝 중 크래시로 멈춘 잔여 레코드 — 정리 후 재삽입(unique 제약 충돌 방지).
+        // 키+소유자+상태로 스코프한 deleteMany(멱등 — 0/1행, 남의 행 오삭제 없음). 유실 시엔 아래 create 의 P2002 처리가 방어.
+        if (existing.mv_world) await deleteMinecraftWorld(existing.mv_world).catch(() => {});
+        await prisma.minecraftWorld.deleteMany({ where: { import_key: opts.importKey, owner_id: profile.id, status: "provisioning" } }).catch(() => {});
+      }
+    }
     const v = validateWorldName(name);
     if (!v.ok) { await cleanup(); return { success: false as const, error: v.error }; }
     const cleanName = v.name;
     const validIcon = icon && WORLD_ICON_KEYS.includes(icon) ? icon : null;
     const nick = profile.minecraft_username || profile.creator_name;
 
-    const activeCount = await prisma.minecraftWorld.count({ where: { owner_id: profile.id, status: { not: "archived" } } });
-    if (activeCount >= MAX_WORLDS) {
-      await cleanup();
-      return { success: false as const, error: `월드는 최대 ${MAX_WORLDS}개까지 만들 수 있습니다.` };
-    }
+    const cap = await worldCountLimitError(profile);
+    if (cap) { await cleanup(); return cap; }
 
-    const { worldKey, folder, dup } = await reserveWorldKey(profile.id, nick, cleanName);
-    if (dup) {
+    // 같은 맵 재삽입 허용: 이름이 겹치면 "이름 (2)", "이름 (3)" … 으로 자동 번호 → 폴더 해시도 자연히 고유.
+    const reserved = await reserveUniqueWorld(profile.id, nick, cleanName);
+    if (!reserved) {
       await cleanup();
-      return { success: false as const, error: "같은 이름의 월드가 이미 있습니다." };
+      return { success: false as const, error: "같은 이름의 월드가 너무 많습니다. 다른 이름을 사용해 주세요." };
     }
-    if (await displayNameTaken(profile.id, cleanName)) {
-      await cleanup();
-      return { success: false as const, error: "같은 이름의 월드가 이미 있습니다." };
-    }
+    const { name: finalName, worldKey, folder } = reserved;
 
-    const world = await prisma.minecraftWorld.create({
-      data: {
-        owner_id: profile.id,
-        name: cleanName,
-        world_key: worldKey,
-        mv_world: folder,
-        source: "import",
-        generator: "import",
-        icon: validIcon,
-        size_bytes: BigInt(Math.max(0, Math.floor(sizeBytes))),
-        status: "provisioning",
-        last_active_at: new Date(),
-      },
-    });
+    let world;
+    try {
+      world = await prisma.minecraftWorld.create({
+        data: {
+          owner_id: profile.id,
+          name: finalName,
+          world_key: worldKey,
+          mv_world: folder,
+          source: "import",
+          generator: "import",
+          icon: validIcon,
+          size_bytes: BigInt(Math.max(0, Math.floor(sizeBytes))),
+          status: "provisioning",
+          last_active_at: new Date(),
+          import_key: opts?.importKey ?? null, // 멱등 키(청크 업로드 uploadId). 재시도 시 중복 삽입 차단.
+        },
+      });
+    } catch (e: unknown) {
+      // import_key unique 충돌(P2002) — 직전 시도의 롤백/정리 삭제가 유실된 드문 DB 경합. 원자적으로 멱등 처리.
+      if ((e as { code?: string })?.code === "P2002" && opts?.importKey) {
+        await deleteMinecraftWorld(folder).catch(() => {}); // 방금 예약한 폴더 되돌림
+        const again = await prisma.minecraftWorld.findFirst({ where: { import_key: opts.importKey, owner_id: profile.id } });
+        await cleanup();
+        if (again && again.status !== "provisioning") return { success: true as const, worldId: again.id, name: again.name };
+        return { success: false as const, error: "이전 업로드를 정리하는 중입니다. 잠시 후 다시 시도해 주세요." };
+      }
+      throw e;
+    }
 
     const res = await importMinecraftWorld(folder, stagingPath, 3000);
     await cleanup(); // 스테이징 zip 정리(성공/실패 무관 — 플러그인이 이미 풀었음)
 
     if (!res.success) {
+      // 삽입 실패 시 서버에 잔존물(부분 삽입된 폴더)을 남기지 않는다: 폴더 제거 + DB 레코드 롤백.
+      // 단 409(world_exists=이미 로드된 실제 월드)는 우리가 만든 게 아니므로 삭제하지 않는다.
+      if (res.status !== 409) await deleteMinecraftWorld(folder).catch(() => {});
       await prisma.minecraftWorld.delete({ where: { id: world.id } }).catch(() => {});
       return { success: false as const, error: res.error || "서버에 월드를 삽입하지 못했습니다. (서버 연결/zip 확인)" };
     }
@@ -344,11 +416,12 @@ export async function importWorld(name: string, icon: string | undefined, stagin
       data: { size_bytes: BigInt(res.sizeBytes ?? Math.floor(sizeBytes)), version: res.version ?? null, status: "active", flags: JSON.stringify({ gamemode: "creative" }) },
     });
 
-    // 압축 해제 후 실제 용량이 쿼터를 넘으면 등록 취소(롤백) — zip 사전검사를 통과해도 확정 차단.
-    const total = getWorldQuotaBytes(profile.role);
+    // 압축 해제 후 실제 용량이 쿼터를 넘으면 등록 취소(롤백) — zip 사전검사를 통과해도 확정 차단. 공동 풀(월드+스키매틱) 기준.
+    const total = effectiveQuotaBytes(profile.role, subscriptionQuotaBonus(profile.subscription_until));
     if (Number.isFinite(total)) {
       const agg = await prisma.minecraftWorld.aggregate({ where: { owner_id: profile.id }, _sum: { size_bytes: true } });
-      const usedAll = Number(agg._sum.size_bytes ?? BigInt(0));
+      const schemBytes = profile.minecraft_uuid ? await playerSchematicsBytes(profile.minecraft_uuid) : 0;
+      const usedAll = Number(agg._sum.size_bytes ?? BigInt(0)) + schemBytes;
       if (usedAll > total) {
         if (world.mv_world) await deleteMinecraftWorld(world.mv_world);
         await prisma.minecraftWorld.delete({ where: { id: world.id } }).catch(() => {});
@@ -356,9 +429,9 @@ export async function importWorld(name: string, icon: string | undefined, stagin
       }
     }
     await pushWorldAccess(folder, profile.minecraft_uuid, null); // 소유자 빌드 권한 등록
-    await logWorld(profile.creator_name, "WORLD_IMPORT", `월드 삽입: ${cleanName}`);
+    await logWorld(profile.creator_name, "WORLD_IMPORT", `월드 삽입: ${finalName}`);
     try { await evaluateQuota(profile.id); } catch { /* 평가 실패는 무시 */ }
-    return { success: true as const, worldId: world.id };
+    return { success: true as const, worldId: world.id, name: finalName };
   } catch (e: unknown) {
     await cleanup();
     return { success: false as const, error: e instanceof Error ? e.message : String(e) };
@@ -450,7 +523,8 @@ export async function setWorldGamerule(worldId: string, rule: string, value: boo
   }
 }
 
-/** 게임룰이 아닌 월드 설정 변경(소유자 전용): 난이도/랜덤틱속도/폭발방지. 서버 적용 후 flags 캐시 반영. */
+/** 게임룰이 아닌 월드 설정 변경(소유자 전용): 난이도/랜덤틱속도/폭발방지 + 개인월드 보호 오버라이드
+ *  (allowItemDrop/allowRedstone/allowPhysics/trampleProtect). 서버 적용 후 flags 캐시 반영. */
 export async function setWorldSetting(worldId: string, key: string, value: string | number | boolean) {
   try {
     const profile = await getAuthenticatedProfile();
@@ -472,6 +546,8 @@ export async function setWorldSetting(worldId: string, key: string, value: strin
       v = n;
     } else if (key === "explosionBlocked") {
       v = !!value;
+    } else if (key === "allowItemDrop" || key === "allowRedstone" || key === "allowPhysics" || key === "trampleProtect") {
+      v = !!value; // 개인(w_) 월드 보호 오버라이드 — 플러그인이 w_ 월드에서만 enforcement
     } else {
       return { success: false as const, error: "지원하지 않는 설정입니다." };
     }
@@ -586,13 +662,18 @@ export async function inviteWorldMember(worldId: string, playerName: string) {
     if (profile.minecraft_username && profile.minecraft_username.toLowerCase() === name.toLowerCase()) {
       return { success: false as const, error: "본인은 초대할 수 없습니다." };
     }
+    if (await isInviteBlockedByName(name)) {
+      return { success: false as const, error: "해당 플레이어는 초대할 수 없습니다." };
+    }
 
     const uuid = await resolveMinecraftUuid(name);
     trusted.push({ uuid: uuid || "", name, perms: emptyPerms() }); // 기본 권한 없음 — 소유자가 개별 부여
     await prisma.minecraftWorld.update({ where: { id: world.id }, data: { trusted_players: JSON.stringify(trusted) } });
     await pushWorldAccess(world.mv_world, await ownerUuidOf(world, profile), JSON.stringify(trusted)); // 빌드 권한 동기화(소유자 기준)
     await logWorld(profile.creator_name, "WORLD_INVITE", `월드 초대: ${world.name} ← ${name}`);
-    return { success: true as const, trusted };
+    // 미연동 유저는 uuid 를 못 채움 — 상대가 연동 후 본인이 조회할 때 worldInvites 가 자동 매칭/백필
+    const warning = uuid ? undefined : "이 유저는 아직 웹 연동(/웹연동)을 안 했어요. 연동하면 본인 대시보드·인게임에 자동으로 나타납니다.";
+    return { success: true as const, trusted, warning };
   } catch (e: unknown) {
     return { success: false as const, error: e instanceof Error ? e.message : String(e) };
   }
@@ -612,6 +693,33 @@ export async function kickWorldMember(worldId: string, memberName: string) {
     await pushWorldAccess(world.mv_world, await ownerUuidOf(world, profile), JSON.stringify(trusted)); // 빌드 권한 동기화(소유자 기준)
     await logWorld(profile.creator_name, "WORLD_KICK", `월드 제외: ${world.name} → ${memberName}`);
     return { success: true as const, trusted };
+  } catch (e: unknown) {
+    return { success: false as const, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** 초대받은 월드에서 본인이 스스로 나간다(원치 않은 초대 탈퇴). 소유자는 사용 불가(삭제/양도 사용). */
+export async function leaveWorld(worldId: string) {
+  try {
+    const profile = await getAuthenticatedProfile();
+    if (!profile.minecraft_uuid) return { success: false as const, error: "마인크래프트 계정 연동이 필요합니다." };
+
+    const world = await prisma.minecraftWorld.findUnique({ where: { id: worldId } });
+    if (!world) return { success: false as const, error: "월드를 찾을 수 없습니다." };
+    if (world.owner_id === profile.id) return { success: false as const, error: "소유한 월드는 나갈 수 없습니다. (삭제 또는 양도를 사용하세요)" };
+
+    const myName = (profile.minecraft_username || "").toLowerCase();
+    const isMe = (t: { uuid: string; name: string }) =>
+      (!!t.uuid && t.uuid === profile.minecraft_uuid) || (!!myName && (t.name || "").toLowerCase() === myName);
+
+    const trusted = parseTrusted(world.trusted_players);
+    if (!trusted.some(isMe)) return { success: false as const, error: "초대된 월드가 아닙니다." };
+
+    const next = trusted.filter((t) => !isMe(t));
+    await prisma.minecraftWorld.update({ where: { id: world.id }, data: { trusted_players: JSON.stringify(next) } });
+    await pushWorldAccess(world.mv_world, await ownerUuidOf(world, profile), JSON.stringify(next)); // 소유자 기준 빌드권한 재동기화(내 권한 회수)
+    await logWorld(profile.creator_name, "WORLD_LEAVE", `월드 나가기: ${world.name}`);
+    return { success: true as const };
   } catch (e: unknown) {
     return { success: false as const, error: e instanceof Error ? e.message : String(e) };
   }
@@ -642,6 +750,103 @@ export async function setMemberPermission(worldId: string, memberName: string, p
   }
 }
 
+/** 월드 소유권 양도 요청(소유자 전용). 받는 사람이 수락해야 완료(플롯 양도와 동일한 흐름). */
+export async function transferWorld(worldId: string, recipientName: string) {
+  try {
+    const profile = await getAuthenticatedProfile();
+    const name = (recipientName || "").trim();
+    if (name.length < 2 || name.length > 16) return { success: false as const, error: "올바른 닉네임을 입력하세요." };
+
+    const world = await prisma.minecraftWorld.findUnique({ where: { id: worldId } });
+    if (!world || world.owner_id !== profile.id) return { success: false as const, error: "월드를 찾을 수 없습니다." };
+    if (world.status !== "active") return { success: false as const, error: "활성 월드만 양도할 수 있습니다." };
+    if (world.pending_transfer_to) return { success: false as const, error: "이미 양도 대기 중입니다." };
+    if (profile.minecraft_username && profile.minecraft_username.toLowerCase() === name.toLowerCase())
+      return { success: false as const, error: "본인에게는 양도할 수 없습니다." };
+
+    const uuid = await resolveMinecraftUuid(name);
+    const recipient = uuid ? await prisma.profile.findUnique({ where: { minecraft_uuid: uuid } }) : null;
+    if (!recipient) return { success: false as const, error: "받는 사람이 웹 계정을 연동하지 않았습니다. (양도받으려면 먼저 연동 필요)" };
+    if (recipient.id === profile.id) return { success: false as const, error: "본인에게는 양도할 수 없습니다." };
+
+    await prisma.minecraftWorld.update({
+      where: { id: world.id },
+      data: { pending_transfer_to: recipient.id, pending_transfer_at: new Date() },
+    });
+    await logWorld(profile.creator_name, "WORLD_TRANSFER_REQ", `양도 요청: ${world.name} → ${name}`);
+    return { success: true as const, recipientName: name };
+  } catch (e: unknown) {
+    return { success: false as const, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** 양도 수락(받는 사람 전용). owner_id 이전 + 양쪽 쿼터 재평가 + 인게임 빌드 권한 새 소유자 기준 동기화. */
+export async function acceptWorldTransfer(worldId: string) {
+  try {
+    const profile = await getAuthenticatedProfile();
+    const world = await prisma.minecraftWorld.findUnique({ where: { id: worldId } });
+    if (!world || world.pending_transfer_to !== profile.id) return { success: false as const, error: "양도 대기 중인 월드가 아닙니다." };
+    // 양도 수락도 새 월드를 보유하게 되므로 보유 한도를 적용(대안 계정으로 월드를 몰아 우회하는 것 차단).
+    const cap = await worldCountLimitError(profile);
+    if (cap) return cap;
+
+    const prevOwnerId = world.owner_id;
+    await prisma.minecraftWorld.update({
+      where: { id: world.id },
+      data: { owner_id: profile.id, pending_transfer_to: null, pending_transfer_at: null },
+    });
+    try { await pushWorldAccess(world.mv_world, profile.minecraft_uuid, world.trusted_players || "[]"); } catch { /* 서버 미연결 무시 */ }
+    try { await evaluateQuota(profile.id); } catch { /* */ } // 월드 용량이 새 소유자 쪽으로 이동
+    try { await evaluateQuota(prevOwnerId); } catch { /* */ } // 이전 소유자는 용량 확보
+    await logWorld(profile.creator_name, "WORLD_TRANSFER_ACCEPT", `양도 수락: ${world.name}`);
+    return { success: true as const };
+  } catch (e: unknown) {
+    return { success: false as const, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** 양도 취소(소유자) 또는 거절(받는 사람). 양쪽 다 호출 가능 — pending 해제. */
+export async function cancelWorldTransfer(worldId: string) {
+  try {
+    const profile = await getAuthenticatedProfile();
+    const world = await prisma.minecraftWorld.findUnique({ where: { id: worldId } });
+    if (!world || !world.pending_transfer_to) return { success: false as const, error: "양도 대기 중인 월드가 아닙니다." };
+    if (world.owner_id !== profile.id && world.pending_transfer_to !== profile.id)
+      return { success: false as const, error: "권한이 없습니다." };
+
+    const isOwner = world.owner_id === profile.id;
+    await prisma.minecraftWorld.update({
+      where: { id: world.id },
+      data: { pending_transfer_to: null, pending_transfer_at: null },
+    });
+    await logWorld(profile.creator_name, isOwner ? "WORLD_TRANSFER_CANCEL" : "WORLD_TRANSFER_REJECT", `양도 ${isOwner ? "취소" : "거절"}: ${world.name}`);
+    return { success: true as const };
+  } catch (e: unknown) {
+    return { success: false as const, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** 나에게 양도 요청된 월드들(받는 사람용 — 수락/거절 UI). */
+export async function getIncomingTransfers(viewAs?: string) {
+  try {
+    const { profile } = await resolveViewProfile(viewAs);
+    const worlds = await prisma.minecraftWorld.findMany({
+      where: { pending_transfer_to: profile.id },
+      select: { id: true, name: true, icon: true, version: true, size_bytes: true, owner: { select: { creator_name: true, minecraft_username: true } } },
+    });
+    return worlds.map((w) => ({
+      id: w.id,
+      name: w.name,
+      icon: w.icon,
+      version: w.version,
+      sizeBytes: Number(w.size_bytes),
+      fromName: w.owner?.minecraft_username || w.owner?.creator_name || "?",
+    }));
+  } catch {
+    return [];
+  }
+}
+
 /** 아카이브된 월드 복구(소유자 전용). 백업 zip 으로 서버에 재삽입 후 활성화. */
 export async function restoreWorld(worldId: string) {
   try {
@@ -652,6 +857,9 @@ export async function restoreWorld(worldId: string) {
     if (!world || world.owner_id !== profile.id) return { success: false as const, error: "월드를 찾을 수 없습니다." };
     if (world.status !== "archived") return { success: false as const, error: "보관된 월드만 복구할 수 있습니다." };
     if (!world.mv_world || !world.backup_path) return { success: false as const, error: "복구할 백업이 없습니다." };
+    // 복구는 보관(비활성)→활성이라 보유 한도를 소비한다. 한도 초과면 먼저 정리해야 복구 가능(전체 한도 불변식 유지).
+    const cap = await worldCountLimitError(profile);
+    if (cap) return cap;
 
     const res = await importMinecraftWorld(world.mv_world, world.backup_path, world.border);
     if (!res.success) return { success: false as const, error: res.error || "복구에 실패했습니다. (서버 연결 확인)" };
@@ -696,6 +904,76 @@ export async function renameWorld(worldId: string, newName: string) {
     await prisma.minecraftWorld.update({ where: { id: world.id }, data: { name: cleanName } });
     await logWorld(profile.creator_name, "WORLD_RENAME", `월드 이름 변경: ${world.name} → ${cleanName}`);
     return { success: true as const, name: cleanName };
+  } catch (e: unknown) {
+    return { success: false as const, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/**
+ * 월드 아이콘 변경(소유자 전용). 프리셋 키(WORLD_ICON_KEYS)만 허용하고, null 이면 기본 아이콘으로.
+ * 표시용 메타데이터라 서버 폴더/프로비저닝과 무관하다(rename 과 동일하게 키만 갱신).
+ */
+export async function setWorldIcon(worldId: string, icon: string | null) {
+  try {
+    const profile = await getAuthenticatedProfile();
+    const locked = lockedResponse(profile);
+    if (locked) return locked;
+    const validIcon = icon && WORLD_ICON_KEYS.includes(icon) ? icon : null;
+
+    const world = await prisma.minecraftWorld.findUnique({ where: { id: worldId } });
+    if (!world || world.owner_id !== profile.id) return { success: false as const, error: "월드를 찾을 수 없습니다." };
+    if (world.icon === validIcon) return { success: true as const, icon: validIcon };
+
+    await prisma.minecraftWorld.update({ where: { id: world.id }, data: { icon: validIcon } });
+    await logWorld(profile.creator_name, "WORLD_ICON", `월드 아이콘 변경: ${world.name} → ${validIcon ?? "기본"}`);
+    return { success: true as const, icon: validIcon };
+  } catch (e: unknown) {
+    return { success: false as const, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** 유저당 탐방 공유 가능 월드 수. */
+const EXPLORE_SHARE_MAX = 9;
+
+/**
+ * 탐방 공유 토글(소유자 전용). 켤 때 유저당 최대 EXPLORE_SHARE_MAX 개로 제한.
+ * 실제 /탐방 목록 노출 조건은 (explore_shared && !explore_suspended && status=active) — 별도 API 에서 필터.
+ */
+export async function setWorldExploreShare(worldId: string, shared: boolean) {
+  try {
+    const profile = await getAuthenticatedProfile();
+    const world = await prisma.minecraftWorld.findUnique({ where: { id: worldId } });
+    if (!world || world.owner_id !== profile.id) return { success: false as const, error: "월드를 찾을 수 없습니다." };
+    if (world.explore_shared === shared) return { success: true as const, shared };
+    if (shared) {
+      if (world.explore_suspended) return { success: false as const, error: "관리자가 이 월드의 탐방 공유를 정지했습니다." };
+      const sharedCount = await prisma.minecraftWorld.count({ where: { owner_id: profile.id, explore_shared: true } });
+      if (sharedCount >= EXPLORE_SHARE_MAX) {
+        return { success: false as const, error: `탐방 공유는 최대 ${EXPLORE_SHARE_MAX}개까지 가능합니다.` };
+      }
+    }
+    await prisma.minecraftWorld.update({ where: { id: world.id }, data: { explore_shared: shared } });
+    await logWorld(profile.creator_name, "WORLD_EXPLORE_SHARE", `탐방 공유 ${shared ? "ON" : "OFF"}: ${world.name}`);
+    return { success: true as const, shared };
+  } catch (e: unknown) {
+    return { success: false as const, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/**
+ * 탐방 공유 정지/해제(관리자·스태프 전용 — canModerate). 소유자 토글과 무관하게 목록에서 숨긴다(어뷰징 차단).
+ * 정지 시 explore_shared 도 함께 끄지 않고 그대로 둬, 정지 해제하면 소유자의 기존 공유 의사가 복원되게 한다.
+ */
+export async function setWorldExploreSuspended(worldId: string, suspended: boolean) {
+  try {
+    const profile = await getAuthenticatedProfile();
+    if (!canModerate(profile.role)) return { success: false as const, error: "권한이 없습니다." };
+    const world = await prisma.minecraftWorld.findUnique({ where: { id: worldId } });
+    if (!world) return { success: false as const, error: "월드를 찾을 수 없습니다." };
+    if (world.explore_suspended === suspended) return { success: true as const, suspended };
+    await prisma.minecraftWorld.update({ where: { id: world.id }, data: { explore_suspended: suspended } });
+    await logWorld(profile.creator_name, "WORLD_EXPLORE_SUSPEND", `탐방 공유 ${suspended ? "정지" : "정지해제"}: ${world.name} (owner ${world.owner_id})`);
+    return { success: true as const, suspended };
   } catch (e: unknown) {
     return { success: false as const, error: e instanceof Error ? e.message : String(e) };
   }

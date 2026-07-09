@@ -7,14 +7,22 @@ export interface WorldIcon {
 }
 
 export const WORLD_ICONS: WorldIcon[] = [
-  { key: "grass", label: "잔디", src: "/world-icons/grass.png" },
-  { key: "stone", label: "돌", src: "/world-icons/stone.png" },
-  { key: "oak", label: "참나무", src: "/world-icons/oak.png" },
-  { key: "bricks", label: "벽돌", src: "/world-icons/bricks.png" },
-  { key: "sand", label: "사막", src: "/world-icons/sand.png" },
-  { key: "water", label: "바다", src: "/world-icons/water.png" },
-  { key: "diamond", label: "다이아", src: "/world-icons/diamond.png" },
-  { key: "netherrack", label: "네더", src: "/world-icons/netherrack.png" },
+  { key: "grass", label: "잔디", src: "/world-icons/Grass_Block.png" },
+  { key: "dirt", label: "흙", src: "/world-icons/Dirt.png" },
+  { key: "stone", label: "돌", src: "/world-icons/Stone.png" },
+  { key: "deepslate", label: "심층암", src: "/world-icons/Deepslate.png" },
+  { key: "oak", label: "참나무", src: "/world-icons/Oak_Log.png" },
+  { key: "oak_leaves", label: "참나무 잎", src: "/world-icons/Oak_Leaves.png" },
+  { key: "bricks", label: "벽돌", src: "/world-icons/Bricks.png" },
+  { key: "glass", label: "유리", src: "/world-icons/Glass.png" },
+  { key: "blue_ice", label: "푸른 얼음", src: "/world-icons/Blue_Ice.png" },
+  { key: "gold", label: "금", src: "/world-icons/Gold_Block.png" },
+  { key: "iron", label: "철", src: "/world-icons/Iron_Block.png" },
+  { key: "diamond", label: "다이아", src: "/world-icons/Diamond_Block.png" },
+  { key: "emerald", label: "에메랄드", src: "/world-icons/Emerald_Block.png" },
+  { key: "redstone", label: "레드스톤", src: "/world-icons/Redstone_Block.png" },
+  { key: "netherite", label: "네더라이트", src: "/world-icons/Netherite_Block.png" },
+  { key: "tnt", label: "TNT", src: "/world-icons/Tnt.png" },
 ];
 
 export const WORLD_ICON_KEYS = WORLD_ICONS.map((i) => i.key);

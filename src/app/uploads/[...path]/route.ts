@@ -13,6 +13,12 @@ export async function GET(
     return new NextResponse('Not Found', { status: 404 });
   }
 
+  // 숨김파일(.env, .git 등)·점으로 시작하는 세그먼트 차단. 정상 업로드 파일명은 점으로 시작하지 않으므로
+  // 스캐너의 시크릿 탐색(/uploads/.env 등)을 조용히 404 처리한다(경로탈출 .. 세그먼트도 함께 막힘).
+  if (filePathArray.some((seg) => seg.startsWith('.'))) {
+    return new NextResponse('File Not Found', { status: 404 });
+  }
+
   // 조립할 로컬 디스크 물리 경로: C:\Github\BlockCanvas\public\uploads\...
   const uploadsRoot = path.join(process.cwd(), 'public', 'uploads');
   const physicalPath = path.resolve(uploadsRoot, ...filePathArray);
@@ -51,8 +57,12 @@ export async function GET(
         'Expires': '0',
       },
     });
-  } catch (error) {
-    console.error('API Static file serving error:', error);
+  } catch (error: unknown) {
+    // 파일 없음(ENOENT)은 흔한 정상 404(스캐너 탐색·오타 링크 등) → 로그 소음을 줄이려 에러 로깅 생략.
+    // 그 외(권한 등 예기치 못한 오류)만 로깅한다.
+    if ((error as NodeJS.ErrnoException)?.code !== 'ENOENT') {
+      console.error('API Static file serving error:', error);
+    }
     return new NextResponse('File Not Found', { status: 404 });
   }
 }

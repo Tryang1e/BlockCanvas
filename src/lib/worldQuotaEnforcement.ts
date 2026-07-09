@@ -1,10 +1,12 @@
 import { prisma } from "@/lib/prisma";
-import { getWorldQuotaBytes, desiredQuotaState, formatBytes } from "@/lib/worldQuota";
+import { effectiveQuotaBytes, desiredQuotaState, formatBytes } from "@/lib/worldQuota";
+import { subscriptionQuotaBonus } from "@/lib/subscription";
 import { archiveWorld } from "@/lib/worldLifecycle";
 import { getMinecraftWorldInfo, notifyMinecraftPlayer } from "@/lib/minecraft";
+import { playerSchematicsBytes } from "@/lib/schematics";
 
 // 월드 클라우드 쿼터 enforcement.
-//   사용량 = 그 유저의 모든 월드(활성+비활성) size_bytes 합 → 비활성화로는 안 줄고, 삭제해야 줄어든다.
+//   사용량 = 그 유저의 모든 월드(활성+비활성) size_bytes 합 + 스키매틱 폴더 용량(공동 풀) → 비활성화로는 안 줄고, 삭제해야 줄어든다.
 //   90%+ = warned(경고 알림), 100%+ = locked(전 월드 자동 비활성화, 다운로드/삭제만), 다시 미만 = 잠금 해제.
 //   알림 3채널: 웹(CreatorLog + 대시보드 배너[상태 기반]) · 디스코드(웹훅) · 인게임(플러그인 notify, 온라인 시).
 
@@ -23,11 +25,26 @@ interface OwnerProfile {
   minecraft_uuid: string | null;
   minecraft_username: string | null;
   world_quota_state: string;
+  subscription_until: Date | null;
 }
 
-async function usedBytesForOwner(ownerId: string): Promise<number> {
+async function usedBytesForOwner(ownerId: string, minecraftUuid: string | null): Promise<number> {
   const agg = await prisma.minecraftWorld.aggregate({ where: { owner_id: ownerId }, _sum: { size_bytes: true } });
-  return Number(agg._sum.size_bytes ?? BigInt(0));
+  const worldBytes = Number(agg._sum.size_bytes ?? BigInt(0));
+  const schemBytes = minecraftUuid ? await playerSchematicsBytes(minecraftUuid) : 0; // 스키매틱도 같은 풀
+  return worldBytes + schemBytes;
+}
+
+/** 읽기 전용 쿼터 사용량 조회(부수효과 없음 — evaluateQuota 와 달리 비활성화/알림 안 함). 스키매틱 업로드 사전 검사용. */
+export async function getQuotaUsage(ownerId: string): Promise<{ usedBytes: number; totalBytes: number | null; state: string }> {
+  const profile = await prisma.profile.findUnique({
+    where: { id: ownerId },
+    select: { role: true, minecraft_uuid: true, world_quota_state: true, subscription_until: true },
+  });
+  if (!profile) return { usedBytes: 0, totalBytes: null, state: "ok" };
+  const total = effectiveQuotaBytes(profile.role, subscriptionQuotaBonus(profile.subscription_until));
+  const used = await usedBytesForOwner(ownerId, profile.minecraft_uuid);
+  return { usedBytes: used, totalBytes: Number.isFinite(total) ? total : null, state: profile.world_quota_state || "ok" };
 }
 
 async function postDiscord(profile: OwnerProfile, kind: QuotaKind, used: number, total: number) {
@@ -85,12 +102,12 @@ async function notifyAll(profile: OwnerProfile, kind: QuotaKind, used: number, t
 export async function evaluateQuota(ownerId: string): Promise<{ state: string; usedBytes: number; totalBytes: number | null }> {
   const profile = (await prisma.profile.findUnique({
     where: { id: ownerId },
-    select: { id: true, creator_name: true, role: true, minecraft_uuid: true, minecraft_username: true, world_quota_state: true },
+    select: { id: true, creator_name: true, role: true, minecraft_uuid: true, minecraft_username: true, world_quota_state: true, subscription_until: true },
   })) as OwnerProfile | null;
   if (!profile) return { state: "ok", usedBytes: 0, totalBytes: null };
 
-  const total = getWorldQuotaBytes(profile.role);
-  const used = await usedBytesForOwner(ownerId);
+  const total = effectiveQuotaBytes(profile.role, subscriptionQuotaBonus(profile.subscription_until));
+  const used = await usedBytesForOwner(ownerId, profile.minecraft_uuid);
   const desired = desiredQuotaState(used, total);
   const prev = profile.world_quota_state || "ok";
 

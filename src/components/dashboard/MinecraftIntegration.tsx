@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Gamepad2, RefreshCw, UserCheck, UserMinus, ShieldAlert, CheckCircle2, UserPlus, Key, LogIn } from "lucide-react";
+import { Gamepad2, RefreshCw, UserCheck, UserMinus, ShieldAlert, CheckCircle2, LogIn } from "lucide-react";
 import {
   getMinecraftStatus,
-  generateVerificationCode,
   unlinkMinecraftAccount,
 } from "@/app/actions/minecraft";
 
@@ -12,7 +11,6 @@ interface MinecraftStatus {
   linked: boolean;
   minecraftUuid: string | null;
   minecraftUsername: string | null;
-  verificationCode: string | null;
 }
 
 function mcErrorText(code: string): string {
@@ -25,6 +23,8 @@ function mcErrorText(code: string): string {
       return "보안 검증에 실패했습니다. 다시 시도해주세요.";
     case "oauth_failed":
       return "Microsoft 인증에 실패했습니다. 정품 Java 계정인지 확인 후 다시 시도해주세요.";
+    case "blocked":
+      return "이 마인크래프트 계정은 이용이 제한되어 연동할 수 없습니다. 문의: 운영진.";
     default:
       return "연동 중 오류가 발생했습니다.";
   }
@@ -35,7 +35,6 @@ export default function MinecraftIntegration({ msLoginUrl = "/api/auth/minecraft
     linked: false,
     minecraftUuid: null,
     minecraftUsername: null,
-    verificationCode: null,
   });
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -49,7 +48,6 @@ export default function MinecraftIntegration({ msLoginUrl = "/api/auth/minecraft
         linked: res.linked || false,
         minecraftUuid: res.minecraftUuid || null,
         minecraftUsername: res.minecraftUsername || null,
-        verificationCode: res.verificationCode || null,
       });
     }
     setLoading(false);
@@ -70,19 +68,6 @@ export default function MinecraftIntegration({ msLoginUrl = "/api/auth/minecraft
     }
   }, []);
 
-  const handleGenerateCode = async () => {
-    setActionLoading(true);
-    setMessage(null);
-    const res = await generateVerificationCode();
-    if (res.success && res.code) {
-      setStatus((prev) => ({ ...prev, verificationCode: res.code as string }));
-      setMessage({ type: "success", text: "새로운 연동 코드가 발급되었습니다." });
-    } else {
-      setMessage({ type: "error", text: res.error || "코드 발급 중 오류가 발생했습니다." });
-    }
-    setActionLoading(false);
-  };
-
   const handleUnlink = async () => {
     if (!confirm("정말로 마인크래프트 계정 연동을 해제하시겠습니까?\n연동 해제 시 웹을 통한 플롯 관리 기능이 모두 비활성화됩니다.")) {
       return;
@@ -95,7 +80,6 @@ export default function MinecraftIntegration({ msLoginUrl = "/api/auth/minecraft
         linked: false,
         minecraftUuid: null,
         minecraftUsername: null,
-        verificationCode: null,
       });
       setMessage({ type: "success", text: "마인크래프트 계정이 성공적으로 연동 해제되었습니다." });
     } else {
@@ -192,46 +176,9 @@ export default function MinecraftIntegration({ msLoginUrl = "/api/auth/minecraft
             </a>
           </div>
 
-          {/* 2순위(폴백): 인게임 6자리 코드 */}
-          <details className="group bg-neutral-50/60 border border-neutral-100 rounded-2xl">
-            <summary className="cursor-pointer list-none p-4 text-xs font-semibold text-neutral-600 flex items-center justify-between">
-              <span>또는 인게임 6자리 코드로 연동</span>
-              <span className="text-neutral-400 transition-transform group-open:rotate-180">▾</span>
-            </summary>
-            <div className="px-4 pb-4 space-y-3">
-              <button
-                onClick={handleGenerateCode}
-                disabled={actionLoading}
-                className="flex items-center gap-1.5 px-4 py-2.5 bg-neutral-900 hover:bg-neutral-700 text-white text-xs font-bold rounded-lg transition-all shadow-sm disabled:opacity-50 whitespace-nowrap"
-              >
-                <UserPlus size={15} />
-                연동 코드 발급하기
-              </button>
-
-          {status.verificationCode && (
-            <div className="bg-neutral-900 text-white rounded-2xl p-8 flex flex-col items-center text-center space-y-4 shadow-md border border-neutral-800 animate-in zoom-in-95 duration-300">
-              <div className="p-3 bg-neutral-800 rounded-full text-amber-400">
-                <Key size={24} />
-              </div>
-              <div>
-                <span className="text-xs text-neutral-400 font-bold uppercase tracking-wider">마인크래프트 연동 인증코드</span>
-                <div className="text-4xl font-black text-white tracking-widest mt-2 select-all font-mono">
-                  {status.verificationCode}
-                </div>
-              </div>
-              <div className="max-w-md text-xs text-neutral-400 leading-relaxed font-medium">
-                마인크래프트 서버에 접속하신 뒤 아래 명령어를 입력해 주세요:<br />
-                <span className="inline-block mt-2 px-3 py-1.5 bg-neutral-800 text-amber-300 rounded font-mono text-xs font-bold border border-neutral-700">
-                  /웹연동 {status.verificationCode}
-                </span>
-              </div>
-              <p className="text-[10px] text-neutral-500 font-medium">
-                * 인증번호는 10분간 유효합니다.
-              </p>
-            </div>
-          )}
-            </div>
-          </details>
+          <p className="text-[11px] text-neutral-400 font-medium px-1">
+            정품 Java(마이크로소프트) 계정으로 로그인하면 즉시 연동됩니다.
+          </p>
         </div>
       )}
     </section>
