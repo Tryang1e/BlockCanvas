@@ -1,5 +1,7 @@
 import React from 'react'
 import { prisma } from '@/lib/prisma'
+import { currentAdminIdentity } from '@/lib/admin-auth'
+import { isSuperAdmin, isAdminPanelAccess } from '@/lib/roles'
 import PasswordResetForm from './PasswordResetForm'
 
 export const dynamic = 'force-dynamic'
@@ -17,15 +19,25 @@ export default async function PasswordResetPage() {
       id: true,
       email: true,
       display_name: true,
-      creator_name: true
+      creator_name: true,
+      role: true
     },
     orderBy: {
       email: 'asc'
     }
   })
 
+  // 🔒 C-3: 최종 관리자가 아니면(=매니저) 스태프/관리자 계정은 목록에서 제외한다.
+  //   서버측 assertCanActOn 이 이미 스태프 비번 재설정을 차단하므로, 목록에서도 감춰
+  //   관리자 이메일 노출과 혼란을 막는다(매니저는 일반 사용자 비번만 재설정 가능).
+  const viewer = await currentAdminIdentity()
+  const canSuper = isSuperAdmin(viewer?.role)
+  const visible = canSuper
+    ? profiles
+    : profiles.filter(p => !isAdminPanelAccess(p.role) && p.creator_name !== 'admin')
+
   // 안전하게 타입 가공 처리 (Null 방어)
-  const userList = profiles.map(p => ({
+  const userList = visible.map(p => ({
     email: p.email || '',
     display_name: p.display_name || p.creator_name || '이름 없음',
     creator_name: p.creator_name

@@ -1,9 +1,16 @@
 import { prisma } from '@/lib/prisma'
+import { redirect } from 'next/navigation'
+import { currentAdminIdentity } from '@/lib/admin-auth'
+import { isSuperAdmin } from '@/lib/roles'
 import AdminSettingsForm from './AdminSettingsForm'
 
 export const dynamic = 'force-dynamic'
 
 export default async function AdminSettingsPage() {
+  // 🔒 최종 관리자 전용 — 매니저의 URL 직접접근 차단(사이드바 canSuper 숨김의 서버측 백업).
+  const me = await currentAdminIdentity()
+  if (!isSuperAdmin(me?.role)) redirect('/adminpage')
+
   const settings = await prisma.siteSetting.findMany()
 
   // Convert settings array to object for easier consumption

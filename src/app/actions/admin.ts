@@ -5,26 +5,10 @@ import { cookies, headers } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 import { hashPassword } from '@/lib/hash'
 import { deleteUserPhysicalFiles } from '@/lib/file-delete'
-import { signSession, verifySession } from '@/lib/session'
-import { roleToLpGroup } from '@/lib/roles'
+import { signSession } from '@/lib/session'
+import { roleToLpGroup, isAdminPanelAccess } from '@/lib/roles'
 import { setMinecraftLuckPermsGroup } from '@/lib/minecraft'
-
-async function requireAdmin() {
-  const cookieStore = await cookies()
-  const sessionToken = cookieStore.get('session')?.value
-  const session = verifySession(sessionToken)
-  
-  if (session === 'admin') return 'admin'
-
-  if (session) {
-    const profile = await prisma.profile.findUnique({
-      where: { creator_name: session }
-    })
-    if (profile && profile.role?.toLowerCase() === 'admin') return profile.creator_name
-  }
-  
-  throw new Error('권한이 없습니다: 관리자만 접근 가능합니다.')
-}
+import { requireStaff, requireSuperAdmin, currentAdminIdentity, assertCanActOn } from '@/lib/admin-auth'
 
 async function getDynamicConfig() {
   const host = (await headers()).get('host') || 'craftopia.work'
@@ -46,34 +30,45 @@ async function getDynamicConfig() {
 
 export async function deleteUserAction(id: string) {
   try {
-    const admin = await requireAdmin()
+    const admin = await requireSuperAdmin()
     const user = await prisma.profile.findUnique({ where: { id } })
-    
+    if (!user) return { error: '대상 회원을 찾을 수 없습니다.' }
+
+    if (user.creator_name === 'admin') return { error: '슈퍼 관리자 계정은 삭제할 수 없습니다.' }
+
     // 1. Delete physical files from local storage first (before DB records are gone)
     await deleteUserPhysicalFiles(id)
-    
+
     // 2. Cascade delete from DB
     await prisma.profile.delete({
       where: { id }
     })
-    
-    if (user && admin) {
-      await prisma.auditLog.create({
-        data: { admin_name: admin, action: 'DELETE_USER', target_id: id, details: `Deleted user: ${user.creator_name}` }
-      })
-    }
-    
+
+    await prisma.auditLog.create({
+      data: { admin_name: admin, action: 'DELETE_USER', target_id: id, details: `Deleted user: ${user.creator_name}` }
+    })
+
     revalidatePath('/adminpage')
     return { success: true }
   } catch (err: any) {
     console.error('Admin Action Error:', err)
-    return { error: '서버 처리 중 문제가 발생했습니다.' }
+    return { error: err?.message || '서버 처리 중 문제가 발생했습니다.' }
   }
 }
 
+const ASSIGNABLE_ROLES = ['user', 'creator', 'official', 'manager', 'admin']
+
 export async function updateUserRoleAction(id: string, role: string) {
   try {
-    const admin = await requireAdmin()
+    const admin = await requireSuperAdmin()
+    // 역할 화이트리스트 검증 — 임의 문자열이 Profile.role 에 저장돼 롤 랭크/권한 판정이 깨지는 것을 막는다.
+    if (!ASSIGNABLE_ROLES.includes(role)) {
+      return { error: '알 수 없는 역할입니다.' }
+    }
+    // 슈퍼 관리자 계정의 역할은 변경 불가(자기 강등/타 계정 admin 남발 방지의 최소 방어).
+    const existing = await prisma.profile.findUnique({ where: { id }, select: { creator_name: true } })
+    if (!existing) return { error: '대상 회원을 찾을 수 없습니다.' }
+    if (existing.creator_name === 'admin') return { error: '슈퍼 관리자 계정의 역할은 변경할 수 없습니다.' }
     const user = await prisma.profile.update({
       where: { id },
       data: { role }
@@ -105,7 +100,7 @@ export async function updateUserRoleAction(id: string, role: string) {
 
 export async function deleteProjectAdminAction(id: string) {
   try {
-    const admin = await requireAdmin()
+    const admin = await requireStaff()
     const project = await prisma.project.findUnique({ where: { id } })
     await prisma.project.delete({
       where: { id }
@@ -127,7 +122,7 @@ export async function deleteProjectAdminAction(id: string) {
 
 export async function toggleProjectPublishAdminAction(id: string, is_published: boolean) {
   try {
-    const admin = await requireAdmin()
+    const admin = await requireStaff()
     const project = await prisma.project.update({
       where: { id },
       data: { is_published }
@@ -149,7 +144,7 @@ export async function toggleProjectPublishAdminAction(id: string, is_published: 
 
 export async function updateSiteSettingsAction(settings: { key: string, value: string }[]) {
   try {
-    await requireAdmin()
+    await requireSuperAdmin()
     
     // We will upsert each setting
     for (const setting of settings) {
@@ -171,7 +166,7 @@ export async function updateSiteSettingsAction(settings: { key: string, value: s
 
 export async function createCategoryAction(name: string, slug: string) {
   try {
-    const admin = await requireAdmin()
+    const admin = await requireSuperAdmin()
     const category = await prisma.category.create({
       data: { name, slug }
     })
@@ -193,7 +188,7 @@ export async function createCategoryAction(name: string, slug: string) {
 
 export async function deleteCategoryAction(id: string) {
   try {
-    const admin = await requireAdmin()
+    const admin = await requireSuperAdmin()
     const category = await prisma.category.findUnique({ where: { id } })
     await prisma.category.delete({
       where: { id }
@@ -215,7 +210,7 @@ export async function deleteCategoryAction(id: string) {
 
 export async function createUserAdminAction(formData: FormData) {
   try {
-    const admin = await requireAdmin()
+    const admin = await requireSuperAdmin()
     
     const email = formData.get('email') as string
     const password = formData.get('password') as string
@@ -293,21 +288,27 @@ export async function createUserAdminAction(formData: FormData) {
 
 export async function impersonateUserAction(creatorName: string) {
   try {
-    const admin = await requireAdmin()
-    
+    const admin = await requireStaff()
+
     // 대상 사용자가 존재하는지 확인
     const targetUser = await prisma.profile.findUnique({
       where: { creator_name: creatorName }
     })
-    
+
     if (!targetUser) {
       return { error: '대상 크리에이터를 찾을 수 없습니다.' }
     }
-    
+
+    // 권한 상승 방지: 스태프(manager)는 관리자/스태프 계정으로 대행 로그인할 수 없다(최종관리자만 가능).
+    const actor = await currentAdminIdentity()
+    if (isAdminPanelAccess(targetUser.role) && actor?.role?.toLowerCase() !== 'admin') {
+      return { error: '권한이 없습니다: 관리자/스태프 계정으로는 대행 로그인할 수 없습니다.' }
+    }
+
     // 쿠키를 해당 크리에이터로 변경하여 강제 세션 가로채기 대리 로그인 가동!
     const { protocol, cookieDomain, isDev } = await getDynamicConfig()
     const cookieStore = await cookies()
-    const signedToken = signSession(creatorName)
+    const signedToken = signSession(creatorName, targetUser.token_version)
     cookieStore.set('session', signedToken, { 
       httpOnly: true, 
       secure: isDev ? false : (protocol === 'https'),
@@ -337,12 +338,14 @@ export async function impersonateUserAction(creatorName: string) {
 
 export async function resetUser2FAAction(id: string) {
   try {
-    const admin = await requireAdmin()
+    const admin = await requireStaff()
     const user = await prisma.profile.findUnique({ where: { id } })
     if (!user) {
       return { error: '해당 사용자를 찾을 수 없습니다.' }
     }
-    
+    // 🔒 대상 보호(C-3): 스태프(manager)가 상위/동급 관리자의 2FA 를 해제해 계정을 탈취하지 못하게 한다.
+    await assertCanActOn(user)
+
     await prisma.profile.update({
       where: { id },
       data: {

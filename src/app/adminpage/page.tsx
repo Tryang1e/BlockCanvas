@@ -1,13 +1,17 @@
 import { prisma } from '@/lib/prisma'
 import AdminTable from './AdminTable'
 import AddUserModal from '@/components/admin/AddUserModal'
+import { currentAdminRole } from '@/lib/admin-auth'
+import { isSuperAdmin } from '@/lib/roles'
 
 export const dynamic = 'force-dynamic'
 
 export default async function AdminDashboardPage() {
+  const viewerRole = await currentAdminRole()
+
   // 1. Fetch total creator count
   const creatorCount = await prisma.profile.count({
-    where: { role: { in: ['creator', 'official'] } }
+    where: { role: { in: ['creator', 'official', 'admin', 'manager'] } }
   })
 
   // 2. Fetch total projects count
@@ -34,7 +38,7 @@ export default async function AdminDashboardPage() {
   return (
     <div>
       <h2 className="text-2xl font-bold mb-6 tracking-tight">대시보드 요약</h2>
-      
+
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         <div className="bg-white p-5 rounded-md border border-neutral-200 flex flex-col shadow-sm">
@@ -55,11 +59,11 @@ export default async function AdminDashboardPage() {
       <div className="bg-white rounded-md border border-neutral-200 overflow-hidden shadow-sm">
         <div className="p-4 border-b border-neutral-200 flex justify-between items-center bg-neutral-50/80">
           <h3 className="text-sm font-bold text-neutral-800">최근 승인 요청 및 가입 현황</h3>
-          <AddUserModal />
+          {isSuperAdmin(viewerRole) && <AddUserModal />}
         </div>
-        <AdminTable profiles={profiles} />
+        <AdminTable profiles={profiles} viewerRole={viewerRole ?? undefined} />
         <div className="p-3 border-t border-neutral-100 flex justify-center bg-white text-xs text-neutral-400">
-           총 {profiles?.length || 0}개 회원 정보
+          총 {profiles?.length || 0}개 회원 정보
         </div>
       </div>
     </div>

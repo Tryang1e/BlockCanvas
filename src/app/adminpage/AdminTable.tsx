@@ -3,10 +3,26 @@
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { deleteUserAction, updateUserRoleAction, impersonateUserAction, resetUser2FAAction } from '@/app/actions/admin'
+import { isSuperAdmin } from '@/lib/roles'
 import Link from 'next/link'
 
-export default function AdminTable({ profiles }: { profiles: any[] }) {
+// 제재 상태 뱃지 계산(클라이언트 인라인 — lib/moderation 은 서버전용이라 import 불가).
+function modBadge(p: any): { label: string; cls: string } {
+  const now = Date.now()
+  const status = (p?.status || 'active').toLowerCase()
+  if (status === 'banned') return { label: '영구차단', cls: 'bg-red-100 text-red-700' }
+  if (status === 'suspended') {
+    const until = p?.suspended_until ? new Date(p.suspended_until).getTime() : null
+    if (!until || until > now) return { label: '이용정지', cls: 'bg-amber-100 text-amber-700' }
+  }
+  const mUntil = p?.muted_until ? new Date(p.muted_until).getTime() : null
+  if (mUntil && mUntil > now) return { label: '뮤트', cls: 'bg-orange-100 text-orange-700' }
+  return { label: '정상', cls: 'bg-emerald-50 text-emerald-600' }
+}
+
+export default function AdminTable({ profiles, viewerRole }: { profiles: any[]; viewerRole?: string }) {
   const router = useRouter()
+  const canSuper = isSuperAdmin(viewerRole)
   const [loading, setLoading] = useState<string | null>(null)
   const [isMounted, setIsMounted] = useState(false)
 
@@ -135,6 +151,7 @@ export default function AdminTable({ profiles }: { profiles: any[] }) {
               <th className="px-6 py-3 font-semibold uppercase">크리에이터 닉네임</th>
               <th className="px-6 py-3 font-semibold uppercase">디스코드 / 이메일</th>
               <th className="px-6 py-3 font-semibold uppercase">권한 (Role)</th>
+              <th className="px-6 py-3 font-semibold uppercase">제재 상태</th>
               <th className="px-6 py-3 font-semibold uppercase">2차 보안 (2FA)</th>
               <th className="px-6 py-3 font-semibold uppercase">가입일</th>
               <th className="px-6 py-3 font-semibold uppercase text-right">관리 작업</th>
@@ -159,7 +176,7 @@ export default function AdminTable({ profiles }: { profiles: any[] }) {
                     </button>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="text-xs font-medium text-neutral-900">{profile.discord_id || '-'}</div>
+                    <div className="text-xs font-medium text-neutral-900">{profile.discord_username || profile.discord_id || '-'}</div>
                     <div className="text-xs text-neutral-400">{profile.email}</div>
                   </td>
                   <td className="px-6 py-4">
@@ -167,9 +184,12 @@ export default function AdminTable({ profiles }: { profiles: any[] }) {
                       const r = profile.role?.toLowerCase()
                       let badgeClass = 'bg-neutral-100 text-neutral-600'
                       let label = profile.role
-                      if (r === 'admin' || r === 'manager') {
+                      if (r === 'admin') {
                         badgeClass = 'bg-purple-100 text-purple-700'
                         label = 'ADMIN'
+                      } else if (r === 'manager') {
+                        badgeClass = 'bg-teal-100 text-teal-700'
+                        label = 'STAFF'
                       } else if (r === 'official') {
                         badgeClass = 'bg-green-100 text-green-700'
                         label = 'OFFICIAL'
@@ -185,6 +205,12 @@ export default function AdminTable({ profiles }: { profiles: any[] }) {
                           {label}
                         </span>
                       )
+                    })()}
+                  </td>
+                  <td className="px-6 py-4">
+                    {(() => {
+                      const b = modBadge(profile)
+                      return <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wide ${b.cls}`}>{b.label}</span>
                     })()}
                   </td>
                   <td className="px-6 py-4">
@@ -212,27 +238,37 @@ export default function AdminTable({ profiles }: { profiles: any[] }) {
                   {isMounted ? new Date(profile.created_at).toLocaleDateString() : ''}
                   </td>
                   <td className="px-6 py-4 text-right space-x-3">
-                    <a 
+                    <Link
+                      href={`/adminpage/users/${profile.id}`}
+                      className="text-violet-600 hover:text-violet-800 hover:underline font-bold text-[11px] uppercase"
+                    >
+                      상세 관리
+                    </Link>
+                    <a
                       href={getFullUrl(profile.creator_name, '/dashboard')}
                       target="_blank"
                       className="text-neutral-600 hover:text-neutral-900 hover:underline font-bold text-[11px] uppercase"
                     >
-                      대시보드 보기
+                      대시보드
                     </a>
-                    <button 
-                      onClick={() => openRoleModal(profile.id, profile.creator_name, profile.role)}
-                      disabled={loading === profile.id}
-                      className="text-blue-600 hover:text-blue-800 hover:underline font-bold text-[11px] uppercase disabled:opacity-50"
-                    >
-                      권한수정
-                    </button>
-                    <button 
-                      onClick={() => openDeleteModal(profile.id, profile.creator_name)}
-                      disabled={loading === profile.id}
-                      className="text-red-500 hover:text-red-700 hover:underline font-bold text-[11px] uppercase disabled:opacity-50"
-                    >
-                      삭제
-                    </button>
+                    {canSuper && (
+                      <>
+                        <button
+                          onClick={() => openRoleModal(profile.id, profile.creator_name, profile.role)}
+                          disabled={loading === profile.id}
+                          className="text-blue-600 hover:text-blue-800 hover:underline font-bold text-[11px] uppercase disabled:opacity-50"
+                        >
+                          권한수정
+                        </button>
+                        <button
+                          onClick={() => openDeleteModal(profile.id, profile.creator_name)}
+                          disabled={loading === profile.id}
+                          className="text-red-500 hover:text-red-700 hover:underline font-bold text-[11px] uppercase disabled:opacity-50"
+                        >
+                          삭제
+                        </button>
+                      </>
+                    )}
                   </td>
               </tr>
             ))}
@@ -287,7 +323,8 @@ export default function AdminTable({ profiles }: { profiles: any[] }) {
                       <option value="official">Official (공식 크리에이터)</option>
                       <option value="creator">Creator (일반 크리에이터)</option>
                       <option value="user">User (일반 사용자)</option>
-                      <option value="admin">Admin (관리자)</option>
+                      <option value="manager">Manager (중간 관리자/스태프)</option>
+                      <option value="admin">Admin (최종 관리자)</option>
                     </select>
                   </div>
                 </div>
@@ -372,9 +409,12 @@ export default function AdminTable({ profiles }: { profiles: any[] }) {
                       const r = selectedUserProfile.role?.toLowerCase()
                       let badgeClass = 'bg-neutral-50 dark:bg-neutral-950/20 text-neutral-600 dark:text-neutral-400 border-neutral-200 dark:border-neutral-800'
                       let label = selectedUserProfile.role
-                      if (r === 'admin' || r === 'manager') {
+                      if (r === 'admin') {
                         badgeClass = 'bg-purple-50 dark:bg-purple-950/20 text-purple-600 dark:text-purple-400 border-purple-100 dark:border-purple-900/40'
                         label = 'ADMIN'
+                      } else if (r === 'manager') {
+                        badgeClass = 'bg-teal-50 dark:bg-teal-950/20 text-teal-600 dark:text-teal-400 border-teal-100 dark:border-teal-900/40'
+                        label = 'STAFF'
                       } else if (r === 'official') {
                         badgeClass = 'bg-green-50 dark:bg-green-950/20 text-green-600 dark:text-green-400 border-green-100 dark:border-green-900/40'
                         label = 'OFFICIAL'
@@ -416,8 +456,13 @@ export default function AdminTable({ profiles }: { profiles: any[] }) {
 
                 <div className="flex justify-between items-center py-1">
                   <span className="text-neutral-400">디스코드 계정</span>
-                  <span className="font-mono bg-indigo-50/50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 px-2.5 py-1 rounded-lg border border-indigo-100/40 dark:border-indigo-900/40 font-bold">
-                    {selectedUserProfile.discord_id || '연동 안 됨'}
+                  <span className="flex flex-col items-end gap-0.5">
+                    <span className="font-mono bg-indigo-50/50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 px-2.5 py-1 rounded-lg border border-indigo-100/40 dark:border-indigo-900/40 font-bold">
+                      {selectedUserProfile.discord_username || selectedUserProfile.discord_id || '연동 안 됨'}
+                    </span>
+                    {selectedUserProfile.discord_username && selectedUserProfile.discord_id && (
+                      <span className="text-[10px] text-neutral-400 font-mono select-all">ID: {selectedUserProfile.discord_id}</span>
+                    )}
                   </span>
                 </div>
 
