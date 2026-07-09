@@ -3,13 +3,13 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { verifySession } from "@/lib/session";
 import { exchangeCodeForIdentity } from "@/lib/minecraftOAuth";
-import { linkProviderToHub, syncBridgeFromProfile } from "@/lib/hub";
-import { signHubSession, verifyHubSession, HUB_COOKIE } from "@/lib/hubSession";
-import { oauthRedirectUri, publicUrl, cookieDomain, creatorUrl } from "@/lib/publicUrl";
+import { evaluateBuildAccess } from "@/lib/roleSync";
+import { oauthRedirectUri, publicUrl, creatorUrl } from "@/lib/publicUrl";
+import { isIdentityBlockedStrict } from "@/lib/blocklist";
 
 /**
  * GET /api/auth/minecraft/callback
- * mc_flow 쿠키로 분기: hub(허브 LinkedAccount+세션) / link(크리에이터 Profile).
+ * 로그인된 크리에이터 Profile 에 마크(정품 Java) 계정을 연동한다.
  * redirect_uri / 리다이렉트 대상 모두 공개 호스트 기준(터널 대응).
  */
 export async function GET(req: NextRequest) {
@@ -19,52 +19,13 @@ export async function GET(req: NextRequest) {
   const state = url.searchParams.get("state");
   const oauthError = url.searchParams.get("error");
   const savedState = cookieStore.get("mc_oauth_state")?.value;
-  const flow = cookieStore.get("mc_flow")?.value === "hub" ? "hub" : "link";
   const redirectUri = oauthRedirectUri(req, "/api/auth/minecraft/callback");
 
   const clear = (res: NextResponse) => {
     res.cookies.set("mc_oauth_state", "", { maxAge: 0, path: "/" });
-    res.cookies.set("mc_flow", "", { maxAge: 0, path: "/" });
     return res;
   };
 
-  // ===== HUB FLOW =====
-  if (flow === "hub") {
-    const hub = (q: string) => publicUrl(req, `/auth${q}`);
-    if (oauthError) return clear(NextResponse.redirect(hub(`?error=${encodeURIComponent(oauthError)}`)));
-    if (!code || !state || !savedState || state !== savedState) {
-      return clear(NextResponse.redirect(hub("?error=invalid_state")));
-    }
-    try {
-      const identity = await exchangeCodeForIdentity(code, redirectUri);
-      const currentHub = verifyHubSession(cookieStore.get(HUB_COOKIE)?.value);
-      const r = await linkProviderToHub({
-        currentLinkedAccountId: currentHub,
-        provider: "minecraft",
-        id: identity.uuid,
-        username: identity.username,
-      });
-      if (!r.ok || !r.linkedAccountId) {
-        return clear(NextResponse.redirect(hub(`?error=${encodeURIComponent(r.error || "link_failed")}`)));
-      }
-      const res = clear(NextResponse.redirect(hub("?connected=minecraft")));
-      res.cookies.set(HUB_COOKIE, signHubSession(r.linkedAccountId), {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
-        maxAge: 60 * 60 * 24 * 30,
-        path: "/",
-        domain: cookieDomain(req),
-      });
-      return res;
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error("Minecraft hub callback error:", msg);
-      return clear(NextResponse.redirect(hub(`?error=oauth_failed&detail=${encodeURIComponent(msg.slice(0, 200))}`)));
-    }
-  }
-
-  // ===== CREATOR DASHBOARD LINK FLOW =====
   const creatorName = verifySession(cookieStore.get("session")?.value);
   if (!creatorName) return clear(NextResponse.redirect(publicUrl(req, "/")));
 
@@ -84,6 +45,13 @@ export async function GET(req: NextRequest) {
     if (!profile) return clear(NextResponse.redirect(publicUrl(req, "/")));
 
     const identity = await exchangeCodeForIdentity(code, redirectUri);
+
+    // 접근 차단 목록 대조 — 제재 회피(부계정) 방지. 차단된 마크 계정은 연동을 거부한다.
+    // 조회 장애 시 strict 가 throw → 아래 연동(update) 대신 catch 로 빠져 연동을 완료하지 않는다(fail-closed).
+    if (await isIdentityBlockedStrict("minecraft_uuid", identity.uuid)) {
+      return clear(NextResponse.redirect(accountUrl({ mc_error: "blocked" })));
+    }
+
     const existing = await prisma.profile.findUnique({ where: { minecraft_uuid: identity.uuid } });
     if (existing && existing.id !== profile.id) {
       return clear(NextResponse.redirect(accountUrl({ mc_error: "already_linked" })));
@@ -93,7 +61,8 @@ export async function GET(req: NextRequest) {
       where: { id: profile.id },
       data: { minecraft_uuid: identity.uuid, minecraft_username: identity.username },
     });
-    await syncBridgeFromProfile(profile.id); // 브리지된 허브 계정에 미러링
+    // MS OAuth 로 마크 연동했으니 3종 인증 충족 여부 재평가 → 인게임 건축 권한 자동 반영
+    await evaluateBuildAccess(profile.id).catch(() => {});
     return clear(NextResponse.redirect(accountUrl({ mc_linked: "1" })));
   } catch (error: unknown) {
     console.error("Minecraft OAuth callback error:", error instanceof Error ? error.message : String(error));

@@ -7,36 +7,28 @@ import { oauthRedirectUri, publicUrl, creatorUrl } from "@/lib/publicUrl";
 
 /**
  * GET /api/auth/minecraft/start
- *  - 기본(flow=link): 로그인된 크리에이터가 대시보드에서 마크 계정 연동.
- *    중앙화: 대시보드 버튼이 단일 호스트(auth.<base>)로 보내므로 여기서 생성되는 redirect_uri 도 단일 호스트 1개.
- *  - flow=hub: 연동 허브의 Minecraft 로그인/연결(크리에이터 세션 불필요).
+ * 로그인된 크리에이터가 대시보드/허브에서 마크(정품) 계정을 연동한다(결과를 본인 Profile 에 붙인다).
+ * 중앙화: 대시보드/허브 버튼이 단일 호스트(auth.<base>)로 보내므로 redirect_uri 도 단일(Azure 등록 1개).
  * redirect_uri 는 요청의 공개 호스트에서 동적 생성(터널 대응).
  */
 export async function GET(req: NextRequest) {
-  const flow = new URL(req.url).searchParams.get("flow") === "hub" ? "hub" : "link";
   const cookieStore = await cookies();
 
-  if (flow === "link") {
-    const creatorName = verifySession(cookieStore.get("session")?.value);
-    if (!creatorName) return NextResponse.redirect(publicUrl(req, "/"));
-    if (!isOAuthConfigured()) {
-      return NextResponse.redirect(creatorUrl(req, creatorName, `/dashboard/connections?mc_error=oauth_not_configured`));
-    }
-  } else if (!isOAuthConfigured()) {
-    return NextResponse.redirect(publicUrl(req, "/auth?error=oauth_not_configured"));
+  const creatorName = verifySession(cookieStore.get("session")?.value);
+  if (!creatorName) return NextResponse.redirect(publicUrl(req, "/"));
+  if (!isOAuthConfigured()) {
+    return NextResponse.redirect(creatorUrl(req, creatorName, `/dashboard/connections?mc_error=oauth_not_configured`));
   }
 
   const state = crypto.randomBytes(16).toString("hex");
   const redirectUri = oauthRedirectUri(req, "/api/auth/minecraft/callback");
   const res = NextResponse.redirect(buildAuthorizeUrl(state, redirectUri));
-  const opts = {
+  res.cookies.set("mc_oauth_state", state, {
     httpOnly: true,
-    sameSite: "lax" as const,
+    sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     maxAge: 600,
     path: "/",
-  };
-  res.cookies.set("mc_oauth_state", state, opts);
-  res.cookies.set("mc_flow", flow, opts);
+  });
   return res;
 }

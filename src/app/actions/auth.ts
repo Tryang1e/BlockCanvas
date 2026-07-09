@@ -11,6 +11,9 @@ import { generateTotpSecret, getOtpauthUrl, verifyTotpToken } from '@/lib/totp'
 import { rateLimit } from '@/lib/rate-limit'
 import { sendEmail, verificationEmailHtml, passwordResetEmailHtml, findHandleEmailHtml } from '@/lib/email'
 import { validatePassword } from '@/lib/password-policy'
+import { getModerationState, blockedMessage } from '@/lib/moderation'
+import { isAdminPanelAccess } from '@/lib/roles'
+import { currentAdminIdentity, assertCanActOn } from '@/lib/admin-auth'
 
 /**
  * Get dynamic domain and protocol based on the current request host
@@ -51,18 +54,26 @@ export async function login(formData: FormData) {
     return { error: '이메일 또는 비밀번호가 일치하지 않습니다. 입력 내용을 다시 확인해 주세요.' }
   }
 
-  // If the profile exists and has a password, verify it
-  if (profile && profile.password) {
-    const isMatch = await verifyPassword(password, profile.password)
-    if (!isMatch) {
-      return { error: '이메일 또는 비밀번호가 일치하지 않습니다. 입력 내용을 다시 확인해 주세요.' }
-    }
+  // 비밀번호 미설정 계정(소셜 전용 등)은 비밀번호 로그인 불가 — password 가 null/빈값이면 검증을
+  // 건너뛰어 '아무 비번이나 통과'하는 인증우회가 생기지 않도록 명시적으로 차단한다(메시지는 동일=열거 방지).
+  if (!profile.password) {
+    return { error: '이메일 또는 비밀번호가 일치하지 않습니다. 입력 내용을 다시 확인해 주세요.' }
+  }
+  const isMatch = await verifyPassword(password, profile.password)
+  if (!isMatch) {
+    return { error: '이메일 또는 비밀번호가 일치하지 않습니다. 입력 내용을 다시 확인해 주세요.' }
+  }
+
+  // 제재 게이트: 이용정지/영구차단 계정은 로그인을 차단(쿠키 미발급). 2FA 단계 진입 전에 막는다.
+  const modState = getModerationState(profile)
+  if (modState.isBlocked) {
+    return { error: blockedMessage(modState) }
   }
 
   // 만약 2차 인증(2FA)이 활성화되어 있는 경우, 로그인 성공 토큰 대신 5분 임시 인증 토큰 반환
   if (profile.two_factor_enabled) {
     // 2FA 챌린지용 임시 토큰은 5분만 유효하도록 짧은 TTL 적용.
-    const tempToken = signSession(profile.creator_name + ':temp_2fa', 5 * 60 * 1000)
+    const tempToken = signSession(profile.creator_name + ':temp_2fa', 0, 5 * 60 * 1000)
     return { requires2FA: true, tempToken }
   }
 
@@ -70,7 +81,7 @@ export async function login(formData: FormData) {
   const isDev = process.env.NODE_ENV !== 'production'
 
   const cookieStore = await cookies()
-  const signedToken = signSession(profile.creator_name)
+  const signedToken = signSession(profile.creator_name, profile.token_version)
   cookieStore.set('session', signedToken, {
     httpOnly: true,
     secure: isDev ? false : (protocol === 'https'),
@@ -172,6 +183,74 @@ export async function signup(formData: FormData) {
   }
 }
 
+/**
+ * 로그인된 계정에 이메일/비밀번호 추가 — 인증 메일 발송.
+ * Discord 로 가입해 이메일/비번이 없는 계정이 '웹 인증'을 완료(3종 충족 → 건축 권한)하기 위한 경로.
+ * 인증 링크 클릭 시 /api/auth/verify-email 이 pending.profile_id 분기로 기존 계정에 이메일/비번을 설정한다.
+ */
+export async function addEmailToAccount(formData: FormData) {
+  const cookieStore = await cookies()
+  const creatorName = verifySession(cookieStore.get('session')?.value)
+  if (!creatorName) return { error: '로그인이 필요합니다.' }
+
+  const me = await prisma.profile.findUnique({ where: { creator_name: creatorName.toLowerCase() } })
+  if (!me) return { error: '계정을 찾을 수 없습니다.' }
+  if (me.email && me.password) {
+    return { error: '이미 이메일/비밀번호가 설정된 계정입니다.' }
+  }
+
+  const email = ((formData.get('email') as string) || '').trim().toLowerCase()
+  const password = (formData.get('password') as string) || ''
+  const passwordConfirm = (formData.get('password_confirm') as string) || ''
+
+  // 레이트리밋: IP당 15분 내 5회
+  const _h = await headers()
+  const _ip = (_h.get('cf-connecting-ip') || (_h.get('x-forwarded-for') || '').split(',')[0] || '').trim()
+  if (!rateLimit('addemail:' + _ip, 5, 15 * 60 * 1000)) {
+    return { error: '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.' }
+  }
+
+  // 입력 검증
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { error: '올바른 이메일 주소를 입력해 주세요.' }
+  }
+  const pwCheck = validatePassword(password)
+  if (!pwCheck.ok) return { error: pwCheck.error || '비밀번호 형식이 올바르지 않습니다.' }
+  if (password !== passwordConfirm) {
+    return { error: '비밀번호와 비밀번호 확인이 일치하지 않습니다.' }
+  }
+
+  // 이미 다른 계정이 쓰는 이메일이면 차단
+  const existing = await prisma.profile.findFirst({ where: { email } })
+  if (existing) return { error: '이미 사용 중인 이메일입니다.' }
+
+  // 토큰 + 비번 해시 → 대기열 upsert(profile_id 세팅 = 기존계정 추가 분기)
+  const token = crypto.randomBytes(32).toString('hex')
+  const password_hash = await hashPassword(password)
+  await prisma.emailVerification.upsert({
+    where: { email },
+    update: { token, password_hash, profile_id: me.id, display_name: me.display_name, created_at: new Date() },
+    create: { email, token, password_hash, profile_id: me.id, display_name: me.display_name },
+  })
+
+  const { protocol, baseDomain } = await getDynamicConfig()
+  const verifyUrl = `${protocol}://${baseDomain}/api/auth/verify-email?token=${token}`
+  const sent = await sendEmail(email, 'craftopia 이메일 인증', verificationEmailHtml(verifyUrl))
+  if (!sent.ok) {
+    await prisma.emailVerification.deleteMany({ where: { email } }).catch(() => {})
+    if (sent.error === 'not_configured') {
+      return { error: '메일 발송이 아직 설정되지 않았습니다. 관리자에게 문의해 주세요.' }
+    }
+    console.error('Add-email send failed:', sent.error)
+    return { error: '인증 메일 발송에 실패했습니다. 잠시 후 다시 시도해 주세요.' }
+  }
+
+  return {
+    success: true,
+    message: `${email} 로 인증 메일을 보냈습니다. 링크를 눌러 이메일 등록을 완료해 주세요.`,
+  }
+}
+
 const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000 // 1시간
 
 /**
@@ -205,7 +284,8 @@ export async function requestPasswordReset(formData: FormData) {
 
   const { protocol, baseDomain } = await getDynamicConfig()
   const resetUrl = `${protocol}://${baseDomain}/reset-password?token=${token}`
-  await sendEmail(email, 'craftopia 비밀번호 재설정', passwordResetEmailHtml(resetUrl)).catch(() => {})
+  const sent = await sendEmail(email, 'craftopia 비밀번호 재설정', passwordResetEmailHtml(resetUrl))
+  if (!sent.ok) console.error('Password reset email send failed:', sent.error)
 
   return generic
 }
@@ -235,7 +315,8 @@ export async function resetPassword(token: string, newPassword: string, confirm:
   }
 
   const hashed = await hashPassword(newPassword)
-  await prisma.profile.update({ where: { id: profile.id }, data: { password: hashed } })
+  // 재설정 → token_version +1 로 기존 세션 전부 무효화(유출/탈취 세션 차단). 사용자는 새 비번으로 재로그인.
+  await prisma.profile.update({ where: { id: profile.id }, data: { password: hashed, token_version: { increment: 1 } } })
   await prisma.passwordReset.deleteMany({ where: { email: reset.email } }).catch(() => {})
 
   try {
@@ -271,7 +352,8 @@ export async function findMyHandle(formData: FormData) {
 
   const { protocol, baseDomain } = await getDynamicConfig()
   const siteUrl = `${protocol}://${profile.creator_name}.${baseDomain}`
-  await sendEmail(email, 'craftopia 아이디(핸들) 안내', findHandleEmailHtml(profile.creator_name, siteUrl)).catch(() => {})
+  const sent = await sendEmail(email, 'craftopia 아이디(핸들) 안내', findHandleEmailHtml(profile.creator_name, siteUrl))
+  if (!sent.ok) console.error('Find-handle email send failed:', sent.error)
 
   return generic
 }
@@ -307,9 +389,21 @@ export async function changePasswordAction(creatorName: string, currentPass: str
 
   const hashedNewPass = await hashPassword(newPass)
 
-  await prisma.profile.update({
+  // 비밀번호 변경 → token_version +1 로 기존(다른 기기/유출) 세션 무효화. 본인 현재 세션은 새 버전으로 재발급.
+  const updated = await prisma.profile.update({
     where: { id: authCreatorId },
-    data: { password: hashedNewPass }
+    data: { password: hashedNewPass, token_version: { increment: 1 } }
+  })
+  const { protocol, cookieDomain } = await getDynamicConfig()
+  const isDev = process.env.NODE_ENV !== 'production'
+  const cookieStore = await cookies()
+  cookieStore.set('session', signSession(updated.creator_name, updated.token_version), {
+    httpOnly: true,
+    secure: isDev ? false : (protocol === 'https'),
+    sameSite: 'lax',
+    path: '/',
+    domain: cookieDomain,
+    maxAge: 60 * 60 * 24 * 30,
   })
 
   return { success: true }
@@ -385,25 +479,12 @@ export async function logout() {
 }
 
 export async function resetUserPasswordByAdminAction(formData: FormData) {
-  // 1. 어드민 세션 권한 검증
-  const cookieStore = await cookies()
-  const sessionToken = cookieStore.get('session')?.value
-  const session = verifySession(sessionToken)
-  if (!session) return { error: '로그인이 필요합니다.' }
-
-  let isAdmin = false
-  if (session === 'admin') {
-    isAdmin = true
-  } else {
-    const adminProfile = await prisma.profile.findUnique({
-      where: { creator_name: session }
-    })
-    if (adminProfile && adminProfile.role === 'admin') {
-      isAdmin = true
-    }
+  // 1. 어드민 세션 권한 검증 — token_version 대조까지 하는 currentAdminIdentity 사용
+  //    (verifySession 만 쓰면 정지/비번변경으로 무효화된 스태프 세션이 통과하던 문제도 함께 차단).
+  const actor = await currentAdminIdentity()
+  if (!actor || !isAdminPanelAccess(actor.role)) {
+    return { error: '관리자 권한이 없습니다.' }
   }
-
-  if (!isAdmin) return { error: '관리자 권한이 없습니다.' }
 
   // 2. 입력 데이터 파싱
   const targetEmail = formData.get('email') as string
@@ -422,18 +503,27 @@ export async function resetUserPasswordByAdminAction(formData: FormData) {
     return { error: '해당 이메일을 사용하는 크리에이터를 찾을 수 없습니다.' }
   }
 
+  // 🔒 대상 보호(C-3): 스태프(manager)가 상위/동급 관리자의 비밀번호를 재설정해 계정을
+  //    탈취하지 못하게 한다. 관리자·스태프·슈퍼 계정은 최종 관리자만 재설정할 수 있다.
+  try {
+    await assertCanActOn(targetProfile)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : '권한이 없습니다.' }
+  }
+
   // 4. 비밀번호 암호화 후 업데이트 수행
   const hashedPassword = await hashPassword(newPassword)
+  // 관리자 강제 재설정 → token_version +1 로 대상 사용자의 기존 세션 전부 무효화(강제 로그아웃).
   await prisma.profile.update({
     where: { id: targetProfile.id },
-    data: { password: hashedPassword }
+    data: { password: hashedPassword, token_version: { increment: 1 } }
   })
 
   // 5. 어드민 오디트 로그(Audit Log) 적재
   try {
     await prisma.auditLog.create({
       data: {
-        admin_name: session,
+        admin_name: actor.name,
         action: 'PASSWORD_RESET',
         target_id: targetProfile.id,
         details: `Admin reset password for user: ${targetEmail}`
@@ -572,6 +662,12 @@ export async function verify2faLoginAction(tempToken: string, code: string) {
     return { error: '2FA 설정 정보를 찾을 수 없습니다.' }
   }
 
+  // 제재 게이트(2차 방어): 1차(login) 통과 후 상태가 바뀌었을 수 있으니 쿠키 발급 직전에 재확인.
+  const modState = getModerationState(profile)
+  if (modState.isBlocked) {
+    return { error: blockedMessage(modState) }
+  }
+
   const isDev = process.env.NODE_ENV !== 'production'
   const isValid = verifyTotpToken(code, profile.two_factor_secret)
   if (!isValid) {
@@ -582,7 +678,7 @@ export async function verify2faLoginAction(tempToken: string, code: string) {
   const { protocol, baseDomain, cookieDomain } = await getDynamicConfig()
 
   const cookieStore = await cookies()
-  const signedToken = signSession(profile.creator_name)
+  const signedToken = signSession(profile.creator_name, profile.token_version)
   cookieStore.set('session', signedToken, {
     httpOnly: true,
     secure: isDev ? false : (protocol === 'https'),

@@ -30,7 +30,7 @@ export default function PrivacyPolicyPage() {
           </Link>
           <div className="flex items-center gap-1.5 select-none">
             <Image src="/logo_icon.png" alt="Logo" width={20} height={20} className="dark:invert" />
-            <span className="font-extrabold text-xs tracking-wider text-black dark:text-white">BLOCKCANVAS</span>
+            <Image src="/logo_text.png" alt="BLOCK CANVAS" width={100} height={12} className="h-3 w-auto object-contain" />
           </div>
         </div>
 
@@ -40,9 +40,9 @@ export default function PrivacyPolicyPage() {
             개인정보처리방침
           </h1>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-400 dark:text-neutral-500 font-mono font-medium">
-            <span>시행일자: 2026년 6월 20일</span>
-            <span>최종 개정: 2026년 6월 20일 (v2)</span>
-            <span>직전 버전: 2026년 6월 3일</span>
+            <span>시행일자: 2026년 7월 10일</span>
+            <span>최종 개정: 2026년 7월 10일 (v4)</span>
+            <span>직전 버전: 2026년 7월 8일 (v3)</span>
           </div>
         </div>
 
@@ -54,7 +54,7 @@ export default function PrivacyPolicyPage() {
               <strong>BlockCanvas</strong>(서비스 운영 도메인 craftopia.work, 이하 &apos;회사&apos; 혹은 &apos;서비스&apos;)는 이용자(크리에이터, 연동 이용자 및 일반 방문자)의 개인정보를 소중히 다루며, 「개인정보 보호법」, 「정보통신망 이용촉진 및 정보보호 등에 관한 법률」 등 대한민국의 관련 법령을 철저히 준수합니다.
             </p>
             <p className="mt-2">
-              본 방침은 서비스를 이용하는 과정에서 수집되는 개인정보가 어떤 목적과 방식으로 처리되며, 정보주체의 권리를 보호하기 위해 어떠한 조치가 취해지고 있는지 상시 알려드리기 위해 제정되었습니다. 본 개정판(v2)은 마인크래프트 서버 연동, Discord/Microsoft 계정 연동, 월드 클라우드 및 영토(플롯) 기능 도입에 따른 처리 항목과 국외 이전 사항을 반영하여 보강되었습니다.
+              본 방침은 서비스를 이용하는 과정에서 수집되는 개인정보가 어떤 목적과 방식으로 처리되며, 정보주체의 권리를 보호하기 위해 어떠한 조치가 취해지고 있는지 상시 알려드리기 위해 제정되었습니다. 본 개정판(v4)은 공식 Discord 서버(커뮤니티) 가입 여부 확인을 통한 건축 서버 이용 자격 부여·회수(연동 시 및 주기적 확인, 서버 이탈 시 관련 권한 자동 회수) 처리를 반영하여 보강되었습니다. (직전 v3 은 Patreon 후원 연동(후원자 인증 및 구독 혜택 부여)에 따른 처리 항목과 국외 이전(Patreon, Inc./미국) 사항을, v2 는 마인크래프트 서버 연동, Discord/Microsoft 계정 연동, 월드 클라우드 및 영토(플롯) 기능 도입 사항을 반영하였습니다.)
             </p>
           </section>
 
@@ -78,9 +78,14 @@ export default function PrivacyPolicyPage() {
                     <td className="p-3">회원가입 폼 입력, 이메일 인증</td>
                   </tr>
                   <tr>
-                    <td className="p-3 font-bold text-neutral-800 dark:text-neutral-200">Discord 로그인·연동</td>
-                    <td className="p-3"><span className="text-red-500 font-bold">[필수]</span> Discord 계정 고유 ID, Discord 사용자명 (Discord 로그인 가입 시 신규 계정 자동 생성)</td>
-                    <td className="p-3">Discord OAuth 인증, 인게임 봇 /연동 코드</td>
+                    <td className="p-3 font-bold text-neutral-800 dark:text-neutral-200">Discord 연동</td>
+                    <td className="p-3"><span className="text-red-500 font-bold">[필수]</span> Discord 계정 고유 ID, Discord 사용자명, 공식 Discord 서버(커뮤니티) 가입 여부 (로그인 후 계정에 연동할 때만 수집 — 회원가입은 이메일로만 진행하며 Discord로는 신규 계정이 생성되지 않습니다)</td>
+                    <td className="p-3">로그인 후 Discord OAuth 연동</td>
+                  </tr>
+                  <tr>
+                    <td className="p-3 font-bold text-neutral-800 dark:text-neutral-200">Patreon 후원 연동</td>
+                    <td className="p-3"><span className="text-neutral-400">[선택]</span> Patreon 사용자 ID, 표시 이름, 후원 상태(활성 후원자 여부) (구독 혜택 부여 목적으로 로그인 후 연동할 때만 수집 — 이메일·후원 금액 등은 저장하지 않습니다)</td>
+                    <td className="p-3">로그인 후 Patreon OAuth 연동</td>
                   </tr>
                   <tr>
                     <td className="p-3 font-bold text-neutral-800 dark:text-neutral-200">마인크래프트 정품 인증·연동</td>
@@ -129,10 +134,13 @@ export default function PrivacyPolicyPage() {
               <li>회원 가입 의사 확인, 본인 식별·인증, 불량 회원의 부정 이용 방지</li>
               <li>개인별 크리에이터 포트폴리오 하위 도메인 개설 및 편집 권한 제공</li>
               <li>Discord·마인크래프트 계정 연동 및 연동 신원(허브) 관리, 인게임-웹 권한·역할 동기화</li>
+              <li>공식 Discord 서버(커뮤니티) 가입 여부 확인을 통한 건축 서버 이용 자격(권한) 부여 및 회수 — 연동 시점 및 주기적으로 서버 가입 상태를 확인하며, 서버를 떠난 경우 관련 인게임·웹 건축 권한을 자동으로 회수합니다(연동 식별자는 삭제하지 않아 재가입 시 권한이 자동 복구됩니다)</li>
               <li>마인크래프트 영토(플롯)·개인 월드 클라우드 생성·백업·초대·양도·경매 등 영토 관리 기능 제공</li>
+              <li>Patreon 후원자 본인 인증 및 그에 따른 구독 혜택(포트폴리오 사이트·클라우드 용량 등) 부여</li>
               <li>2단계 인증(2FA)을 통한 계정 보안 보호 및 보안 알림</li>
               <li>외부 방문자 문의의 접수·전달 및 답변 회신</li>
               <li>보안 침해사고 대응, 접속 이력 모니터링을 통한 비인가 접근 차단 및 분쟁 발생 시 증빙</li>
+              <li>이용이 정지·제한된 회원의 제재 회피(부계정 재가입·재연동) 방지를 위한 차단 식별자 대조 (근거: 「개인정보 보호법」 제15조 제1항 제6호 개인정보처리자의 정당한 이익 및 가입 시 동의. 식별자는 단방향 해시로만 보관)</li>
               <li>이메일 인증 등 서비스 운영에 필요한 통지 발송</li>
             </ul>
           </section>
@@ -152,6 +160,7 @@ export default function PrivacyPolicyPage() {
                 <li>이메일/Discord/마인크래프트 인증 코드 및 OAuth 상태값: 발급 후 단기간(약 10분~24시간) 내 자동 파기</li>
                 <li>개인 월드 클라우드 데이터: 마지막 사용일로부터 30일 미사용 시 아카이브, 아카이브 후 90일(최종 미사용 약 120일) 경과 시 영구 삭제(수명주기 정책)</li>
                 <li>재해 복구용 데이터베이스 백업본(국외 저장소 포함): 최대 5년 후 자동 삭제(개인정보가 포함될 수 있음)</li>
+                <li>제재 회피 방지를 위한 차단 식별자(마인크래프트 UUID·Discord ID·이메일의 단방향 해시값 — 원문 미보관): 회원의 다른 개인정보와 분리하여 저장하며, 재가입 차단에 필요한 기간(등록일 기준 최대 3년) 동안 보관합니다. 관리자가 정기적으로 재검토하여 차단 필요가 소멸한 항목은 파기합니다.</li>
               </ul>
             </ul>
           </section>
@@ -207,10 +216,17 @@ export default function PrivacyPolicyPage() {
                   </tr>
                   <tr>
                     <td className="p-3 font-bold text-neutral-800 dark:text-neutral-200">Discord, Inc.</td>
-                    <td className="p-3">OAuth 인가 코드(이용자가 직접 로그인), 회신되는 Discord ID·사용자명</td>
+                    <td className="p-3">OAuth 인가 코드(이용자가 직접 로그인), 회신되는 Discord ID·사용자명, 서버 가입 여부 확인을 위한 Discord ID 조회 요청</td>
                     <td className="p-3">미국</td>
-                    <td className="p-3">이용자가 Discord 연동/로그인을 진행하는 시점</td>
-                    <td className="p-3">Discord 계정 본인 인증·연동 / 인증 절차 동안에만 처리</td>
+                    <td className="p-3">Discord 계정 연동 시점 및 서버 가입 여부 주기적 재확인 시 HTTPS API 요청</td>
+                    <td className="p-3">Discord 계정 본인 인증·연동 및 공식 서버 가입 여부 확인(건축 이용 자격 판단) / 연동·확인 시점에만 처리(토큰 미저장)</td>
+                  </tr>
+                  <tr>
+                    <td className="p-3 font-bold text-neutral-800 dark:text-neutral-200">Patreon, Inc.</td>
+                    <td className="p-3">OAuth 인가 코드(이용자가 직접 로그인), 회신되는 Patreon 사용자 ID·표시 이름·후원 상태 (후원 금액·이메일 등 그 외 정보는 저장하지 않음)</td>
+                    <td className="p-3">미국</td>
+                    <td className="p-3">이용자가 Patreon 후원 연동을 진행하는 시점</td>
+                    <td className="p-3">Patreon 후원자 본인 인증 및 구독 혜택 부여 / 인증 절차 동안에만 처리(토큰 미저장)</td>
                   </tr>
                 </tbody>
               </table>

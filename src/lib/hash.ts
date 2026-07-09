@@ -12,8 +12,8 @@ export async function hashPassword(password: string): Promise<string> {
   // The goal of this PBKDF2 step is simply to stretch the key and condense it.
   const pbkdf2Hash = crypto.pbkdf2Sync(password, 'static-app-salt-blockcanvas', 100000, 64, 'sha512').toString('base64');
   
-  // Step 2: Bcrypt
-  const salt = await bcrypt.genSalt(10);
+  // Step 2: Bcrypt (cost 12 — 기존 cost10 해시는 해시에 cost가 내장돼 그대로 검증됨)
+  const salt = await bcrypt.genSalt(12);
   const finalHash = await bcrypt.hash(pbkdf2Hash, salt);
   
   return finalHash;

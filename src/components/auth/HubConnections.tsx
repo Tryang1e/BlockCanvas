@@ -12,6 +12,8 @@ interface Props {
   discord: { id: string; username: string | null } | null;
   minecraft: { uuid: string; username: string | null } | null;
   discordConfigured: boolean;
+  minecraftConnectHref: string;
+  minecraftConfigured: boolean;
 }
 
 export default function HubConnections(props: Props) {
@@ -35,9 +37,10 @@ export default function HubConnections(props: Props) {
   return (
     <div className="space-y-2.5">
       {/* 로그인된 계정 정체성 */}
-      <div className="flex items-center justify-between gap-3 bg-neutral-50/50 dark:bg-neutral-950/40 border border-neutral-200 dark:border-neutral-800/80 rounded-2xl p-3.5">
+      {/* 하우스 라이트 고정 — 페이지 셸(크림+화이트 카드)과 톤 일치, dark: 변형 제거 */}
+      <div className="flex items-center justify-between gap-3 bg-[#FAF9F5] border border-neutral-200 rounded-2xl p-3.5">
         <div className="min-w-0">
-          <div className="font-bold text-sm text-neutral-900 dark:text-white truncate">
+          <div className="font-bold text-sm text-neutral-900 truncate">
             {props.displayName || props.creatorName}
           </div>
           <div className="text-xs text-neutral-400 truncate">
@@ -46,7 +49,7 @@ export default function HubConnections(props: Props) {
         </div>
         <a
           href={props.dashboardHref}
-          className="text-xs px-3.5 py-2 rounded-xl bg-neutral-950 dark:bg-white text-white dark:text-neutral-950 font-bold hover:opacity-90 transition-opacity whitespace-nowrap"
+          className="text-xs px-3.5 py-2 rounded-xl bg-black text-white font-bold hover:bg-neutral-800 transition-colors whitespace-nowrap"
         >
           내 대시보드
         </a>
@@ -64,21 +67,22 @@ export default function HubConnections(props: Props) {
         onDisconnect={disconnectDiscord}
       />
 
-      {/* 마인크래프트 — 연동은 대시보드(Microsoft 로그인/인게임 코드)에서. 허브는 상태 표시만. */}
+      {/* 마인크래프트 — Microsoft 정품 로그인으로 연동(미설정 시 안내). 해제는 대시보드에서. */}
       <ConnectionCard
         name="Minecraft"
         color="#3AAE4F"
         connected={!!props.minecraft}
         label={props.minecraft?.username || props.minecraft?.uuid || null}
-        configured={false}
-        note="대시보드에서 연동"
+        connectHref={props.minecraftConnectHref}
+        configured={props.minecraftConfigured}
+        note="설정 필요"
         busy={false}
       />
 
       <div className="text-center pt-3">
         <a
           href="/api/auth/hub/logout"
-          className="text-xs text-neutral-400 dark:text-neutral-600 hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors"
+          className="text-xs text-neutral-400 hover:text-black transition-colors"
         >
           로그아웃
         </a>
@@ -99,7 +103,7 @@ function CardShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 bg-neutral-50/50 dark:bg-neutral-950/40 border border-neutral-200 dark:border-neutral-800/80 rounded-2xl p-3.5">
+    <div className="flex items-center justify-between gap-3 bg-[#FAF9F5] border border-neutral-200 rounded-2xl p-3.5">
       <div className="flex items-center gap-3 min-w-0">
         <span
           className="w-9 h-9 rounded-xl flex items-center justify-center font-black text-white shrink-0 text-sm"
@@ -108,7 +112,7 @@ function CardShell({
           {name[0]}
         </span>
         <div className="min-w-0">
-          <div className="font-bold text-sm text-neutral-900 dark:text-white">{name}</div>
+          <div className="font-bold text-sm text-neutral-900">{name}</div>
           <div className="text-xs text-neutral-400 truncate">{sub}</div>
         </div>
       </div>
@@ -145,12 +149,12 @@ function ConnectionCard({
           <button
             onClick={onDisconnect}
             disabled={busy}
-            className="text-xs px-3.5 py-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-rose-600 hover:border-rose-200 transition-colors disabled:opacity-50 whitespace-nowrap"
+            className="text-xs px-3.5 py-2 rounded-xl bg-white border border-neutral-200 text-neutral-500 hover:text-rose-600 hover:border-rose-200 transition-colors disabled:opacity-50 whitespace-nowrap"
           >
             {busy ? "..." : "해제"}
           </button>
         ) : (
-          <span className="text-[10px] text-emerald-500 dark:text-emerald-400 font-bold whitespace-nowrap">연결됨</span>
+          <span className="text-[10px] text-emerald-500 font-bold whitespace-nowrap">연결됨</span>
         )
       ) : configured && connectHref ? (
         <a
@@ -161,7 +165,7 @@ function ConnectionCard({
           연결
         </a>
       ) : (
-        <span className="text-[10px] text-neutral-400 dark:text-neutral-600 whitespace-nowrap">{note || "설정 필요"}</span>
+        <span className="text-[10px] text-neutral-400 whitespace-nowrap">{note || "설정 필요"}</span>
       )}
     </CardShell>
   );

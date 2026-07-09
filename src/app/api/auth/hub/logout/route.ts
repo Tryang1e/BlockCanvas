@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { HUB_COOKIE } from "@/lib/hubSession";
 import { cookieDomain, publicUrl } from "@/lib/publicUrl";
 
 /**
@@ -11,7 +10,7 @@ export async function GET(req: NextRequest) {
   const res = NextResponse.redirect(publicUrl(req, "/auth"));
   const domain = cookieDomain(req);
 
-  for (const name of ["session", HUB_COOKIE]) {
+  for (const name of ["session", "hub_session"]) {
     // 도메인 쿠키(서브도메인 공유분) 제거
     if (domain) {
       res.headers.append("Set-Cookie", `${name}=; Path=/; Max-Age=0; Domain=${domain}; SameSite=Lax`);
