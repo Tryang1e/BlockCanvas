@@ -12,10 +12,6 @@ if (!TOKEN || !CLIENT_ID) {
 
 const commands = [
   new SlashCommandBuilder()
-    .setName("연동")
-    .setDescription("웹 대시보드에서 발급받은 코드로 BlockCanvas 계정을 연동합니다.")
-    .addStringOption((o) => o.setName("코드").setDescription("6자리 연동 코드").setRequired(true)),
-  new SlashCommandBuilder()
     .setName("홍보")
     .setDescription("내 영토를 이 채널에 홍보합니다.")
     .addStringOption((o) => o.setName("플롯").setDescription("플롯 ID (예: 1;2)").setRequired(true)),
@@ -23,6 +19,9 @@ const commands = [
     .setName("판매")
     .setDescription("내 영토를 판매글로 이 채널에 게시합니다.")
     .addStringOption((o) => o.setName("플롯").setDescription("플롯 ID (예: 1;2)").setRequired(true)),
+  new SlashCommandBuilder()
+    .setName("내정보")
+    .setDescription("내 프로필(영토·월드·코인·클라우드)을 카드로 확인합니다."),
 ].map((c) => c.toJSON());
 
 const rest = new REST({ version: "10" }).setToken(TOKEN);

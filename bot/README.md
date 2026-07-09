@@ -32,4 +32,5 @@ npm run typecheck  # 타입 검사
 ## 주의
 - 웹 서버가 HTTPS(터널)면 `WEB_API_URL` 도 HTTPS 여야 합니다.
 - `/홍보` 는 웹에 캐시된 플롯이 있어야 동작합니다(웹 대시보드에서 **동기화** 1회 필요).
-- 봇은 게이트웨이 인텐트로 `Guilds` 만 사용합니다(메시지 내용 인텐트 불필요).
+- 봇은 게이트웨이 인텐트로 `Guilds`, `GuildMembers`(**PRIVILEGED**), `GuildModeration`, `GuildMessageReactions` 를 사용합니다(메시지 내용 인텐트는 불필요).
+  - ⚠ `GuildMembers` 는 privileged 인텐트라 [Developer Portal] → Bot → **Privileged Gateway Intents** 에서 "Server Members Intent" 를 켜야 합니다. 이 인텐트로 멤버 이탈/재가입(`GuildMemberRemove`/`GuildMemberAdd`)을 감지해 건축권한을 자동 회수/복구합니다(웹 `/api/discord/membership`).
