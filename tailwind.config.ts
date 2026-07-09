@@ -15,6 +15,13 @@ export default {
         background: "var(--background)",
         foreground: "var(--foreground)",
       },
+      fontFamily: {
+        sans: [
+          "'Pretendard Variable'", 'Pretendard', '-apple-system', 'BlinkMacSystemFont',
+          'system-ui', 'Roboto', "'Helvetica Neue'", "'Segoe UI'", "'Apple SD Gothic Neo'",
+          "'Noto Sans KR'", "'Malgun Gothic'", "'Apple Color Emoji'", "'Segoe UI Emoji'", 'sans-serif',
+        ],
+      },
       keyframes: {
         shimmer: {
           '0%': { backgroundPosition: '200% center' },

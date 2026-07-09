@@ -50,6 +50,9 @@ next-env.d.ts
 *.db-wal
 *.db-shm
 /dev.db.pre-mc-*.bak
+# 타임스탬프 DB 백업(유저 데이터 스냅샷) — never commit
+/dev.db.bak
+/dev.db.bak-*
 /public/uploads/
 *.mp4
 *.zip
@@ -65,6 +68,12 @@ next-env.d.ts
 # DB backups (compressed .db.br snapshots + log) — never commit
 /backups/
 
+# 앱 로그 백업(PII 포함 가능) — never commit
+/log-backups/
+
+# Claude Code 로컬/개인 설정 — never commit
+/.claude/settings.local.json
+
 # Minecraft server (separate project, ~800MB world/jar data — never commit)
 /MC_SER/
 
@@ -74,3 +83,6 @@ next-env.d.ts
 
 # 외부 참고용 UI 라이브러리 사본 (자체 .git 보유 — 추적/린트 제외)
 /temp_animate_ui/
+
+# 외부 변환 도구 SchemConvert (GPL-3.0) — 3rd party 바이너리는 커밋 안 함(별도 다운로드/배치)
+/tools/*.jar
