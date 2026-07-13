@@ -25,9 +25,11 @@ icon: user-plus
 
 <div><figure><img src="../.gitbook/assets/image (5).png" alt=""><figcaption></figcaption></figure> <figure><img src="../.gitbook/assets/image (2).png" alt=""><figcaption></figcaption></figure></div>
 
-을 통해 다음과을같이 연동해주시기바랍니다.   \
+을 통해 다음과을같이 연동해주시기바랍니다.  &#x20;
+
 1\. **Discord 계정연동**\
-&#x20;        \- 서버참여필수 : [https://discord.gg/xbA5Y5QWf5](https://discord.gg/xbA5Y5QWf5)\
+&#x20;        \- 서버참여필수 : [https://discord.gg/xbA5Y5QWf5](https://discord.gg/xbA5Y5QWf5)
+
 2\. **Minecraft 계정연동**\
 &#x20;          \- 마이크로소프트 계정 ( 마인크래프트 Java Edition을 구매한 Xbox 계정 )
 

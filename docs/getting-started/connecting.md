@@ -30,7 +30,7 @@ icon: plug
 3. 연결되면 인게임 활동이 웹 대시보드에 자동 반영됩니다.
 
 {% hint style="info" %}
-서버 주소가 보이지 않으면 Discord 공지를 확인하거나 [문의](../community/help.md)해 주세요.
+서버 주소가 보이지 않으면 Discord 공지를 확인하거나 [문의](../undefined-4/help.md)해 주세요.
 {% endhint %}
 
 ***

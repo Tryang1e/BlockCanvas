@@ -19,8 +19,8 @@ icon: house
 | ----------------------------------- | ---------------- |
 | 🚀 [시작하기](getting-started/)         | 회원가입·계정 연동·서버 접속 |
 | 🏗️ [건축 공간](building/plots.md)      | 영토(플롯)·월드 클라우드   |
-| ⌨️ [인게임 명령어](reference/commands.md) | 자주 쓰는 명령어·등급     |
-| 💬 [커뮤니티](community/coins.md)       | 코인·규칙·문의         |
+| ⌨️ [인게임 명령어](undefined-3/commands/) | 자주 쓰는 명령어·등급     |
+| 💬 [커뮤니티](undefined-4/coins.md)     | 코인·규칙·문의         |
 
 ### 한눈에 보기
 

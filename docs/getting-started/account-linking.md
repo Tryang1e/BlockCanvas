@@ -23,6 +23,9 @@ icon: link
 
 Discord 로그인(OAuth)으로 연결하거나, 인게임 봇 명령어로 연동할 수 있습니다.
 
+단, **BLOCK CANVAS 디스코드 서버**에 가입해야합니다. \
+디스코드 서버주소 : [https://discord.gg/xbA5Y5QWf5](https://discord.gg/xbA5Y5QWf5)
+
 아래 사진과 같이 본인 계정에서 **승인**을 눌러주시기바랍니다.
 
 <figure><img src="../.gitbook/assets/image (7).png" alt="" width="306"><figcaption></figcaption></figure>
