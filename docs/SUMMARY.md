@@ -1,11 +1,11 @@
-# 목차
+# Table of contents
 
 * [소개](README.md)
 
 ## 시작하기
 
 * [개요](getting-started/README.md)
-* [회원가입](getting-started/signup.md)
+* [플랫폼 연동](getting-started/signup.md)
 * [계정 연동](getting-started/account-linking.md)
 * [서버 접속](getting-started/connecting.md)
 

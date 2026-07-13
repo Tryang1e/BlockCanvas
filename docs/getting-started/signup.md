@@ -1,11 +1,13 @@
 ---
-description: 이메일 또는 Discord로 BlockCanvas 계정 만들기
+description: Discord 서버연동, 마인크래프트 계정 연동, 웹 사이트 회원가입
 icon: user-plus
 ---
 
-# 회원가입
+# 플랫폼 연동
 
-두 가지 방법으로 가입할 수 있습니다. 어느 쪽으로 시작해도 이후 대시보드에서 나머지 계정을 연동할 수 있습니다.
+먼저, [http://auth.craftopia.work/](http://auth.craftopia.work/) 에서 본 사이트 회원가입을 진행합니다.
+
+<figure><img src="../.gitbook/assets/image.png" alt=""><figcaption></figcaption></figure>
 
 ## 📧 이메일로 가입
 
@@ -17,14 +19,19 @@ icon: user-plus
 비밀번호는 **10자 이상**이며 **특수문자를 포함**해야 합니다.
 {% endhint %}
 
-## 🎮 Discord로 가입
+이메일 가입이 완료되었다면,\
+\- [http://auth.craftopia.work/](http://auth.craftopia.work/) \
+\- 혹은, 내 개인 대시보드 → 외부 계정연동
 
-Discord 로그인 한 번으로 계정이 **자동 생성**됩니다. 커뮤니티(디스코드) 활동과 바로 연결되어 가장 편리합니다.
+<div><figure><img src="../.gitbook/assets/image (5).png" alt=""><figcaption></figcaption></figure> <figure><img src="../.gitbook/assets/image (2).png" alt=""><figcaption></figcaption></figure></div>
 
-{% hint style="info" %}
-가입을 진행하면 [이용약관](https://craftopia.work/terms)과 [개인정보처리방침](https://craftopia.work/privacy)에 동의하는 것으로 간주됩니다.
-{% endhint %}
+을 통해 다음과을같이 연동해주시기바랍니다.   \
+1\. **Discord 계정연동**\
+&#x20;        \- 서버참여필수 : [https://discord.gg/xbA5Y5QWf5](https://discord.gg/xbA5Y5QWf5)\
+2\. **Minecraft 계정연동**\
+&#x20;          \- 마이크로소프트 계정 ( 마인크래프트 Java Edition을 구매한 Xbox 계정 )
 
 ***
 
-다음: **[계정 연동](account-linking.md)** — 마인크래프트와 Discord를 연결하세요.
+자세히 보기: [**계정 연동**](account-linking.md) — 마인크래프트와 Discord를 연결하세요.
+
