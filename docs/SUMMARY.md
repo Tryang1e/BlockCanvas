@@ -17,9 +17,14 @@
 ## 건축 대시보드
 
 * [건축 대시보드](undefined-2/plots.md)
-* [건축 대시보드 ( 플롯 )](undefined-2/undefined.md)
+* [건축 대시보드 ( 플롯 )](undefined-2/undefined/README.md)
+  * [플롯 구매/삭제](undefined-2/undefined/undefined.md)
+  * [플롯 초대/추방/양도](undefined-2/undefined/undefined-1.md)
+  * [플롯 경매](undefined-2/undefined/undefined-2.md)
 * [건축 대시보드 ( 스키매틱 )](undefined-2/undefined-1.md)
-* [건축 대시보드 ( 월드 )](undefined-2/undefined-2.md)
+* [건축 대시보드 ( 월드 )](undefined-2/undefined-2/README.md)
+  * [월드 초대/추방/권한/양도](undefined-2/undefined-2/undefined.md)
+  * [월드 설정](undefined-2/undefined-2/undefined-1.md)
 
 ## 레퍼런스
 
@@ -30,5 +35,6 @@
 ## 커뮤니티
 
 * [코인](undefined-4/coins.md)
-* [규칙·매너](undefined-4/rules.md)
+* [BLOCK CANVAS 구독](undefined-4/rules.md)
+* [규칙·매너](undefined-4/rules-1.md)
 * [도움말·문의](undefined-4/help.md)

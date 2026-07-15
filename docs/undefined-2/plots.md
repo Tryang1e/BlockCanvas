@@ -15,7 +15,7 @@ icon: globe-pointer
 
 **초록색 영역** ............... 본인의 플롯 혹은 월드의 정보를 확인 할 수 있습니다.
 
-## 개요
+## 사이드 탭
 
 <table><thead><tr><th width="140.39996337890625">사이드 탭</th><th>기능 설명</th></tr></thead><tbody><tr><td>초대 차단</td><td>누군가 당신을 플롯, 월드, 스키메틱에 초대할 수 없게됩니다.</td></tr><tr><td>내 플롯</td><td>본인이 보유한 플롯 혹은 초대된 플롯을 확인할 수 있습니다.</td></tr><tr><td>스키매틱</td><td><code>//schem save</code> 또는 <code>//schem load</code> , <a href="http://craftopia.work/gallery">Blueprint Gallery</a>를 통해 다운받은 스키매틱파일과 블루프린트를 저장 및 확인 할 수 있습니다.</td></tr><tr><td>내 월드</td><td>본인이 보유한 월드 또는 초대된 월드를 확인 할 수 있고, 월드를 생성 할 수 있습니다.</td></tr></tbody></table>
 
