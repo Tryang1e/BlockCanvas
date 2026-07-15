@@ -19,7 +19,7 @@ icon: coins
 
 또한, 경매 시스템을 이용해 재화 수급을 늘릴 수 있습니다.&#x20;
 
-<table><thead><tr><th width="233.7999267578125">판매</th><th>설명</th></tr></thead><tbody><tr><td>플롯 경매 시스템(코인)</td><td>게임 내에 플롯을 경매에 올릴 수 있으며 관련한 사항은 <a data-mention href="../undefined-2/undefined/">undefined</a>을 확인해주세요.</td></tr><tr><td>블루 프린트 판매 시스템(코인)</td><td>본인의 저작물.schem과 .bp를 타인에게 코인을 받고 판매할 수 있습니다. 관련 판매처는 <a href="https://craftopia.work/gallery">https://craftopia.work/gallery</a> 을 확인해주세요.</td></tr></tbody></table>
+<table><thead><tr><th width="233.7999267578125">판매</th><th>설명</th></tr></thead><tbody><tr><td>플롯 경매 시스템(코인)</td><td>게임 내에 플롯을 경매에 올릴 수 있으며 관련한 사항은 <a data-mention href="../dashboard/plot/">plot</a>을 확인해주세요.</td></tr><tr><td>블루 프린트 판매 시스템(코인)</td><td>본인의 저작물.schem과 .bp를 타인에게 코인을 받고 판매할 수 있습니다. 관련 판매처는 <a href="https://craftopia.work/gallery">https://craftopia.work/gallery</a> 을 확인해주세요.</td></tr></tbody></table>
 
 {% hint style="info" %}
 코인 적립·송금·구매는 **플랫폼 연동**이 되어 있어야 합니다.
@@ -29,7 +29,7 @@ icon: coins
 
 웹 대시보드의 **\[상점]** 에서 모은 코인으로 닉네임변경권, 구독권, 플롯확장권을 구매할수있습니다.    &#x20;
 
-<table><thead><tr><th width="233.7999267578125">판매</th><th width="139">가격 (코인)</th><th>설명</th></tr></thead><tbody><tr><td>BLOCK CANVAS 서버 구독권</td><td>50000</td><td>Block Canvas 내 구독을 진행 할 수 있습니다. 구독혜택의 경우 <a data-mention href="rules/">rules</a> 참고해주세요.</td></tr><tr><td>닉네임 변경권</td><td>10000</td><td>2~5글자이내로 닉네임을 변경할 수 있습니다.</td></tr><tr><td>플롯 최대 구매 확장권</td><td>300 * (2^(n-1)) </td><td>첫 구매 300코인으로 다음 구매 600코인 그 다음 구매 1200코인처럼 2의 배수로 상승됩니다.</td></tr></tbody></table>
+<table><thead><tr><th width="233.7999267578125">판매</th><th width="139">가격 (코인)</th><th>설명</th></tr></thead><tbody><tr><td>BLOCK CANVAS 서버 구독권</td><td>50000</td><td>Block Canvas 내 구독을 진행 할 수 있습니다. 구독혜택의 경우 <a data-mention href="subscribe/">subscribe</a> 참고해주세요.</td></tr><tr><td>닉네임 변경권</td><td>10000</td><td>2~5글자이내로 닉네임을 변경할 수 있습니다.</td></tr><tr><td>플롯 최대 구매 확장권</td><td>300 * (2^(n-1)) </td><td>첫 구매 300코인으로 다음 구매 600코인 그 다음 구매 1200코인처럼 2의 배수로 상승됩니다.</td></tr></tbody></table>
 
 {% hint style="warning" %}
 보상을 노린 어뷰징(다중계정·반복 반응·담합)은 [이용약관 제7·9조](https://craftopia.work/terms)에 따라 제한되며, 적발 시 보상 회수·제재 대상이 됩니다.

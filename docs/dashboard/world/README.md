@@ -7,7 +7,7 @@ icon: hard-drive
 
 월드의 경우 본인 건축대시보드의 사이드탭에서 확인할 수 있습니다.
 
-본인 월드의 최대용량은 [ranks.md](../../undefined-3/ranks.md "mention")을 확인하세요.
+본인 월드의 최대용량은 [ranks.md](../../undefined-1/ranks.md "mention")을 확인하세요.
 
 <figure><img src="../../.gitbook/assets/image (51).png" alt="" width="221"><figcaption></figcaption></figure>
 

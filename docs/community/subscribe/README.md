@@ -11,8 +11,8 @@ icon: layer-plus
 
 구독 방법은 다음과 같습니다.
 
-{% content-ref url="block-canvas.md" %}
-[block-canvas.md](block-canvas.md)
+{% content-ref url="subscribing.md" %}
+[subscribing.md](subscribing.md)
 {% endcontent-ref %}
 
 
