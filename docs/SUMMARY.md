@@ -35,6 +35,7 @@
 ## 커뮤니티
 
 * [코인](undefined-4/coins.md)
-* [BLOCK CANVAS 구독](undefined-4/rules.md)
+* [BLOCK CANVAS 구독](undefined-4/rules/README.md)
+  * [Block Canvas 구독 방법](undefined-4/rules/block-canvas.md)
 * [규칙·매너](undefined-4/rules-1.md)
 * [도움말·문의](undefined-4/help.md)
