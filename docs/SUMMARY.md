@@ -35,7 +35,7 @@
 ## 커뮤니티 <a href="#community" id="community"></a>
 
 * [코인](community/coins.md)
-* [BLOCK CANVAS 구독](community/subscribe/README.md)
+* [BLOCK CANVAS 맴버십](community/subscribe/README.md)
   * [Block Canvas 구독 방법](community/subscribe/subscribing.md)
 * [규칙·매너](community/rules.md)
 * [도움말·문의](community/help.md)
